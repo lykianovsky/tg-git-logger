@@ -21,6 +21,7 @@ mod workflow;
 pub fn create_router() -> Router {
     let token = ENV.get("TELEGRAM_BOT_TOKEN");
     let chat_id: i64 = ENV.get("TELEGRAM_CHAT_ID").parse().unwrap();
+
     let telegram_bot: Arc<dyn TelegramBot> = Arc::new(TelegramHttpClient::new(token));
     let telegram_adapter: Arc<dyn Notifier> =
         Arc::new(TelegramNotifierAdapter::new(telegram_bot, chat_id));

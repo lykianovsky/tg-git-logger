@@ -1,15 +1,29 @@
 use crate::config::environment::ENV;
 use crate::server::http::handlers::create_application_routes;
+use axum::Router;
 use tracing_subscriber;
 
 pub mod handlers;
 
 pub async fn run(port: &str) {
-    tracing_subscriber::fmt::init();
+    let is_debug_enabled: bool = ENV.get("DEBUG").parse().unwrap();
+
+    let debug_filter: &str = if is_debug_enabled { "debug" } else { "info" };
+
+    tracing_subscriber::fmt()
+        .with_env_filter(debug_filter)
+        .with_span_events(
+            tracing_subscriber::fmt::format::FmtSpan::ENTER
+                | tracing_subscriber::fmt::format::FmtSpan::EXIT,
+        )
+        .with_target(true)
+        .with_file(true)
+        .with_line_number(is_debug_enabled)
+        .init();
 
     tracing::info!("Preparing application router...");
 
-    let application_router = create_application_routes();
+    let application_router: Router = create_application_routes();
 
     tracing::info!("Application routes have been created successfully!");
     tracing::info!("Starting listener on 127.0.0.1:{}...", port);
@@ -26,7 +40,7 @@ pub async fn run(port: &str) {
 
     if secret == "" {
         tracing::warn!(
-            "GITHUB_WEBHOOK_SECRET is empty. If you use this in production more please, add this environment"
+            "!!! GITHUB_WEBHOOK_SECRET is empty. If you use this in production more please, add this environment !!!"
         );
     }
 

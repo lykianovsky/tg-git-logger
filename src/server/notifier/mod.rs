@@ -8,19 +8,17 @@ pub struct NotifierService {
 }
 
 impl NotifierService {
-    // Конструктор, как в TypeScript
     pub fn new(client: Arc<dyn Notifier>) -> Self {
         Self { client }
     }
 
-    // Fire-and-forget версия (не ждем результата)
-    pub fn notify_async(&self, message: &MessageBuilder) {
+    pub fn notify_async(&self, message: Arc<MessageBuilder>) {
         let client = Arc::clone(&self.client);
-        let message_string = message.clone();
+        let message = Arc::clone(&message);
 
         tokio::spawn(async move {
-            if let Err(e) = client.notify(&message_string).await {
-                eprintln!("Failed to send notification: {}", e);
+            if let Err(e) = client.notify(&message).await {
+                tracing::error!("Failed to send notification: {}", e);
             }
         });
     }

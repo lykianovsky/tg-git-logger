@@ -34,36 +34,72 @@ impl GithubWebhookController {
     }
 
     pub fn handle(&self, headers: HeaderMap, body: Bytes) -> StatusCode {
+        tracing::debug!(
+            headers = ?headers,
+            body_size = body.len(),
+            "Incoming GitHub webhook request"
+        );
+
         let raw_event_type = match headers
             .get(GithubHeaders::EVENT)
             .and_then(|header_value| header_value.to_str().ok())
         {
-            Some(v) => v,
+            Some(value) => value,
             None => {
-                tracing::error!("Failed to read {} from GitHub header", GithubHeaders::EVENT);
+                tracing::error!(header = GithubHeaders::EVENT, "Missing GitHub event header");
                 return StatusCode::FORBIDDEN;
             }
         };
 
-        tracing::info!("Got event from webhook: {}", raw_event_type);
+        tracing::info!(event = raw_event_type, "GitHub webhook raw event received");
 
         let event_name = GithubEventName::from_str(raw_event_type)
             .unwrap_or(GithubEventName::Unknown(raw_event_type.to_string()));
 
+        tracing::debug!(
+            parsed_event = ?event_name,
+            "Parsed GitHub event name"
+        );
+
         let payload: Value = match serde_json::from_slice(&body) {
-            Ok(v) => v,
-            Err(_) => return StatusCode::BAD_REQUEST,
+            Ok(value) => {
+                tracing::trace!("Payload JSON parsed successfully");
+                value
+            }
+            Err(error) => {
+                tracing::error!(
+                    error = %error,
+                    "Failed to parse webhook payload JSON"
+                );
+                return StatusCode::INTERNAL_SERVER_ERROR;
+            }
         };
 
-        match event_name {
+        let status = match event_name {
             GithubEventName::Push => self.service.handle::<PushEvent>(payload),
             GithubEventName::PullRequest => self.service.handle::<PullRequestEvent>(payload),
             GithubEventName::Release => self.service.handle::<ReleaseEvent>(payload),
             GithubEventName::Workflow => self.service.handle::<WorkflowEvent>(payload),
             GithubEventName::Issues => StatusCode::NO_CONTENT,
-            GithubEventName::Ping => StatusCode::NO_CONTENT,
-            GithubEventName::Unknown(_) => StatusCode::FORBIDDEN,
-        }
+            GithubEventName::Ping => {
+                tracing::debug!("Ping event received");
+                StatusCode::NO_CONTENT
+            }
+            GithubEventName::Unknown(name) => {
+                tracing::warn!(
+                    event = %name,
+                    "Unknown GitHub event type"
+                );
+                StatusCode::FORBIDDEN
+            }
+        };
+
+        tracing::debug!(
+            status = %status,
+            "Webhook handled"
+        );
+
+        status
     }
 }
 
