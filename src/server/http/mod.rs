@@ -26,15 +26,15 @@ pub async fn run(port: &str) {
     let application_router: Router = create_application_routes();
 
     tracing::info!("Application routes have been created successfully!");
-    tracing::info!("Starting listener on 127.0.0.1:{}...", port);
+    tracing::info!("Starting listener on {} port", port);
 
-    let listener = tokio::net::TcpListener::bind(format!("127.0.0.1:{}", port))
+    let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", port))
         .await
         .unwrap_or_else(|err| {
             panic!("Failed to bind TCP listener on port {}: {}", port, err);
         });
 
-    tracing::info!("Server started successfully on 127.0.0.1:{}", port);
+    tracing::info!("Server started successfully on {} port", port);
 
     let secret = ENV.get_or("GITHUB_WEBHOOK_SECRET", "");
 
