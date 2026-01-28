@@ -28,7 +28,6 @@ impl FromStr for GithubEventName {
             "issues" => Ok(GithubEventName::Issues),
             "release" => Ok(GithubEventName::Release),
             "workflow_run" => Ok(GithubEventName::Workflow),
-            "workflow_job" => Ok(GithubEventName::Workflow),
             other => Ok(GithubEventName::Unknown(other.to_string())),
         }
     }
