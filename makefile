@@ -8,4 +8,4 @@ prod-build:
 	cargo build --release
 
 prod-run:
-	./target/release/tg-bot-logger
+	git pull && make prod-build && ./target/release/tg-bot-logger
