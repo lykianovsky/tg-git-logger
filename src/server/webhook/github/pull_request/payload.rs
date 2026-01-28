@@ -1,5 +1,6 @@
 use crate::server::webhook::github::events::GithubEvent;
 use crate::utils::notifier::message_builder::MessageBuilder;
+use crate::utils::task_link;
 use chrono::{DateTime, Local};
 use serde::Deserialize;
 use serde_json::Value;
@@ -95,7 +96,10 @@ impl PullRequestEvent {
         builder = builder.section_bold("👤 Автор PR", &self.pull_request.user.login);
 
         // Заголовок PR
-        builder = builder.section_code("📝 Заголовок PR", &self.pull_request.title);
+        builder = builder.section_code(
+            "📝 Заголовок PR",
+            &task_link::linkify(self.pull_request.title.as_str()),
+        );
 
         // Ссылка на PR
         builder = builder.section(

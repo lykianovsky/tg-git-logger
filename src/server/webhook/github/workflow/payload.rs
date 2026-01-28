@@ -92,7 +92,7 @@ impl WorkflowEvent {
             "in_progress" => "🏃 Workflow выполняется".to_string(),
             "completed" => {
                 let conclusion = self
-                    .workflow_job
+                    .workflow_run
                     .as_ref()
                     .and_then(|w| w.conclusion.as_deref())
                     .unwrap_or("unknown");
