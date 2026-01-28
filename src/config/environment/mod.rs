@@ -20,6 +20,10 @@ impl Environment {
 
         return env::var(name).expect(exception_message);
     }
+
+    pub fn get_or(&self, name: &str, default: &str) -> String {
+        env::var(name).unwrap_or_else(|_| default.to_string())
+    }
 }
 
 pub static ENV: Lazy<Environment> = Lazy::new(|| {

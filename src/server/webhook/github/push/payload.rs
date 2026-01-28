@@ -86,15 +86,15 @@ impl PushEvent {
     }
 
     fn title(&self) -> &'static str {
-        if (self.deleted.unwrap_or(false)) {
+        if self.deleted.unwrap_or(false) {
             return "🗑️ Ветка удалена";
         }
 
-        if (self.created.unwrap_or(false)) {
+        if self.created.unwrap_or(false) {
             return "🌱 Новая ветка создана";
         }
 
-        if (self.forced.unwrap_or(false)) {
+        if self.forced.unwrap_or(false) {
             return "⚠️ Принудительные изменения";
         }
 

@@ -11,7 +11,11 @@ use std::sync::Arc;
 type HmacSha256 = Hmac<Sha256>;
 
 pub async fn handle(mut request: Request<Body>, next: Next) -> Result<Response, StatusCode> {
-    let secret = ENV.get("GITHUB_WEBHOOK_SECRET");
+    let secret = ENV.get_or("GITHUB_WEBHOOK_SECRET", "");
+
+    if (secret == "") {
+        return Ok(next.run(request).await);
+    }
 
     let signature = request
         .headers()
