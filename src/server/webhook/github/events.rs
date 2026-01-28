@@ -1,5 +1,11 @@
 use std::str::FromStr;
 
+use crate::utils::notifier::message_builder::MessageBuilder;
+
+pub trait GithubEvent {
+    fn build(&self) -> MessageBuilder;
+}
+
 #[derive(Debug)]
 pub enum GithubEventName {
     Ping,
@@ -7,6 +13,7 @@ pub enum GithubEventName {
     PullRequest,
     Issues,
     Release,
+    Workflow,
     Unknown(String),
 }
 
@@ -20,6 +27,8 @@ impl FromStr for GithubEventName {
             "pull_request" => Ok(GithubEventName::PullRequest),
             "issues" => Ok(GithubEventName::Issues),
             "release" => Ok(GithubEventName::Release),
+            "workflow_run" => Ok(GithubEventName::Workflow),
+            "workflow_job" => Ok(GithubEventName::Workflow),
             other => Ok(GithubEventName::Unknown(other.to_string())),
         }
     }

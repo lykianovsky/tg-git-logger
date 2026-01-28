@@ -1,5 +1,5 @@
-use crate::client::notifier::message_builder::MessageBuilder;
-use crate::client::notifier::Notifier;
+use crate::utils::notifier::message_builder::MessageBuilder;
+use crate::utils::notifier::Notifier;
 use std::sync::Arc;
 
 #[derive(Clone)]

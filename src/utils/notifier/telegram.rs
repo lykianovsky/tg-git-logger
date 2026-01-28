@@ -1,7 +1,7 @@
-use crate::client::notifier::Notifier;
 use crate::client::telegram::bot::TelegramBot;
+use crate::utils::notifier::Notifier;
 
-use crate::client::notifier::message_builder::MessageBuilder;
+use crate::utils::notifier::message_builder::MessageBuilder;
 use async_trait::async_trait;
 use std::sync::Arc;
 

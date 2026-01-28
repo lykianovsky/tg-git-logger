@@ -1,6 +1,7 @@
-use crate::client::notifier::message_builder::MessageBuilder;
+use crate::server::webhook::github::events::GithubEvent;
+use crate::utils::notifier::message_builder::MessageBuilder;
+use crate::utils::task_link;
 use chrono::{DateTime, Local};
-use regex::Regex;
 use serde::Deserialize;
 use serde_json::Value;
 
@@ -78,21 +79,26 @@ impl PushEvent {
     fn format_commit_time(&self) -> Option<String> {
         let ts = self.head_commit.as_ref()?.timestamp.as_ref()?;
 
-        DateTime::parse_from_rfc3339(ts).ok().map(|dt| {
+        return DateTime::parse_from_rfc3339(ts).ok().map(|dt| {
             let local: DateTime<Local> = dt.with_timezone(&Local);
             local.format("%d.%m.%Y %H:%M:%S").to_string()
-        })
+        });
     }
 
-    fn linkify_kaiten(text: &str) -> String {
-        // Regex создаём один раз на вызов — этого более чем достаточно
-        let re = Regex::new(r"\bZB-(\d+)\b").unwrap();
+    fn title(&self) -> &'static str {
+        if (self.deleted.unwrap_or(false)) {
+            return "🗑️ Ветка удалена";
+        }
 
-        re.replace_all(text, |caps: &regex::Captures| {
-            let id = &caps[1];
-            format!("<a href=\"https://zhilibyli.kaiten.ru/space/{id}\">ZB-{id}</a>")
-        })
-        .to_string()
+        if (self.created.unwrap_or(false)) {
+            return "🌱 Новая ветка создана";
+        }
+
+        if (self.forced.unwrap_or(false)) {
+            return "⚠️ Принудительные изменения";
+        }
+
+        return "🚀 Новые изменения";
     }
 
     pub fn build(&self) -> MessageBuilder {
@@ -105,18 +111,7 @@ impl PushEvent {
 
         let mut builder = MessageBuilder::new().with_html_escape(true);
 
-        // ===== Заголовок события =====
-        let event_title = if self.deleted.unwrap_or(false) {
-            "🗑️ Ветка удалена"
-        } else if self.created.unwrap_or(false) {
-            "🌱 Новая ветка создана"
-        } else if self.forced.unwrap_or(false) {
-            "⚠️ Принудительные изменения"
-        } else {
-            "🚀 Новые изменения"
-        };
-
-        builder = builder.bold(event_title);
+        builder = builder.bold(self.title());
 
         // ===== Время =====
         if let Some(time) = self.format_commit_time() {
@@ -161,7 +156,7 @@ impl PushEvent {
                     .unwrap_or("unknown");
 
                 let raw_message = commit.message.lines().next().unwrap_or("");
-                let message = Self::linkify_kaiten(raw_message);
+                let message = task_link::linkify(raw_message);
 
                 builder = builder.line(&format!(
                     "• <code>{}</code> — {} <i>({})</i>",
@@ -186,5 +181,11 @@ impl PushEvent {
         }
 
         builder
+    }
+}
+
+impl GithubEvent for PushEvent {
+    fn build(&self) -> MessageBuilder {
+        self.build()
     }
 }

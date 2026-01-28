@@ -1,0 +1,16 @@
+use crate::config::environment::ENV;
+use regex::Regex;
+
+pub fn linkify(text: &str) -> String {
+    let pattern = ENV.get("TASK_TRACKER_REGEXP");
+    let regex = Regex::new(pattern.as_str()).unwrap();
+
+    regex
+        .replace_all(text, |caps: &regex::Captures| {
+            let original_text = &caps[0];
+            let id = &caps[1]; // цифры из группы
+            let link = ENV.get("TASK_TRACKER_LINK").replace("{%s}", id);
+            format!("<a href=\"{}\">{}</a>", link, original_text)
+        })
+        .to_string()
+}

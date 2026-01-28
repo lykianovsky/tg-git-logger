@@ -1,7 +1,7 @@
 pub mod message_builder;
 pub mod telegram;
 
-use crate::client::notifier::message_builder::MessageBuilder;
+use crate::utils::notifier::message_builder::MessageBuilder;
 use async_trait::async_trait;
 
 #[async_trait]

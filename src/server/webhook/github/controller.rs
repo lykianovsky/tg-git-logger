@@ -1,5 +1,9 @@
 use crate::server::webhook::github::events::GithubEventName;
+use crate::server::webhook::github::pull_request::payload::PullRequestEvent;
+use crate::server::webhook::github::push::payload::PushEvent;
+use crate::server::webhook::github::release::payload::ReleaseEvent;
 use crate::server::webhook::github::service::GithubWebhookService;
+use crate::server::webhook::github::workflow::payload::WorkflowEvent;
 use axum::body::Bytes;
 use axum::extract::State;
 use axum::http::HeaderMap;
@@ -52,10 +56,11 @@ impl GithubWebhookController {
         };
 
         match event_name {
-            GithubEventName::Push => self.service.handle_push(payload),
-            GithubEventName::PullRequest => StatusCode::NO_CONTENT,
+            GithubEventName::Push => self.service.handle::<PushEvent>(payload),
+            GithubEventName::PullRequest => self.service.handle::<PullRequestEvent>(payload),
+            GithubEventName::Release => self.service.handle::<ReleaseEvent>(payload),
+            GithubEventName::Workflow => self.service.handle::<WorkflowEvent>(payload),
             GithubEventName::Issues => StatusCode::NO_CONTENT,
-            GithubEventName::Release => StatusCode::NO_CONTENT,
             GithubEventName::Ping => StatusCode::NO_CONTENT,
             GithubEventName::Unknown(_) => StatusCode::FORBIDDEN,
         }

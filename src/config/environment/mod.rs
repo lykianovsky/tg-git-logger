@@ -17,6 +17,7 @@ impl Environment {
             "Environment: {name} is not defined in environment file {}",
             self.filename
         );
+
         return env::var(name).expect(exception_message);
     }
 }
