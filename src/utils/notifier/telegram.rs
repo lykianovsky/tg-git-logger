@@ -27,7 +27,6 @@ impl Notifier for TelegramNotifierAdapter {
             .await
             .map_err(|e| e.to_string())?;
 
-        // Проверяем успешность ответа
         Ok(())
     }
 

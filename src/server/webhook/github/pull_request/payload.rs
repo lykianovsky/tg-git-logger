@@ -96,7 +96,7 @@ impl PullRequestEvent {
         builder = builder.section_bold("👤 Автор PR", &self.pull_request.user.login);
 
         // Заголовок PR
-        builder = builder.section_code(
+        builder = builder.section(
             "📝 Заголовок PR",
             &task_link::linkify(self.pull_request.title.as_str()),
         );
