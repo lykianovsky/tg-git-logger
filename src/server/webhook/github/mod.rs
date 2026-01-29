@@ -1,6 +1,4 @@
 use crate::client::task_tracker::TaskTrackerClient;
-use crate::client::telegram::bot::TelegramBot;
-use crate::client::telegram::client::TelegramHttpClient;
 use crate::config::environment::ENV;
 use crate::server::notifier::NotifierService;
 use crate::server::task_tracker::TaskTrackerService;
@@ -23,13 +21,7 @@ mod workflow;
 pub fn create_router() -> Router {
     let chat_id: i64 = ENV.get("TELEGRAM_CHAT_ID").parse().unwrap();
 
-    let telegram_bot: Arc<dyn TelegramBot> = Arc::new(TelegramHttpClient::new(
-        ENV.get("TELEGRAM_URL_BASE"),
-        ENV.get("TELEGRAM_BOT_TOKEN"),
-    ));
-
-    let telegram_adapter: Arc<dyn Notifier> =
-        Arc::new(TelegramNotifierAdapter::new(telegram_bot, chat_id));
+    let telegram_adapter: Arc<dyn Notifier> = Arc::new(TelegramNotifierAdapter::new(chat_id));
 
     let notifier = Arc::new(NotifierService::new(telegram_adapter));
 

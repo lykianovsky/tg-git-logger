@@ -1,31 +1,32 @@
-use crate::client::telegram::bot::TelegramBot;
 use crate::utils::notifier::Notifier;
 
+use crate::client::telegram::TELEGRAM_BOT;
 use crate::utils::notifier::message_builder::MessageBuilder;
 use async_trait::async_trait;
-use std::sync::Arc;
+use teloxide::payloads::SendMessageSetters;
+use teloxide::requests::Requester;
+use teloxide::types::{ParseMode, Recipient};
 
 pub struct TelegramNotifierAdapter {
-    bot: Arc<dyn TelegramBot>,
     default_chat_id: i64,
 }
 
 impl TelegramNotifierAdapter {
-    pub fn new(bot: Arc<dyn TelegramBot>, default_chat_id: i64) -> Self {
-        Self {
-            bot,
-            default_chat_id,
-        }
+    pub fn new(default_chat_id: i64) -> Self {
+        Self { default_chat_id }
     }
 }
 
 #[async_trait]
 impl Notifier for TelegramNotifierAdapter {
     async fn send_message(&self, chat_id: i64, text: &MessageBuilder) -> Result<(), String> {
-        self.bot
-            .send_message(chat_id, text.to_string().as_str())
-            .await
-            .map_err(|e| e.to_string())?;
+        let _ = TELEGRAM_BOT
+            .send_message(
+                Recipient::Id(teloxide::prelude::ChatId(chat_id)),
+                text.to_string(),
+            )
+            .parse_mode(ParseMode::Html)
+            .await;
 
         Ok(())
     }

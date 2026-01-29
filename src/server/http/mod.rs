@@ -1,6 +1,8 @@
 use crate::config::environment::ENV;
 use crate::server::http::handlers::create_application_routes;
 use axum::Router;
+use teloxide::prelude::Requester;
+use teloxide::Bot;
 use tracing_subscriber;
 
 pub mod handlers;

@@ -7,5 +7,6 @@ mod utils;
 async fn main() {
     let port = config::environment::ENV.get("APPLICATION_PORT");
 
+    server::telegram_bot::run();
     server::http::run(port.as_str()).await;
 }
