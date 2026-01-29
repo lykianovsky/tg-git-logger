@@ -1,6 +1,6 @@
+use crate::server::task_tracker::TaskTrackerService;
 use crate::server::webhook::github::events::GithubEvent;
 use crate::utils::notifier::message_builder::MessageBuilder;
-use crate::utils::task_link;
 use chrono::{DateTime, Local};
 use serde::Deserialize;
 use serde_json::Value;
@@ -161,8 +161,10 @@ impl WorkflowEvent {
         // Commit info
         if let Some(run) = &self.workflow_run {
             if let Some(commit) = &run.head_commit {
-                builder =
-                    builder.section("📝 Сообщение", &task_link::linkify(commit.message.as_str()));
+                builder = builder.section(
+                    "📝 Сообщение",
+                    &TaskTrackerService::linkify(commit.message.as_str()),
+                );
             }
         }
 

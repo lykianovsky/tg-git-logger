@@ -1,6 +1,6 @@
+use crate::server::task_tracker::TaskTrackerService;
 use crate::server::webhook::github::events::GithubEvent;
 use crate::utils::notifier::message_builder::MessageBuilder;
-use crate::utils::task_link;
 use chrono::{DateTime, Local};
 use serde::Deserialize;
 use serde_json::Value;
@@ -111,7 +111,7 @@ impl PullRequestEvent {
         let mut builder = MessageBuilder::new().with_html_escape(true);
 
         // ===== Заголовок =====
-        let mut title = format!("{} #{}", self.title(), self.number);
+        let title = format!("{} #{}", self.title(), self.number);
         builder = builder.bold(&title);
 
         // ===== Draft =====
@@ -127,7 +127,7 @@ impl PullRequestEvent {
         // ===== Заголовок PR =====
         builder = builder.section(
             "📝 Заголовок PR",
-            &task_link::linkify(self.pull_request.title.as_str()),
+            &TaskTrackerService::linkify(self.pull_request.title.as_str()),
         );
 
         builder = builder.empty_line();

@@ -1,5 +1,4 @@
 use crate::client::telegram::client::TelegramHttpClient;
-use crate::config::environment::ENV;
 use async_trait::async_trait;
 use serde::Serialize;
 
@@ -26,8 +25,7 @@ impl TelegramBot for TelegramHttpClient {
         chat_id: i64,
         text: &str,
     ) -> Result<reqwest::Response, reqwest::Error> {
-        let base = ENV.get("TELEGRAM_URL_BASE");
-        let url = format!("{base}/bot{}/sendMessage", self.token);
+        let url = format!("{}/bot{}/sendMessage", self.base, self.token);
 
         let request_body = SendMessageRequest {
             chat_id,

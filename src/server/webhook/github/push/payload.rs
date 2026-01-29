@@ -1,6 +1,6 @@
+use crate::server::task_tracker::TaskTrackerService;
 use crate::server::webhook::github::events::GithubEvent;
 use crate::utils::notifier::message_builder::MessageBuilder;
-use crate::utils::task_link;
 use chrono::{DateTime, Local};
 use serde::Deserialize;
 use serde_json::Value;
@@ -156,7 +156,7 @@ impl PushEvent {
                     .unwrap_or("unknown");
 
                 let raw_message = commit.message.lines().next().unwrap_or("");
-                let message = task_link::linkify(raw_message);
+                let message = TaskTrackerService::linkify(raw_message);
 
                 builder = builder.line(&format!(
                     "• <code>{}</code> — {} <i>({})</i>",
