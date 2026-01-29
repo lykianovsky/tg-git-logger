@@ -51,6 +51,15 @@ impl PullRequestHandler {
     }
 
     fn on_merged(&self, event: &PullRequestEvent) {
+        if event.pull_request.base.ref_field != "dev" {
+            tracing::info!(
+                "PR #{} слит в ветку {}, карточка не перемещается",
+                event.number,
+                event.pull_request.base.ref_field
+            );
+            return;
+        }
+
         let client = Arc::clone(&self.task_tracker.client);
         let notifier = Arc::clone(&self.notifier);
 
