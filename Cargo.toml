@@ -3,6 +3,9 @@ name = "tg-bot-logger"
 version = "0.1.0"
 edition = "2024"
 
+[workspace]
+members = [".", "migration"]
+
 [dependencies]
 tokio = { version = "1.35", features = ["full"] }
 axum = "0.7"
@@ -19,4 +22,13 @@ async-trait = "0.1.89"
 chrono = "0.4.43"
 regex = "1.12.2"
 hex = "0.4"
-teloxide = { version = "0.13", features = ["macros"] }
+teloxide = { version = "0.17.0", features = ["macros"] }
+
+# SeaORM
+sea-orm = { version = "1.1.19", features = [
+    "sqlx-mysql",
+    "runtime-tokio-native-tls",
+    "macros",
+] }
+migration = { path = "migration" }
+thiserror = "2.0.18"
