@@ -1,15 +1,14 @@
 version: "3.9"
 
 services:
-  rust-dev:
-    build: .
+  rust-app:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
     volumes:
-      - .:/usr/src/app             # монтируем код
-      - cargo-target:/usr/src/app/target  # кэш сборки
+      - .env.local:/usr/src/app/.env.local:ro
     ports:
       - "${APPLICATION_PORT}:${APPLICATION_PORT}"
-    stdin_open: true
-    tty: true
     depends_on:
       - db
       - rabbitmq
@@ -32,12 +31,11 @@ services:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
     ports:
-      - "${RABBITMQ_PORT}:5672"        # основной порт AMQP
-      - "${RABBITMQ_MANAGEMENT_PORT}:15672" # веб-менеджмент
+      - "${RABBITMQ_PORT}:5672"
+      - "${RABBITMQ_MANAGEMENT_PORT}:15672"
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq
 
 volumes:
-  cargo-target:
   mysql-data:
   rabbitmq-data:

@@ -3,15 +3,19 @@ name = "tg-bot-logger"
 version = "0.1.0"
 edition = "2024"
 
+[profile.release]
+opt-level = 2
+lto = false
+
 [workspace]
 members = [".", "migration"]
 
 [dependencies]
 tokio = { version = "1.35", features = ["full"] }
-axum = "0.7"
+axum = "0.8.8"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-reqwest = { version = "0.12", features = ["json", "blocking"] }
+reqwest = { version = "0.12", features = ["json", "blocking", "rustls-tls"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 dotenv = "0.15"
