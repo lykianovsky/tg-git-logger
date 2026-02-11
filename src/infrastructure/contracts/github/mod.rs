@@ -1,4 +1,4 @@
-pub mod events;
+pub mod event_type;
 pub mod headers;
-pub mod oauth;
+pub mod mapper;
 pub mod payloads;

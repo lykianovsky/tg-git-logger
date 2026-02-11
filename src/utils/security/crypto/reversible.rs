@@ -27,6 +27,9 @@ pub enum CipherError {
     InvalidUtf8(#[from] std::string::FromUtf8Error),
 }
 
+#[derive(Debug, Clone)]
+pub struct ReversibleCipherValue(String);
+
 pub struct ReversibleCipher {
     cipher: Aes256Gcm,
 }
@@ -56,7 +59,7 @@ impl ReversibleCipher {
         Self { cipher }
     }
 
-    pub fn encrypt(&self, plaintext: &str) -> Result<String, CipherError> {
+    pub fn encrypt(&self, plaintext: &str) -> Result<ReversibleCipherValue, CipherError> {
         let mut nonce_bytes = [0u8; 12];
         rand::thread_rng().fill_bytes(&mut nonce_bytes);
         let nonce = Nonce::from(nonce_bytes);
@@ -69,7 +72,9 @@ impl ReversibleCipher {
         let mut result = nonce_bytes.to_vec();
         result.extend_from_slice(&ciphertext);
 
-        Ok(general_purpose::STANDARD.encode(result))
+        Ok(ReversibleCipherValue(
+            general_purpose::STANDARD.encode(result),
+        ))
     }
 
     pub fn decrypt(&self, encrypted: &str) -> Result<String, CipherError> {

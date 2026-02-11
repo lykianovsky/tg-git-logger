@@ -2,12 +2,9 @@ pub use sea_orm_migration::prelude::*;
 
 mod m001_create_users;
 mod m002_create_roles;
-mod m003_create_user_roles;
-mod m004_create_github_accounts;
-mod m005_create_telegram_accounts;
-mod m006_create_repositories;
-mod m007_create_repository_users;
-mod m008_create_repository_settings;
+mod m003_create_user_has_role;
+mod m004_create_user_socials_services;
+mod m005_create_user_version_control_services;
 
 pub struct Migrator;
 
@@ -17,12 +14,9 @@ impl MigratorTrait for Migrator {
         vec![
             Box::new(m001_create_users::Migration),
             Box::new(m002_create_roles::Migration),
-            Box::new(m003_create_user_roles::Migration),
-            Box::new(m004_create_github_accounts::Migration),
-            Box::new(m005_create_telegram_accounts::Migration),
-            Box::new(m006_create_repositories::Migration),
-            Box::new(m007_create_repository_users::Migration),
-            Box::new(m008_create_repository_settings::Migration),
+            Box::new(m003_create_user_has_role::Migration),
+            Box::new(m004_create_user_socials_services::Migration),
+            Box::new(m005_create_user_version_control_services::Migration),
         ]
     }
 }

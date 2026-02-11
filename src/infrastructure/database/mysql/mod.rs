@@ -3,22 +3,32 @@ pub mod entities;
 use migration::{Migrator, MigratorTrait};
 use sea_orm::{Database, DatabaseConnection};
 
-pub async fn connect(url: String) -> DatabaseConnection {
-    tracing::info!("Connecting to mysql database by url: {url}");
+pub struct MySQLDatabase {
+    url: String,
+}
 
-    let db = Database::connect(&url)
-        .await
-        .expect("Database connection failed.");
+impl MySQLDatabase {
+    pub fn new(url: String) -> Self {
+        Self { url }
+    }
 
-    tracing::info!("Mysql database successfully connected by url: {url}");
+    pub async fn connect(&self) -> DatabaseConnection {
+        tracing::info!("Connecting to mysql database by url: {}", self.url);
 
-    tracing::info!("Starting migrate database...");
+        let pool = Database::connect(&self.url)
+            .await
+            .expect("Database connection failed.");
 
-    Migrator::up(&db, None)
-        .await
-        .expect("Database migration failed.");
+        tracing::info!("Mysql database successfully connected by url: {}", self.url);
 
-    tracing::info!("Database migrate successfully connected to mysql database");
+        tracing::info!("Starting migrate database...");
 
-    db
+        Migrator::up(&pool, None)
+            .await
+            .expect("Database migration failed.");
+
+        tracing::info!("Database migrate successfully connected to mysql database");
+
+        pool
+    }
 }

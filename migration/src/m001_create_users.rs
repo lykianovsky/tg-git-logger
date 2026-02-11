@@ -30,6 +30,12 @@ impl MigrationTrait for Migration {
                             .not_null()
                             .default(Expr::current_timestamp()),
                     )
+                    .col(
+                        ColumnDef::new(Users::UpdatedAt)
+                            .timestamp()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
                     .to_owned(),
             )
             .await?;
@@ -50,4 +56,5 @@ enum Users {
     Id,
     IsActive,
     CreatedAt,
+    UpdatedAt,
 }

@@ -7,61 +7,45 @@ use sea_orm::entity::prelude::*;
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i32,
-    pub is_active: bool,
+    pub is_active: i8,
     pub created_at: DateTimeUtc,
+    pub updated_at: DateTimeUtc,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
-    #[sea_orm(has_many = "super::git_hub_accounts::Entity")]
-    GitHubAccounts,
-    #[sea_orm(has_many = "super::repository_users::Entity")]
-    RepositoryUsers,
-    #[sea_orm(has_many = "super::telegram_accounts::Entity")]
-    TelegramAccounts,
-    #[sea_orm(has_many = "super::user_roles::Entity")]
-    UserRoles,
+    #[sea_orm(has_many = "super::user_has_roles::Entity")]
+    UserHasRoles,
+    #[sea_orm(has_many = "super::user_socials_services::Entity")]
+    UserSocialsServices,
+    #[sea_orm(has_many = "super::user_version_control_services::Entity")]
+    UserVersionControlServices,
 }
 
-impl Related<super::git_hub_accounts::Entity> for Entity {
+impl Related<super::user_has_roles::Entity> for Entity {
     fn to() -> RelationDef {
-        Relation::GitHubAccounts.def()
+        Relation::UserHasRoles.def()
     }
 }
 
-impl Related<super::repository_users::Entity> for Entity {
+impl Related<super::user_socials_services::Entity> for Entity {
     fn to() -> RelationDef {
-        Relation::RepositoryUsers.def()
+        Relation::UserSocialsServices.def()
     }
 }
 
-impl Related<super::telegram_accounts::Entity> for Entity {
+impl Related<super::user_version_control_services::Entity> for Entity {
     fn to() -> RelationDef {
-        Relation::TelegramAccounts.def()
-    }
-}
-
-impl Related<super::user_roles::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::UserRoles.def()
-    }
-}
-
-impl Related<super::repositories::Entity> for Entity {
-    fn to() -> RelationDef {
-        super::repository_users::Relation::Repositories.def()
-    }
-    fn via() -> Option<RelationDef> {
-        Some(super::repository_users::Relation::Users.def().rev())
+        Relation::UserVersionControlServices.def()
     }
 }
 
 impl Related<super::roles::Entity> for Entity {
     fn to() -> RelationDef {
-        super::user_roles::Relation::Roles.def()
+        super::user_has_roles::Relation::Roles.def()
     }
     fn via() -> Option<RelationDef> {
-        Some(super::user_roles::Relation::Users.def().rev())
+        Some(super::user_has_roles::Relation::Users.def().rev())
     }
 }
 
