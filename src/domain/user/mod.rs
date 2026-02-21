@@ -1,4 +1,5 @@
 pub mod entities;
-pub mod repository;
-pub mod use_cases;
+pub mod events;
+pub mod ports;
+pub mod repositories;
 pub mod value_objects;

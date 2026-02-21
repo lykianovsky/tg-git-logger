@@ -1,6 +1,5 @@
-use crate::infrastructure::contracts::github::events::GithubEvent;
-use crate::utils::builder::message::MessageBuilder;
-use chrono::{DateTime, Local};
+use crate::domain::webhook::events::workflow::WebhookWorkflowEvent;
+use crate::infrastructure::contracts::github::event_type::GithubEvent;
 use serde::Deserialize;
 use serde_json::Value;
 
@@ -73,103 +72,38 @@ pub struct GithubUser {
     pub id: u64,
 }
 
-impl GithubWorkflowEvent {
-    pub fn from_value(value: Value) -> Result<Self, String> {
-        serde_json::from_value(value).map_err(|e| format!("Failed to parse workflow event: {}", e))
-    }
-
-    fn format_time(&self, time_str: &str) -> Option<String> {
-        DateTime::parse_from_rfc3339(time_str).ok().map(|dt| {
-            let local: DateTime<Local> = dt.with_timezone(&Local);
-            local.format("%d.%m.%Y %H:%M:%S").to_string()
-        })
-    }
-
-    fn title(&self) -> String {
-        match self.action.as_str() {
-            "queued" => "⏳ Workflow поставлен в очередь".to_string(),
-            "in_progress" => "🏃 Workflow выполняется".to_string(),
-            "completed" => {
-                let conclusion = self
-                    .workflow_run
-                    .as_ref()
-                    .and_then(|w| w.conclusion.as_deref())
-                    .unwrap_or("unknown");
-                match conclusion {
-                    "success" => "✅ Workflow успешно завершён".to_string(),
-                    "failure" => "❌ Workflow завершён с ошибкой".to_string(),
-                    "cancelled" => "⚠️ Workflow отменён".to_string(),
-                    _ => format!("ℹ️ Workflow завершён ({})", conclusion),
-                }
-            }
-            _ => format!("ℹ️ Workflow {}", self.action),
-        }
-    }
-
-    pub fn build(&self) -> MessageBuilder {
-        let mut builder = MessageBuilder::new().with_html_escape(true);
-
-        // Заголовок
-        builder = builder.bold(&self.title());
-
-        // Время workflow
-        if let Some(run) = &self.workflow_run {
-            if let Some(time) = self.format_time(&run.updated_at) {
-                builder = builder.line(&format!("🕒 <i>{}</i>", time));
-            }
-        }
-
-        builder = builder.empty_line();
-
-        // Репозиторий
-        if let Some(repo_url) = &self.repository.html_url {
-            builder = builder.section(
-                "📦 Репозиторий",
-                &format!("<a href=\"{}\">{}</a>", repo_url, self.repository.full_name),
-            );
-        } else {
-            builder = builder.section("📦 Репозиторий", &self.repository.full_name);
-        }
-
-        // Автор события
-        builder = builder.section_bold("👤 Инициатор", &self.sender.login);
-
-        // Workflow Job
-        if let Some(job) = &self.workflow_job {
-            builder = builder.section_code("🏷️ Workflow", &job.name);
-            builder = builder.section(
-                "🔗 Ссылка",
-                &format!("<a href=\"{}\">Перейти</a>", job.html_url),
-            );
-            builder = builder.section("📌 Статус", &job.status);
-            if let Some(conclusion) = &job.conclusion {
-                builder = builder.section("✅ Вывод", conclusion);
-            }
-        } else if let Some(run) = &self.workflow_run {
-            builder = builder.section_code("🏷️ Workflow Run", &run.name);
-            builder = builder.section(
-                "🔗 Ссылка",
-                &format!("<a href=\"{}\">Перейти</a>", run.html_url),
-            );
-            builder = builder.section("📌 Статус", &run.status);
-            if let Some(conclusion) = &run.conclusion {
-                builder = builder.section("✅ Вывод", &run.conclusion.clone().unwrap_or_default());
-            }
-        }
-
-        // Commit info
-        if let Some(run) = &self.workflow_run {
-            if let Some(commit) = &run.head_commit {
-                builder = builder.section("📝 Сообщение", commit.message.as_str());
-            }
-        }
-
-        builder
-    }
-}
-
 impl GithubEvent for GithubWorkflowEvent {
-    fn build(&self) -> MessageBuilder {
-        self.build()
+    type WebhookEvent = WebhookWorkflowEvent;
+
+    fn from_value(value: Value) -> Result<Self, serde_json::Error>
+    where
+        Self: Sized,
+    {
+        Ok(serde_json::from_value(value)?)
+    }
+
+    fn to_webhook_event(&self) -> Self::WebhookEvent {
+        let run = self.workflow_run.as_ref();
+
+        WebhookWorkflowEvent {
+            id: run.map(|r| r.id).unwrap_or(0),
+            name: run.map(|r| r.name.clone()).unwrap_or_default(),
+            run_number: 0,              // GitHub webhook не присылает, оставляем 0
+            head_branch: String::new(), // не приходит напрямую
+            head_sha: run
+                .and_then(|r| r.head_commit.as_ref())
+                .map(|c| c.id.clone())
+                .unwrap_or_default(),
+            status: run
+                .map(|r| r.status.clone())
+                .unwrap_or_else(|| self.action.clone()),
+            conclusion: run.and_then(|r| r.conclusion.clone()),
+            html_url: run.map(|r| r.html_url.clone()),
+            actor: Some(self.sender.login.clone()),
+            repo: self.repository.full_name.clone(),
+            repo_url: self.repository.html_url.clone(),
+            created_at: run.map(|r| r.created_at.clone()),
+            updated_at: run.map(|r| r.updated_at.clone()),
+        }
     }
 }

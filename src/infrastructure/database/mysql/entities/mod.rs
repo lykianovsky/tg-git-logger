@@ -2,12 +2,8 @@
 
 pub mod prelude;
 
-pub mod git_hub_accounts;
-pub mod repositories;
-pub mod repository_settings;
-pub mod repository_users;
 pub mod roles;
-pub mod sea_orm_active_enums;
-pub mod telegram_accounts;
-pub mod user_roles;
+pub mod user_has_roles;
+pub mod user_socials_services;
+pub mod user_version_control_services;
 pub mod users;

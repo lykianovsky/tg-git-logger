@@ -1,6 +1,5 @@
-use crate::infrastructure::contracts::github::events::GithubEvent;
-use crate::utils::builder::message::MessageBuilder;
-use chrono::{DateTime, Local};
+use crate::domain::webhook::events::release::WebhookReleaseEvent;
+use crate::infrastructure::contracts::github::event_type::GithubEvent;
 use serde::Deserialize;
 use serde_json::Value;
 
@@ -41,87 +40,31 @@ pub struct GithubUser {
     pub id: u64,
 }
 
-impl GithubReleaseEvent {
-    pub fn from_value(value: Value) -> Result<Self, String> {
-        serde_json::from_value(value).map_err(|e| format!("Failed to parse release event: {}", e))
-    }
-
-    fn format_time(&self, time_str: &str) -> Option<String> {
-        DateTime::parse_from_rfc3339(time_str).ok().map(|dt| {
-            let local: DateTime<Local> = dt.with_timezone(&Local);
-            local.format("%d.%m.%Y %H:%M:%S").to_string()
-        })
-    }
-
-    fn title(&self) -> String {
-        match self.action.as_str() {
-            "published" => "🚀 Релиз опубликован".to_string(),
-            "created" => {
-                if self.release.draft {
-                    "📝 Черновик релиза создан".to_string()
-                } else if self.release.prerelease {
-                    "⚡ Pre-release создан".to_string()
-                } else {
-                    "🆕 Релиз создан".to_string()
-                }
-            }
-            "edited" => "✏️ Релиз отредактирован".to_string(),
-            "deleted" => "🗑️ Релиз удалён".to_string(),
-            "prereleased" => "⚡ Pre-release опубликован".to_string(),
-            _ => format!("ℹ️ Релиз {}", self.action),
-        }
-    }
-
-    pub fn build(&self) -> MessageBuilder {
-        let mut builder = MessageBuilder::new().with_html_escape(true);
-
-        // Заголовок
-        builder = builder.bold(&self.title());
-
-        // Время
-        if let Some(time) = self
-            .release
-            .published_at
-            .as_deref()
-            .or(Some(&self.release.created_at))
-            .and_then(|t| self.format_time(t))
-        {
-            builder = builder.line(&format!("🕒 <i>{}</i>", time));
-        }
-
-        builder = builder.empty_line();
-
-        // Репозиторий
-        if let Some(repo_url) = &self.repository.html_url {
-            builder = builder.section(
-                "📦 Репозиторий",
-                &format!("<a href=\"{}\">{}</a>", repo_url, self.repository.full_name),
-            );
-        } else {
-            builder = builder.section("📦 Репозиторий", &self.repository.full_name);
-        }
-
-        // Автор релиза
-        builder = builder.section_bold("👤 Автор", &self.release.author.login);
-
-        // Тэг и название релиза
-        builder = builder.section_code("🏷️ Тэг", &self.release.tag_name);
-        if let Some(name) = &self.release.name {
-            builder = builder.section("📌 Название", name);
-        }
-
-        // Ссылка на релиз
-        builder = builder.section(
-            "🔗 Ссылка",
-            &format!("<a href=\"{}\">Перейти</a>", self.release.html_url),
-        );
-
-        builder
-    }
-}
-
 impl GithubEvent for GithubReleaseEvent {
-    fn build(&self) -> MessageBuilder {
-        self.build()
+    type WebhookEvent = WebhookReleaseEvent;
+
+    fn from_value(value: Value) -> Result<Self, serde_json::Error>
+    where
+        Self: Sized,
+    {
+        Ok(serde_json::from_value(value)?)
+    }
+
+    fn to_webhook_event(&self) -> Self::WebhookEvent {
+        WebhookReleaseEvent {
+            id: self.release.id,
+            tag_name: self.release.tag_name.clone(),
+            target_commitish: self.release.tag_name.clone(), // GitHub обычно не присылает target_commit, можно временно использовать тег
+            name: self.release.name.clone(),
+            body: self.release.body.clone(),
+            draft: self.release.draft,
+            prerelease: self.release.prerelease,
+            created_at: Some(self.release.created_at.clone()),
+            published_at: self.release.published_at.clone(),
+            html_url: Some(self.release.html_url.clone()),
+            author: Some(self.release.author.login.clone()),
+            repo: self.repository.full_name.clone(),
+            repo_url: self.repository.html_url.clone(),
+        }
     }
 }

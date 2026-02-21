@@ -1,2 +1,1 @@
-pub mod kaiten;
-pub mod telegram;
+pub mod notification;

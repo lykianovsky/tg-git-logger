@@ -1,5 +1,5 @@
-use crate::infrastructure::contracts::github::events::GithubEvent;
-use crate::utils::builder::message::MessageBuilder;
+use crate::domain::webhook::events::pull_request::WebhookPullRequestEvent;
+use crate::infrastructure::contracts::github::event_type::GithubEvent;
 use chrono::{DateTime, Local};
 use serde::Deserialize;
 use serde_json::Value;
@@ -68,167 +68,55 @@ pub struct GithubUser {
     pub id: u64,
 }
 
-impl GithubPullRequestEvent {
-    pub fn from_value(value: Value) -> Result<Self, String> {
-        serde_json::from_value(value)
-            .map_err(|e| format!("Failed to parse pull request event: {}", e))
+impl GithubEvent for GithubPullRequestEvent {
+    type WebhookEvent = WebhookPullRequestEvent;
+
+    fn from_value(value: Value) -> Result<Self, serde_json::Error>
+    where
+        Self: Sized,
+    {
+        Ok(serde_json::from_value(value)?)
     }
 
-    fn format_time(&self, time_str: &str) -> Option<String> {
-        DateTime::parse_from_rfc3339(time_str).ok().map(|dt| {
-            let local: DateTime<Local> = dt.with_timezone(&Local);
-            local.format("%d.%m.%Y %H:%M:%S").to_string()
-        })
-    }
+    fn to_webhook_event(&self) -> Self::WebhookEvent {
+        let pr = &self.pull_request;
 
-    fn title(&self) -> String {
-        match self.action.as_str() {
-            "opened" => "🆕 Pull Request открыт".to_string(),
-            "closed" => {
-                if self.pull_request.merged {
-                    "🎉 Pull Request смержен".to_string()
-                } else {
-                    "❌ Pull Request закрыт".to_string()
-                }
-            }
-            "reopened" => "♻️ Pull Request переоткрыт".to_string(),
-            "synchronize" => "🔄 Pull Request обновлён".to_string(),
-            _ => format!("ℹ️ Pull Request {}", self.action),
+        WebhookPullRequestEvent {
+            source: self.sender.login.clone(),
+            author: pr.user.login.clone(),
+            repo: self.repository.full_name.clone(),
+            repo_url: self.repository.html_url.clone(),
+            title: pr.title.clone(),
+            number: self.number,
+            action: self.action.clone(),
+            merged: pr.merged,
+            merged_by: pr.merged_by.as_ref().map(|u| u.login.clone()),
+            draft: pr.draft,
+            state: pr.state.clone(),
+            head_ref: pr.head.ref_field.clone(),
+            base_ref: pr.base.ref_field.to_string(),
+            head_repo: pr.head.label.clone(), // уже в формате owner:branch
+            base_repo: pr.base.label.clone(),
+            pr_url: Some(pr.html_url.clone()),
+            merge_commit: pr.merge_commit_sha.clone(),
+            assignees: pr.assignees.iter().map(|u| u.login.clone()).collect(),
+            created_at: format_datetime(&pr.created_at),
+            updated_at: format_datetime(&pr.updated_at),
+            merged_at: pr.merged_at.as_deref().map(format_datetime),
+            commits: pr.commits,
+            additions: pr.additions,
+            deletions: pr.deletions,
+            changed_files: pr.changed_files,
         }
-    }
-
-    fn human_state(&self) -> &'static str {
-        match self.pull_request.state.as_str() {
-            "open" => "🟢 Открыт",
-            "closed" if self.pull_request.merged => "🎉 Смёржен",
-            "closed" => "🔴 Закрыт",
-            _ => "❔ Неизвестно",
-        }
-    }
-
-    pub fn build(&self) -> MessageBuilder {
-        let mut builder = MessageBuilder::new().with_html_escape(true);
-
-        // ===== Заголовок =====
-        let title = format!("{} #{}", self.title(), self.number);
-        builder = builder.bold(&title);
-
-        // ===== Draft =====
-        if self.pull_request.draft {
-            builder = builder.line("📝 <i>Draft Pull Request</i>");
-        }
-
-        // ===== Автор =====
-        builder = builder.section_bold("👤 Автор PR", &self.pull_request.user.login);
-
-        builder = builder.empty_line();
-
-        // ===== Заголовок PR =====
-        builder = builder.section("📝 Заголовок PR", self.pull_request.title.as_str());
-
-        builder = builder.empty_line();
-
-        // ===== Тайминги =====
-        if let Some(created) = self.format_time(&self.pull_request.created_at) {
-            builder = builder.line(&format!("🕒 <i>Создан: {}</i>", created));
-        }
-
-        if let Some(updated) = self.format_time(&self.pull_request.updated_at) {
-            builder = builder.line(&format!("🔄 <i>Обновлён: {}</i>", updated));
-        }
-
-        if let Some(merged) = &self.pull_request.merged_at {
-            if let Some(time) = self.format_time(merged) {
-                builder = builder.line(&format!("🎉 <i>Смёржен: {}</i>", time));
-            }
-        }
-
-        builder = builder.empty_line();
-
-        // ===== Ветки =====
-        builder = builder.section(
-            "🔀 Ветки",
-            &format!(
-                "<code>{}</code> → <code>{}</code>",
-                self.pull_request.head.label, self.pull_request.base.label
-            ),
-        );
-
-        if self.pull_request.head.repo.full_name != self.pull_request.base.repo.full_name {
-            builder = builder.line("⚠️ Pull Request из форка");
-        }
-
-        builder = builder.empty_line();
-
-        // ===== Состояние =====
-        builder = builder.section("📌 Состояние", self.human_state());
-
-        // ===== Кто смержил =====
-        if let Some(user) = &self.pull_request.merged_by {
-            builder = builder.section("🎉 Смёржил", &user.login);
-        }
-
-        // ===== Merge commit =====
-        if let Some(sha) = &self.pull_request.merge_commit_sha {
-            builder = builder.section("🔐 Merge commit", &format!("<code>{}</code>", &sha[..7]));
-        }
-
-        // ===== Ассайны =====
-        if !self.pull_request.assignees.is_empty() {
-            let users = self
-                .pull_request
-                .assignees
-                .iter()
-                .map(|u| u.login.as_str())
-                .collect::<Vec<_>>()
-                .join(", ");
-
-            builder = builder.section("👥 Назначены", &users);
-        }
-
-        // ===== Кто вызвал событие =====
-        builder = builder.section("⚡ Событие вызвал", &self.sender.login);
-
-        builder = builder.empty_line();
-
-        // ===== Статистика =====
-        builder = builder.section(
-            "📊 Изменения",
-            &format!(
-                "Коммитов: <b>{}</b>\n➕ Добавлено: <b>{}</b>\n➖ Удалено: <b>{}</b>\n📂 Файлов: <b>{}</b>",
-                self.pull_request.commits,
-                self.pull_request.additions,
-                self.pull_request.deletions,
-                self.pull_request.changed_files
-            ),
-        );
-
-        builder = builder.empty_line();
-
-        // ===== Ссылка =====
-        builder = builder.section(
-            "🔗 Pull Request",
-            &format!("<a href=\"{}\">Перейти</a>", self.pull_request.html_url),
-        );
-
-        builder = builder.empty_line();
-
-        // ===== Репозиторий =====
-        if let Some(repo_url) = &self.repository.html_url {
-            builder = builder.section(
-                "📦 Репозиторий",
-                &format!("<a href=\"{}\">{}</a>", repo_url, self.repository.full_name),
-            );
-        } else {
-            builder = builder.section("📦 Репозиторий", &self.repository.full_name);
-        }
-
-        builder
     }
 }
 
-impl GithubEvent for GithubPullRequestEvent {
-    fn build(&self) -> MessageBuilder {
-        self.build()
-    }
+fn format_datetime(ts: &str) -> String {
+    DateTime::parse_from_rfc3339(ts)
+        .map(|dt| {
+            dt.with_timezone(&Local)
+                .format("%d.%m.%Y %H:%M:%S")
+                .to_string()
+        })
+        .unwrap_or_else(|_| ts.to_string())
 }
