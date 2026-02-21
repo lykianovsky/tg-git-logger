@@ -1,9 +1,13 @@
 use async_trait::async_trait;
 use serde::Deserialize;
+use thiserror::Error;
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum OAuthClientExchangeCodeError {
+    #[error("Unsupported social type: {0}")]
     UnsupportedSocialType(String),
+
+    #[error("Network error: {0}")]
     Transport(String),
 }
 

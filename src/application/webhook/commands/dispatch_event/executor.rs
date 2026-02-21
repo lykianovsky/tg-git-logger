@@ -15,10 +15,7 @@ impl DispatchWebhookEventExecutor {
     ) -> Result<DispatchWebhookEventExecutorResponse, DispatchWebhookEventExecutorError> {
         tracing::debug!("Dispatching webhook event");
 
-        self.publisher.publish(&*cmd.event).await.map_err(|_| {
-            tracing::error!("Failed to publish event: {}", cmd.event.event_name());
-            DispatchWebhookEventExecutorError::UnknownError
-        })?;
+        self.publisher.publish(&*cmd.event).await?;
 
         Ok(DispatchWebhookEventExecutorResponse {})
     }

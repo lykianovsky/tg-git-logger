@@ -1,5 +1,9 @@
 use crate::config::environment::ENV;
 
+pub struct ApplicationSecretConfig {
+    pub reversible_cipher_secret: String,
+}
+
 pub struct ApplicationRedisConfig {
     pub secret: String,
     pub url: String,
@@ -34,6 +38,7 @@ pub struct ApplicationConfig {
     pub mysql: ApplicationMysqlConfig,
     pub rabbit_mq: ApplicationRabbitMqConfig,
     pub redis: ApplicationRedisConfig,
+    pub secret: ApplicationSecretConfig,
 }
 
 impl ApplicationConfig {
@@ -44,6 +49,7 @@ impl ApplicationConfig {
         let mysql = Self::build_mysql_config();
         let rabbit_mq = Self::build_rabbit_mq_config();
         let redis = Self::build_redis_config();
+        let secret = Self::build_secret_config();
 
         return Self {
             port,
@@ -52,6 +58,7 @@ impl ApplicationConfig {
             mysql,
             rabbit_mq,
             redis,
+            secret,
         };
     }
 
@@ -104,5 +111,13 @@ impl ApplicationConfig {
         let secret = ENV.get("REDIS_SECRET_KEY");
 
         return ApplicationRedisConfig { url, secret };
+    }
+
+    pub fn build_secret_config() -> ApplicationSecretConfig {
+        let reversible_cipher_secret = ENV.get("REVERSABLE_CIPHER_SECRET_KEY");
+
+        return ApplicationSecretConfig {
+            reversible_cipher_secret,
+        };
     }
 }

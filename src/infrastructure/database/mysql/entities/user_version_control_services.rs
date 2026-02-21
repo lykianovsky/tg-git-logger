@@ -10,11 +10,11 @@ pub struct Model {
     pub user_id: i32,
     pub version_control_type: String,
     pub version_control_user_id: i64,
-    pub version_control_login: Option<String>,
+    pub version_control_login: String,
     pub version_control_email: Option<String>,
     pub version_control_avatar_url: Option<String>,
     #[sea_orm(column_type = "Text", nullable)]
-    pub access_token: Option<String>,
+    pub access_token: String,
     #[sea_orm(column_type = "Text", nullable)]
     pub refresh_token: Option<String>,
     pub token_type: Option<String>,

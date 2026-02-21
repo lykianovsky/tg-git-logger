@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use thiserror::Error;
 
 #[derive(Debug)]
 pub struct VersionControlClientUser {
@@ -7,11 +8,15 @@ pub struct VersionControlClientUser {
     pub email: Option<String>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum VersionControlClientError {
+    #[error("Network error: {0}")]
     Transport(String),
+    #[error("User not found")]
     NotFound,
+    #[error("Invalid access token")]
     Unauthorized,
+    #[error("{0}")]
     Other(String),
 }
 

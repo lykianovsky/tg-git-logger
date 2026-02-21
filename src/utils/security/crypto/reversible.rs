@@ -1,8 +1,8 @@
 use aes_gcm::{
-    Aes256Gcm, Nonce,
-    aead::{Aead, KeyInit},
+    aead::{Aead, KeyInit}, Aes256Gcm,
+    Nonce,
 };
-use base64::{Engine as _, engine::general_purpose};
+use base64::{engine::general_purpose, Engine as _};
 use rand::RngCore;
 use thiserror::Error;
 
@@ -29,6 +29,29 @@ pub enum CipherError {
 
 #[derive(Debug, Clone)]
 pub struct ReversibleCipherValue(String);
+
+impl ReversibleCipherValue {
+    pub fn new(value: String) -> Result<Self, CipherError> {
+        // проверяем что это валидный base64
+        let decoded = general_purpose::STANDARD.decode(&value)?;
+
+        // минимум 12 байт nonce + хоть что-то
+        if decoded.len() < 12 {
+            return Err(CipherError::InvalidEncryptedData);
+        }
+
+        Ok(Self(value))
+    }
+
+    /// Создать без проверки — для внутреннего использования в encrypt()
+    pub(crate) fn new_unchecked(value: String) -> Self {
+        Self(value)
+    }
+
+    pub fn value(&self) -> &str {
+        &self.0
+    }
+}
 
 pub struct ReversibleCipher {
     cipher: Aes256Gcm,
@@ -72,7 +95,7 @@ impl ReversibleCipher {
         let mut result = nonce_bytes.to_vec();
         result.extend_from_slice(&ciphertext);
 
-        Ok(ReversibleCipherValue(
+        Ok(ReversibleCipherValue::new_unchecked(
             general_purpose::STANDARD.encode(result),
         ))
     }

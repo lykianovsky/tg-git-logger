@@ -7,6 +7,7 @@ use crate::domain::user::value_objects::user_id::UserId;
 use crate::domain::user::value_objects::version_control_type::VersionControlType;
 use crate::domain::user::value_objects::version_control_user_id::VersionControlUserId;
 use crate::infrastructure::database::mysql::entities::user_version_control_services;
+use crate::utils::security::crypto::reversible::ReversibleCipherValue;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseConnection, DatabaseTransaction, EntityTrait,
     QueryFilter, Set,
@@ -38,7 +39,7 @@ impl UserVersionControlServicesRepository for MySQLUserVersionControlServicesRep
             version_control_login: Set(user.version_control_login.clone()),
             version_control_email: Set(user.version_control_email.clone()),
             version_control_avatar_url: Set(user.version_control_avatar_url.clone()),
-            access_token: Set(user.access_token.clone()),
+            access_token: Set(user.access_token.value().to_string()),
             refresh_token: Set(user.refresh_token.clone()),
             token_type: Set(user.token_type.clone()),
             expires_at: Set(user.expires_at),
@@ -84,7 +85,8 @@ impl UserVersionControlService {
             version_control_login: model.version_control_login,
             version_control_email: model.version_control_email,
             version_control_avatar_url: model.version_control_avatar_url,
-            access_token: model.access_token,
+            // TODO
+            access_token: ReversibleCipherValue::new(model.access_token).unwrap(),
             refresh_token: model.refresh_token,
             token_type: model.token_type,
             expires_at: model.expires_at,

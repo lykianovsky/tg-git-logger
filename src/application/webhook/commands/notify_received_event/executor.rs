@@ -22,8 +22,7 @@ impl NotifyReceivedWebhookEventExecutor {
     {
         self.notification_service
             .send(&cmd.social_type, &cmd.chat_id, &cmd.message)
-            .await
-            .map_err(|_| NotifyReceivedWebhookEventExecutorError::UnknownError)?;
+            .await?;
 
         Ok(NotifyReceivedWebhookEventExecutorResponse {})
     }

@@ -71,6 +71,7 @@ impl UserSocial {
         Self {
             id: mysql_user.id,
             user_id: UserId(mysql_user.user_id),
+            // TODO
             social_type: SocialType::from_str(&mysql_user.social_type).unwrap(),
             social_user_id: SocialUserId(mysql_user.social_user_id as i32),
             social_chat_id: SocialChatId(mysql_user.social_chat_id),

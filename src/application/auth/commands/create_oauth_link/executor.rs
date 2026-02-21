@@ -46,15 +46,18 @@ impl CreateOAuthLinkExecutor {
                 social_chat_id: SocialChatId(0),
                 social_type: SocialType::Telegram,
             })
-            .await
-            .map_err(|e| CreateOAuthLinkExecutorError::UnknownError)?;
+            .await?;
 
         if let Ok(..) = self
             .user_socials_repo
             .find_by_social_user_id(&cmd.social.user_id)
             .await
         {
-            return Err(CreateOAuthLinkExecutorError::ExistRegisteredSocialAccountError);
+            return Err(
+                CreateOAuthLinkExecutorError::ExistRegisteredSocialAccountError(
+                    cmd.social.user_id.0.to_string(),
+                ),
+            );
         }
 
         let link = self.create_oauth_link(&cmd).await?;
@@ -71,15 +74,7 @@ impl CreateOAuthLinkExecutor {
         let mut url = Url::parse(&format!(
             "{}{}",
             cmd.version_control.base, cmd.version_control.path
-        ))
-        .map_err(|e| {
-            tracing::error!(
-                error = %e,
-                github_base = %cmd.version_control.base,
-                "Failed to parse GitHub base URL"
-            );
-            e
-        })?;
+        ))?;
 
         let state = OpenAuthorizationState {
             version_control_type: cmd.version_control.r#type.clone(),
@@ -104,9 +99,7 @@ impl CreateOAuthLinkExecutor {
             .await
             .map_err(|e| CreateOAuthLinkExecutorError::Cache(e.to_string()))?
         {
-            return Err(CreateOAuthLinkExecutorError::Cache(String::from(
-                "Cache has exist, try later",
-            )));
+            return Err(CreateOAuthLinkExecutorError::CacheHasExist(state_key.0));
         }
 
         url.query_pairs_mut()

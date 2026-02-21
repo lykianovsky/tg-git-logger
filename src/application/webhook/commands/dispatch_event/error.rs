@@ -1,9 +1,8 @@
+use crate::domain::shared::events::publisher::EventPublisherError;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum DispatchWebhookEventExecutorError {
-    #[error(
-        "В данный момент авторизация недоступна, попробуйте позже, или обратитесь к администрации"
-    )]
-    UnknownError,
+    #[error("{0}")]
+    PublisherError(#[from] EventPublisherError),
 }

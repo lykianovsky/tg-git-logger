@@ -1,24 +1,23 @@
+use crate::domain::shared::events::publisher::EventPublisherError;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum CreateOAuthLinkExecutorError {
-    #[error(
-        "В данный момент авторизация недоступна, попробуйте позже, или обратитесь к администрации"
-    )]
-    UnknownError,
+    #[error("Exist registered social account with this social_user_id: {0}")]
+    ExistRegisteredSocialAccountError(String),
 
-    #[error("Ваш аккаунт уже зарегистрирован, данная команда больше недоступна")]
-    ExistRegisteredSocialAccountError,
+    #[error("{0}")]
+    PublisherError(#[from] EventPublisherError),
 
-    #[error("Мы не смогли создать пользователя, пожалуйста, попробуйте позже")]
-    UserCreationError,
-
-    #[error("Failed to parse URL: {0}")]
+    #[error("{0}")]
     UrlParse(#[from] url::ParseError),
 
-    #[error("Failed to serialize state: {0}")]
+    #[error("{0}")]
     Serialization(#[from] serde_json::Error),
 
     #[error("Cache error: {0}")]
     Cache(String),
+
+    #[error("Cache has exist by key: {0}")]
+    CacheHasExist(String),
 }

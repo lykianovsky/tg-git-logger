@@ -20,6 +20,7 @@ impl DeliveryHttpServerAxum {
         executors: Arc<ApplicationBoostrapExecutors>,
         config: Arc<ApplicationConfig>,
     ) -> Self {
+        // TODO разбить роуты на модули и вынести в отдельные функции для лучшей читаемости
         let router = Router::new()
             .route("/ping", get(|| async { "PONG" }))
             .nest(

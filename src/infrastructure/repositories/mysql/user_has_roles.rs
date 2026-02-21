@@ -64,6 +64,7 @@ impl UserHasRolesRepository for MySQLUserHasRolesRepository {
             .iter()
             .map(|role| Role {
                 id: RoleId(role.id),
+                // TODO
                 name: RoleName::from_str(role.name.as_str()).unwrap(),
             })
             .collect();

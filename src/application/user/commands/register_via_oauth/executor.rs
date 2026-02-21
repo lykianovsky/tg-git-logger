@@ -14,6 +14,7 @@ use crate::domain::user::repositories::user_version_control_services::UserVersio
 use crate::domain::user::value_objects::version_control_user_id::VersionControlUserId;
 use crate::infrastructure::drivers::cache::contract::CacheService;
 use crate::utils::mutex::key_locker::KeyLocker;
+use crate::utils::security::crypto::reversible::ReversibleCipher;
 use sea_orm::{DatabaseConnection, TransactionTrait};
 use std::sync::Arc;
 
@@ -25,6 +26,7 @@ pub struct RegisterUserViaOAuthExecutor {
     pub oauth_client: Arc<dyn OAuthClient>,
     pub version_control_client: Arc<dyn VersionControlClient>,
     pub notification_service: Arc<dyn NotificationService>,
+    pub reversible_cipher: Arc<ReversibleCipher>,
     pub cache: Arc<dyn CacheService>,
     pub mutex: Arc<KeyLocker<String>>,
 }
@@ -36,10 +38,7 @@ impl RegisterUserViaOAuthExecutor {
     ) -> Result<RegisterUserViaOAuthExecutorResponse, RegisterUserViaOAuthExecutorError> {
         let _guard = self.mutex.lock(cmd.state.clone()).await;
 
-        let txn = self.db.begin().await.map_err(|e| {
-            tracing::error!(error = %e, "Failed to begin database transaction");
-            RegisterUserViaOAuthExecutorError::UnknownError
-        })?;
+        let txn = self.db.begin().await?;
 
         let state = self.retrieve_oauth_state(&cmd.state).await?;
 
@@ -50,32 +49,19 @@ impl RegisterUserViaOAuthExecutor {
             .find_by_social_user_id(&state.social_user_id)
             .await
         {
-            return Err(RegisterUserViaOAuthExecutorError::UnknownError);
+            return Err(
+                RegisterUserViaOAuthExecutorError::UserBySocialUserIdAlreadyExists(
+                    state.social_user_id.0.clone(),
+                ),
+            );
         }
 
-        let exchange_code_response =
-            self.oauth_client
-                .exchange_code(&cmd.code)
-                .await
-                .map_err(|e| {
-                    tracing::error!(
-                        social_user_id = %state.social_user_id.0,
-                        "Failed to exchange code for access token"
-                    );
-                    RegisterUserViaOAuthExecutorError::UnknownError
-                })?;
+        let exchange_code_response = self.oauth_client.exchange_code(&cmd.code).await?;
 
         let version_control_client_user = self
             .version_control_client
             .get_user(&exchange_code_response.access_token)
-            .await
-            .map_err(|e| {
-                tracing::error!(
-                    social_user_id = %state.social_user_id.0,
-                    "Failed to exchange code for access token"
-                );
-                RegisterUserViaOAuthExecutorError::UnknownError
-            })?;
+            .await?;
 
         let user = self
             .user_repo
@@ -88,15 +74,7 @@ impl RegisterUserViaOAuthExecutor {
                     update_at: Default::default(),
                 },
             )
-            .await
-            .map_err(|e| {
-                tracing::error!(
-                    error = %e,
-                    social_user_id = %state.social_user_id.0,
-                    "Failed to create User record"
-                );
-                RegisterUserViaOAuthExecutorError::UnknownError
-            })?;
+            .await?;
 
         let new_social_user = UserSocial {
             id: Default::default(),
@@ -113,27 +91,21 @@ impl RegisterUserViaOAuthExecutor {
 
         self.user_socials_repo
             .create(&txn, &new_social_user)
-            .await
-            .map_err(|e| {
-                tracing::error!(
-                    error = %e,
-                    user_id = %user.id.0,
-                    social_user_id = %state.social_user_id.0,
-                    "Failed to create UserSocial record{}",
-                    format!("{:?}", new_social_user)
-                );
-                RegisterUserViaOAuthExecutorError::UnknownError
-            })?;
+            .await?;
+
+        let encrypted_access_token = self
+            .reversible_cipher
+            .encrypt(&exchange_code_response.access_token)?;
 
         let new_user_version_control_service = UserVersionControlService {
             id: Default::default(),
             user_id: user.id,
             version_control_type: state.version_control_type,
             version_control_user_id: VersionControlUserId(version_control_client_user.id as i32),
-            version_control_login: Some(version_control_client_user.login.clone()),
+            version_control_login: version_control_client_user.login.clone(),
             version_control_email: version_control_client_user.email.clone(),
             version_control_avatar_url: None,
-            access_token: Some(exchange_code_response.access_token),
+            access_token: encrypted_access_token,
             refresh_token: None,
             token_type: Some(exchange_code_response.token_type),
             scope: Some(exchange_code_response.scope),
@@ -144,39 +116,25 @@ impl RegisterUserViaOAuthExecutor {
 
         self.user_version_control_service_repo
             .create(&txn, &new_user_version_control_service)
-            .await
-            .map_err(|e| {
-                tracing::error!(
-                    error = %e,
-                    user_id = %user.id.0,
-                    social_user_id = %state.social_user_id.0,
-                    "Failed to create UserVersionControlService record{}",
-                    format!("{:?}", new_user_version_control_service)
-                );
-                RegisterUserViaOAuthExecutorError::UnknownError
-            })?;
+            .await?;
 
         self.notification_service
             .send(
                 &state.social_type,
                 &state.social_chat_id,
                 &format!(
-                    "Получили данные от гитхаба, распарсили от кого пришло: {} и получили код {}",
-                    state.social_user_id.0, cmd.code
+                    "Вы успешно привязали аккаунт {} к своему профилю! (login: {})",
+                    state.social_type.to_string(),
+                    new_user_version_control_service
+                        .version_control_login
+                        .clone()
                 ),
             )
-            .await
-            .map_err(|_| RegisterUserViaOAuthExecutorError::UnknownError)?;
+            .await?;
 
-        txn.commit().await.map_err(|e| {
-            tracing::error!(error = %e, "Failed to commit database transaction");
-            RegisterUserViaOAuthExecutorError::UnknownError
-        })?;
+        txn.commit().await?;
 
-        // TODO
-        Ok(RegisterUserViaOAuthExecutorResponse {
-            message: String::from("123"),
-        })
+        Ok(RegisterUserViaOAuthExecutorResponse {})
     }
 
     async fn retrieve_oauth_state(
@@ -211,14 +169,6 @@ impl RegisterUserViaOAuthExecutor {
             "OAuth state JSON retrieved from cache"
         );
 
-        serde_json::from_str::<OpenAuthorizationState>(&state_json).map_err(|e| {
-            tracing::error!(
-                error = %e,
-                state_id = %key,
-                state_json = %state_json,
-                "Failed to deserialize OAuth state JSON"
-            );
-            RegisterUserViaOAuthExecutorError::Cache(format!("Invalid state JSON: {}", e))
-        })
+        Ok(serde_json::from_str::<OpenAuthorizationState>(&state_json)?)
     }
 }

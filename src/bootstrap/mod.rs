@@ -29,12 +29,14 @@ impl ApplicationBootstrap {
         let rabbitmq_pool = Arc::new(
             RabbitMQConnector::new(config.rabbit_mq.url.clone())
                 .await
+                // TODO: Handle this error properly instead of panicking
                 .expect("RabbitMQ connection failed"),
         );
 
         let event_publisher: Arc<dyn EventPublisher> = Arc::new(
             RabbitMqPublisher::new(rabbitmq_pool.clone())
                 .await
+                // TODO: Handle this error properly instead of panicking
                 .expect("RabbitMQ event publisher created failed"),
         );
 
@@ -63,6 +65,7 @@ impl ApplicationBootstrap {
             let _ = events_delivery.serve().await;
         });
 
+        // TODO: Handle shutdown signals and gracefully stop the servers
         tokio::try_join!(http_server_handle, bot_handle, events_handle).unwrap();
     }
 

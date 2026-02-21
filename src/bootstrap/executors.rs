@@ -14,6 +14,7 @@ use crate::infrastructure::repositories::mysql::user_social_services::MySQLUserS
 use crate::infrastructure::repositories::mysql::user_version_control_services::MySQLUserVersionControlServicesRepository;
 use crate::infrastructure::services::notification::CompositionNotificationService;
 use crate::utils::mutex::key_locker::KeyLocker;
+use crate::utils::security::crypto::reversible::ReversibleCipher;
 use sea_orm::DatabaseConnection;
 use std::sync::Arc;
 
@@ -37,6 +38,9 @@ impl ApplicationBoostrapExecutors {
         mysql_pool: Arc<DatabaseConnection>,
         event_publisher: Arc<dyn EventPublisher>,
     ) -> Self {
+        let reversible_cipher = Arc::new(ReversibleCipher::new(
+            &config.secret.reversible_cipher_secret,
+        ));
         let cache: Arc<dyn CacheService> = Arc::new(RedisCache::new(config.redis.url.clone()));
 
         let role_repo = Arc::new(MySQLUserRepository::new(mysql_pool.clone()));
@@ -75,6 +79,7 @@ impl ApplicationBoostrapExecutors {
                 user_version_control_service_repo: user_version_controls_repo.clone(),
                 oauth_client: oauth_client.clone(),
                 version_control_client: version_control_client.clone(),
+                reversible_cipher: reversible_cipher.clone(),
                 notification_service: notification_service.clone(),
                 cache: cache.clone(),
                 mutex: Arc::new(KeyLocker::new()),

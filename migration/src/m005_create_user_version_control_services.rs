@@ -36,7 +36,7 @@ impl MigrationTrait for Migration {
                     .col(
                         ColumnDef::new(UserVersionControlServices::VersionControlLogin)
                             .string_len(255)
-                            .null(),
+                            .not_null(),
                     )
                     .col(
                         ColumnDef::new(UserVersionControlServices::VersionControlEmail)
@@ -51,7 +51,7 @@ impl MigrationTrait for Migration {
                     .col(
                         ColumnDef::new(UserVersionControlServices::AccessToken)
                             .text()
-                            .null(),
+                            .not_null(),
                     )
                     .col(
                         ColumnDef::new(UserVersionControlServices::RefreshToken)
