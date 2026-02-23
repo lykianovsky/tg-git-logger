@@ -9,6 +9,8 @@ pub struct ApplicationGithubConfig {
     pub api_base: String,
     pub repository: String,
     pub repository_owner: String,
+    pub oauth_pathname: String,
+    pub oauth_client_scope: String,
     pub oauth_client_id: String,
     pub oauth_client_secret: String,
 }
@@ -128,8 +130,12 @@ impl ApplicationConfig {
     pub fn build_github_config() -> ApplicationGithubConfig {
         let base = ENV.get("GITHUB_BASE");
         let api_base = ENV.get("GITHUB_API_BASE");
+
         let repository = ENV.get("GITHUB_REPOSITORY");
         let repository_owner = ENV.get("GITHUB_REPOSITORY_OWNER");
+
+        let oauth_pathname = ENV.get("GITHUB_OAUTH_PATHNAME");
+        let oauth_client_scope = ENV.get("GITHUB_OAUTH_CLIENT_SCOPE");
         let oauth_client_id = ENV.get("GITHUB_OAUTH_CLIENT_ID");
         let oauth_client_secret = ENV.get("GITHUB_OAUTH_CLIENT_SECRET");
 
@@ -138,6 +144,8 @@ impl ApplicationConfig {
             api_base,
             repository,
             repository_owner,
+            oauth_pathname,
+            oauth_client_scope,
             oauth_client_id,
             oauth_client_secret,
         }

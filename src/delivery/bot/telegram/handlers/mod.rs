@@ -3,6 +3,7 @@ mod report;
 mod start;
 
 use crate::bootstrap::executors::ApplicationBoostrapExecutors;
+use crate::config::application::ApplicationConfig;
 use crate::delivery::bot::telegram::command::TelegramBotCommand;
 use crate::delivery::bot::telegram::context::TelegramBotCommandContext;
 use crate::delivery::bot::telegram::handlers::register::TelegramBotRegisterCommandHandler;
@@ -19,12 +20,14 @@ pub async fn handle(
     msg: Message,
     cmd: TelegramBotCommand,
     executors: Arc<ApplicationBoostrapExecutors>,
+    config: Arc<ApplicationConfig>,
 ) -> ResponseResult<()> {
     let context = TelegramBotCommandContext {
         bot,
         user,
         msg,
         cmd,
+        config,
     };
 
     match context.cmd {

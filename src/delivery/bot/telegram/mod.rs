@@ -47,7 +47,7 @@ impl ApplicationDelivery for DeliveryBotMessengerTelegram {
             .branch(callback_handler);
 
         Dispatcher::builder(bot, handler)
-            .dependencies(dptree::deps![self.executors.clone()]) // ← Прокидываем executors
+            .dependencies(dptree::deps![self.executors.clone(), self.config.clone()]) // ← Прокидываем executors
             .enable_ctrlc_handler()
             .build()
             .dispatch()

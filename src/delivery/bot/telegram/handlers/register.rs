@@ -10,10 +10,10 @@ use crate::domain::user::value_objects::social_user_id::SocialUserId;
 use crate::domain::user::value_objects::version_control_type::VersionControlType;
 use crate::utils::builder::message::MessageBuilder;
 use std::sync::Arc;
-use teloxide::RequestError;
 use teloxide::payloads::SendMessageSetters;
 use teloxide::prelude::Requester;
 use teloxide::types::{Message, ParseMode};
+use teloxide::RequestError;
 
 pub struct TelegramBotRegisterCommandHandler {
     context: TelegramBotCommandContext,
@@ -37,11 +37,10 @@ impl TelegramBotRegisterCommandHandler {
             },
             version_control: CreateOAuthLinkExecutorCommandVersionControl {
                 r#type: VersionControlType::Github,
-                // TODO
-                base: String::from("https://github.com"),
-                path: String::from("/login/oauth/authorize"),
-                client_id: String::from("Ov23liw3t4P8ctoy6vMv"),
-                scope: String::from("user,repo"),
+                base: self.context.config.github.base.to_string(),
+                path: self.context.config.github.oauth_pathname.clone(),
+                client_id: self.context.config.github.oauth_client_id.clone(),
+                scope: self.context.config.github.oauth_client_scope.to_string(),
             },
         };
 
