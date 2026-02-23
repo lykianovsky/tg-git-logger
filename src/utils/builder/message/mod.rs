@@ -16,15 +16,45 @@ impl MessageBuilder {
         }
     }
 
-    // Основные методы
+    // line теперь экранирует
     pub fn line(mut self, text: &str) -> Self {
-        self.parts.push(text.to_string());
+        self.parts.push(format!(
+            "{}\n",
+            Self::escape_if_needed(text, self.escape_html)
+        ));
         self
     }
 
+    // section экранирует content
+    pub fn section(mut self, title: &str, content: &str) -> Self {
+        self.parts.push(format!(
+            "<b>{}:</b> {}\n",
+            title,
+            Self::escape_if_needed(content, self.escape_html)
+        ));
+        self
+    }
+
+    pub fn section_bold(mut self, title: &str, content: &str) -> Self {
+        self.parts.push(format!(
+            "<b>{}:</b> <b>{}</b>\n",
+            title,
+            Self::escape_if_needed(content, self.escape_html)
+        ));
+        self
+    }
+
+    pub fn section_code(mut self, title: &str, content: &str) -> Self {
+        self.parts.push(format!(
+            "<b>{}:</b> <code>{}</code>\n",
+            title,
+            Self::escape_if_needed(content, self.escape_html)
+        ));
+        self
+    }
     pub fn bold(mut self, text: &str) -> Self {
         self.parts.push(format!(
-            "<b>{}</b>",
+            "<b>{}</b>\n",
             Self::escape_if_needed(text, self.escape_html)
         ));
         self
@@ -32,7 +62,7 @@ impl MessageBuilder {
 
     pub fn italic(mut self, text: &str) -> Self {
         self.parts.push(format!(
-            "<i>{}</i>",
+            "<i>{}</i>\n",
             Self::escape_if_needed(text, self.escape_html)
         ));
         self
@@ -40,7 +70,7 @@ impl MessageBuilder {
 
     pub fn code(mut self, text: &str) -> Self {
         self.parts.push(format!(
-            "<code>{}</code>",
+            "<code>{}</code>\n",
             Self::escape_if_needed(text, self.escape_html)
         ));
         self
@@ -57,25 +87,7 @@ impl MessageBuilder {
     }
 
     pub fn empty_line(mut self) -> Self {
-        self.parts.push("".to_string());
-        self
-    }
-
-    // Секции с заголовком
-    pub fn section(mut self, title: &str, content: &str) -> Self {
-        self.parts.push(format!("<b>{}:</b> {}", title, content));
-        self
-    }
-
-    pub fn section_bold(mut self, title: &str, content: &str) -> Self {
-        self.parts
-            .push(format!("<b>{}:</b> <b>{}</b>", title, content));
-        self
-    }
-
-    pub fn section_code(mut self, title: &str, content: &str) -> Self {
-        self.parts
-            .push(format!("<b>{}:</b> <code>{}</code>", title, content));
+        self.parts.push("\n".to_string());
         self
     }
 
@@ -92,9 +104,8 @@ impl MessageBuilder {
 
     // Строим строку
     pub fn build(self) -> String {
-        let mut result = self.parts.join("\n");
+        let mut result = self.parts.concat();
 
-        // Обрезаем если нужно
         if let Some(max_length) = self.max_length {
             if result.len() > max_length {
                 result = result.chars().take(max_length - 3).collect::<String>();
@@ -105,7 +116,6 @@ impl MessageBuilder {
         result
     }
 
-    // Вспомогательные методы
     fn escape_if_needed(text: &str, escape: bool) -> String {
         if escape {
             Self::escape_html(text)
@@ -114,7 +124,7 @@ impl MessageBuilder {
         }
     }
 
-    fn escape_html(text: &str) -> String {
+    pub fn escape_html(text: &str) -> String {
         text.replace('&', "&amp;")
             .replace('<', "&lt;")
             .replace('>', "&gt;")
@@ -122,14 +132,12 @@ impl MessageBuilder {
             .replace('\'', "&#x27;")
     }
 
-    // Метод для добавления уже отформатированной строки
     pub fn raw(mut self, text: &str) -> Self {
         self.parts.push(text.to_string());
         self
     }
 }
 
-// Реализация Display для автоматического преобразования в строку
 impl fmt::Display for MessageBuilder {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.clone().build())

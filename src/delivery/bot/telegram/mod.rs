@@ -1,14 +1,17 @@
+pub mod callback;
+pub mod callbacks;
 mod command;
 pub mod context;
 mod handlers;
 
 use crate::bootstrap::executors::ApplicationBoostrapExecutors;
 use crate::config::application::ApplicationConfig;
+use crate::delivery::bot::telegram::callbacks::handle_callback;
 use crate::delivery::contract::ApplicationDelivery;
 use std::sync::Arc;
-use teloxide::Bot;
 use teloxide::prelude::*;
 use teloxide::utils::command::BotCommands;
+use teloxide::Bot;
 
 pub struct DeliveryBotMessengerTelegram {
     executors: Arc<ApplicationBoostrapExecutors>,
@@ -32,10 +35,16 @@ impl ApplicationDelivery for DeliveryBotMessengerTelegram {
         bot.set_my_commands(command::TelegramBotCommand::bot_commands())
             .await?;
 
-        let handler = Update::filter_message()
+        let commands_handler = Update::filter_message()
             .filter_command::<command::TelegramBotCommand>()
             .filter_map(|update: Update| update.from().cloned())
             .endpoint(handlers::handle);
+
+        let callback_handler = Update::filter_callback_query().endpoint(handle_callback);
+
+        let handler = dptree::entry()
+            .branch(commands_handler)
+            .branch(callback_handler);
 
         Dispatcher::builder(bot, handler)
             .dependencies(dptree::deps![self.executors.clone()]) // ← Прокидываем executors

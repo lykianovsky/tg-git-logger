@@ -1,15 +1,17 @@
 mod register;
+mod report;
 mod start;
 
 use crate::bootstrap::executors::ApplicationBoostrapExecutors;
 use crate::delivery::bot::telegram::command::TelegramBotCommand;
 use crate::delivery::bot::telegram::context::TelegramBotCommandContext;
 use crate::delivery::bot::telegram::handlers::register::TelegramBotRegisterCommandHandler;
+use crate::delivery::bot::telegram::handlers::report::TelegramBotWeeklyReportCommandHandler;
 use crate::delivery::bot::telegram::handlers::start::TelegramBotStartCommandHandler;
 use std::sync::Arc;
-use teloxide::Bot;
 use teloxide::prelude::ResponseResult;
 use teloxide::types::{Message, User};
+use teloxide::Bot;
 
 pub async fn handle(
     bot: Bot,
@@ -35,6 +37,14 @@ pub async fn handle(
             TelegramBotRegisterCommandHandler::new(
                 context,
                 executors.commands.create_oauth_link.clone(),
+            )
+            .execute()
+            .await?;
+        }
+        TelegramBotCommand::WeeklyReport => {
+            TelegramBotWeeklyReportCommandHandler::new(
+                context,
+                executors.queries.build_weekly_report.clone(),
             )
             .execute()
             .await?;

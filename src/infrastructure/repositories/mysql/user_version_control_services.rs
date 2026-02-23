@@ -1,7 +1,7 @@
 use crate::domain::user::entities::user_vcs::UserVersionControlService;
 use crate::domain::user::repositories::user_version_control_services::{
     CreateVersionControlServiceException, FindVersionControlServiceByIdException,
-    UserVersionControlServicesRepository,
+    FindVersionControlServiceByUserIdException, UserVersionControlServicesRepository,
 };
 use crate::domain::user::value_objects::user_id::UserId;
 use crate::domain::user::value_objects::version_control_type::VersionControlType;
@@ -69,6 +69,21 @@ impl UserVersionControlServicesRepository for MySQLUserVersionControlServicesRep
 
         UserVersionControlService::from_mysql(result)
             .map_err(|e| FindVersionControlServiceByIdException::DbError(e))
+    }
+
+    async fn find_by_user_id(
+        &self,
+        id: &UserId,
+    ) -> Result<UserVersionControlService, FindVersionControlServiceByUserIdException> {
+        let result = user_version_control_services::Entity::find()
+            .filter(user_version_control_services::Column::UserId.eq(id.0 as i64))
+            .one(self.db.as_ref())
+            .await
+            .map_err(|e| FindVersionControlServiceByUserIdException::DbError(e.to_string()))?
+            .ok_or(FindVersionControlServiceByUserIdException::NotFound)?;
+
+        UserVersionControlService::from_mysql(result)
+            .map_err(|e| FindVersionControlServiceByUserIdException::DbError(e))
     }
 }
 

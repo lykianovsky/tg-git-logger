@@ -1,4 +1,5 @@
 use crate::domain::user::entities::user_vcs::UserVersionControlService;
+use crate::domain::user::value_objects::user_id::UserId;
 use crate::domain::user::value_objects::version_control_user_id::VersionControlUserId;
 use sea_orm::DatabaseTransaction;
 use thiserror::Error;
@@ -18,6 +19,15 @@ pub enum FindVersionControlServiceByIdException {
     NotFound,
 }
 
+#[derive(Debug, Error)]
+pub enum FindVersionControlServiceByUserIdException {
+    #[error("Database error: {0}")]
+    DbError(String),
+
+    #[error("User not found")]
+    NotFound,
+}
+
 #[async_trait::async_trait]
 pub trait UserVersionControlServicesRepository: Send + Sync {
     async fn create(
@@ -30,4 +40,9 @@ pub trait UserVersionControlServicesRepository: Send + Sync {
         &self,
         id: &VersionControlUserId,
     ) -> Result<UserVersionControlService, FindVersionControlServiceByIdException>;
+
+    async fn find_by_user_id(
+        &self,
+        id: &UserId,
+    ) -> Result<UserVersionControlService, FindVersionControlServiceByUserIdException>;
 }

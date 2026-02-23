@@ -1,6 +1,6 @@
 use crate::domain::auth::ports::oauth_client::OAuthClientExchangeCodeError;
 use crate::domain::notification::services::notification_service::NotificationServiceSendError;
-use crate::domain::user::ports::version_control_client::VersionControlClientError;
+use crate::domain::user::ports::version_control_client::VersionControlClientGetUserError;
 use crate::domain::user::repositories::user_repository::CreateUserException;
 use crate::domain::user::repositories::user_social_services_repository::CreateSocialServiceException;
 use crate::domain::user::repositories::user_version_control_services::CreateVersionControlServiceException;
@@ -19,7 +19,7 @@ pub enum RegisterUserViaOAuthExecutorError {
     OAuthClientExchangeCodeError(#[from] OAuthClientExchangeCodeError),
 
     #[error("{0}")]
-    VersionControlClientError(#[from] VersionControlClientError),
+    VersionControlClientError(#[from] VersionControlClientGetUserError),
 
     #[error("{0}")]
     CreateUserException(#[from] CreateUserException),

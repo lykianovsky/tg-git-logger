@@ -4,6 +4,15 @@ pub struct ApplicationSecretConfig {
     pub reversible_cipher_secret: String,
 }
 
+pub struct ApplicationGithubConfig {
+    pub base: String,
+    pub api_base: String,
+    pub repository: String,
+    pub repository_owner: String,
+    pub oauth_client_id: String,
+    pub oauth_client_secret: String,
+}
+
 pub struct ApplicationRedisConfig {
     pub secret: String,
     pub url: String,
@@ -38,6 +47,7 @@ pub struct ApplicationConfig {
     pub mysql: ApplicationMysqlConfig,
     pub rabbit_mq: ApplicationRabbitMqConfig,
     pub redis: ApplicationRedisConfig,
+    pub github: ApplicationGithubConfig,
     pub secret: ApplicationSecretConfig,
 }
 
@@ -49,17 +59,19 @@ impl ApplicationConfig {
         let mysql = Self::build_mysql_config();
         let rabbit_mq = Self::build_rabbit_mq_config();
         let redis = Self::build_redis_config();
+        let github = Self::build_github_config();
         let secret = Self::build_secret_config();
 
-        return Self {
+        Self {
             port,
             debug,
             telegram,
             mysql,
             rabbit_mq,
             redis,
+            github,
             secret,
-        };
+        }
     }
 
     pub fn build_telegram_config() -> ApplicationTelegramConfig {
@@ -68,12 +80,12 @@ impl ApplicationConfig {
         let chat_id: i64 = ENV.get("TELEGRAM_CHAT_ID").parse().unwrap();
         let admin_user_id: i64 = ENV.get("TELEGRAM_ADMIN_USER_ID").parse().unwrap();
 
-        return ApplicationTelegramConfig {
+        ApplicationTelegramConfig {
             url_base,
             bot_token,
             chat_id,
             admin_user_id,
-        };
+        }
     }
 
     pub fn build_mysql_config() -> ApplicationMysqlConfig {
@@ -83,13 +95,13 @@ impl ApplicationConfig {
         let database = ENV.get("MYSQL_DATABASE_NAME");
         let url = ENV.get("MYSQL_URL");
 
-        return ApplicationMysqlConfig {
+        ApplicationMysqlConfig {
             port,
             username,
             password,
             database,
             url,
-        };
+        }
     }
 
     pub fn build_rabbit_mq_config() -> ApplicationRabbitMqConfig {
@@ -98,26 +110,44 @@ impl ApplicationConfig {
         let password = ENV.get("RABBITMQ_PASSWORD");
         let url = ENV.get("RABBITMQ_URL");
 
-        return ApplicationRabbitMqConfig {
+        ApplicationRabbitMqConfig {
             port,
             username,
             password,
             url,
-        };
+        }
     }
 
     pub fn build_redis_config() -> ApplicationRedisConfig {
         let url = ENV.get("REDIS_URL");
         let secret = ENV.get("REDIS_SECRET_KEY");
 
-        return ApplicationRedisConfig { url, secret };
+        ApplicationRedisConfig { url, secret }
+    }
+
+    pub fn build_github_config() -> ApplicationGithubConfig {
+        let base = ENV.get("GITHUB_BASE");
+        let api_base = ENV.get("GITHUB_API_BASE");
+        let repository = ENV.get("GITHUB_REPOSITORY");
+        let repository_owner = ENV.get("GITHUB_REPOSITORY_OWNER");
+        let oauth_client_id = ENV.get("GITHUB_OAUTH_CLIENT_ID");
+        let oauth_client_secret = ENV.get("GITHUB_OAUTH_CLIENT_SECRET");
+
+        ApplicationGithubConfig {
+            base,
+            api_base,
+            repository,
+            repository_owner,
+            oauth_client_id,
+            oauth_client_secret,
+        }
     }
 
     pub fn build_secret_config() -> ApplicationSecretConfig {
         let reversible_cipher_secret = ENV.get("REVERSABLE_CIPHER_SECRET_KEY");
 
-        return ApplicationSecretConfig {
+        ApplicationSecretConfig {
             reversible_cipher_secret,
-        };
+        }
     }
 }

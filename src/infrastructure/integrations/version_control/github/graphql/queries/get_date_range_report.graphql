@@ -1,0 +1,117 @@
+query GithubDateRangeReport(
+    $owner: String!,
+    $repo: String!,
+    $since: GitTimestamp!,
+    $until: GitTimestamp!,
+    $prSearch: String!,
+    $issueSearch: String!,
+    $after: String
+) {
+    repository(owner: $owner, name: $repo) {
+        defaultBranchRef {
+            target {
+                __typename
+                ... on Commit {
+                    history(since: $since, until: $until, first: 100) {
+                        totalCount
+                        nodes {
+                            oid
+                            message
+                            committedDate
+                            additions
+                            deletions
+                            changedFilesIfAvailable
+                            author {
+                                __typename
+                                name
+                                email
+                                user {
+                                    login
+                                    databaseId
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    pullRequests: search(query: $prSearch, first: 100, after: $after, type: ISSUE) {
+        pageInfo {
+            hasNextPage
+            endCursor
+        }
+        nodes {
+            __typename
+            ... on PullRequest {
+                number
+                title
+                state
+                createdAt
+                updatedAt
+                mergedAt
+                closedAt
+                additions
+                deletions
+                changedFiles
+                author { __typename login }
+                assignees(first: 10) {
+                    nodes { login }
+                }
+                labels(first: 10) {
+                    nodes { name }
+                }
+                reviews(first: 50) {
+                    nodes {
+                        id: fullDatabaseId
+                        state
+                        submittedAt
+                        author { __typename login }
+                        body
+                    }
+                }
+                comments(first: 50) {
+                    nodes {
+                        databaseId
+                        body
+                        createdAt
+                        author { __typename login }
+                    }
+                }
+            }
+        }
+    }
+
+    issues: search(query: $issueSearch, first: 100, type: ISSUE) {
+        pageInfo {
+            hasNextPage
+            endCursor
+        }
+        nodes {
+            __typename
+            ... on Issue {
+                number
+                title
+                state
+                createdAt
+                closedAt
+                author { __typename login }
+                assignees(first: 10) {
+                    nodes { __typename login }
+                }
+                labels(first: 10) {
+                    nodes { name }
+                }
+                comments(first: 50) {
+                    nodes {
+                        databaseId
+                        body
+                        createdAt
+                        author { __typename login }
+                    }
+                }
+            }
+        }
+    }
+}

@@ -100,8 +100,12 @@ impl ReversibleCipher {
         ))
     }
 
-    pub fn decrypt(&self, encrypted: &str) -> Result<String, CipherError> {
-        let data = general_purpose::STANDARD.decode(encrypted)?;
+    pub fn decrypt<T>(&self, encrypted: T) -> Result<String, CipherError>
+    where
+        T: AsRef<str>,
+    {
+        let encrypted_str = encrypted.as_ref();
+        let data = general_purpose::STANDARD.decode(encrypted_str)?;
 
         if data.len() < 12 {
             return Err(CipherError::InvalidEncryptedData);

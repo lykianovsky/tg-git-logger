@@ -11,6 +11,7 @@ lto = false
 members = [".", "migration"]
 
 [dependencies]
+graphql_client = { version = "0.15", features = ["reqwest-blocking"] }
 tokio = { version = "1.35", features = ["full"] }
 axum = "0.8.8"
 serde = { version = "1.0", features = ["derive"] }

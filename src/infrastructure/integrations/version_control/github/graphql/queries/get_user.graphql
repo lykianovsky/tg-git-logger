@@ -1,0 +1,7 @@
+query GithubUser {
+    viewer {
+        id: databaseId
+        login
+        email
+    }
+}

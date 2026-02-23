@@ -1,5 +1,6 @@
 use crate::application::auth::commands::create_oauth_link::executor::CreateOAuthLinkExecutor;
 use crate::application::user::commands::register_via_oauth::executor::RegisterUserViaOAuthExecutor;
+use crate::application::version_control::queries::build_report::executor::BuildVersionControlDateRangeReportExecutor;
 use crate::application::webhook::commands::dispatch_event::executor::DispatchWebhookEventExecutor;
 use crate::application::webhook::commands::notify_received_event::executor::NotifyReceivedWebhookEventExecutor;
 use crate::config::application::ApplicationConfig;
@@ -7,7 +8,7 @@ use crate::domain::shared::events::publisher::EventPublisher;
 use crate::infrastructure::drivers::cache::contract::CacheService;
 use crate::infrastructure::drivers::cache::redis::RedisCache;
 use crate::infrastructure::integrations::oauth::github::GithubOAuthClient;
-use crate::infrastructure::integrations::version_control::github::GithubVersionControlClient;
+use crate::infrastructure::integrations::version_control::github::client::GithubVersionControlClient;
 use crate::infrastructure::repositories::mysql::user::MySQLUserRepository;
 use crate::infrastructure::repositories::mysql::user_has_roles::MySQLUserHasRolesRepository;
 use crate::infrastructure::repositories::mysql::user_social_services::MySQLUserSocialServicesRepository;
@@ -18,7 +19,9 @@ use crate::utils::security::crypto::reversible::ReversibleCipher;
 use sea_orm::DatabaseConnection;
 use std::sync::Arc;
 
-pub struct ApplicationBoostrapExecutorsQueries {}
+pub struct ApplicationBoostrapExecutorsQueries {
+    pub build_weekly_report: Arc<BuildVersionControlDateRangeReportExecutor>,
+}
 
 pub struct ApplicationBoostrapExecutorsCommands {
     pub register_user_via_oauth: Arc<RegisterUserViaOAuthExecutor>,
@@ -61,9 +64,20 @@ impl ApplicationBoostrapExecutors {
         ));
 
         let oauth_client = Arc::new(GithubOAuthClient::new());
-        let version_control_client = Arc::new(GithubVersionControlClient::new());
+        let version_control_client = Arc::new(GithubVersionControlClient::new(
+            config.github.api_base.clone(),
+            config.github.repository_owner.clone(),
+            config.github.repository.clone(),
+        ));
 
-        let queries = ApplicationBoostrapExecutorsQueries {};
+        let queries = ApplicationBoostrapExecutorsQueries {
+            build_weekly_report: Arc::new(BuildVersionControlDateRangeReportExecutor {
+                reversible_cipher: reversible_cipher.clone(),
+                user_socials_repo: user_socials_repo.clone(),
+                user_version_control_service_repo: user_version_controls_repo.clone(),
+                version_control_client: version_control_client.clone(),
+            }),
+        };
 
         let commands = ApplicationBoostrapExecutorsCommands {
             create_oauth_link: Arc::new(CreateOAuthLinkExecutor::new(

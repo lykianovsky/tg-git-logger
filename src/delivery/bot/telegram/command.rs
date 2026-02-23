@@ -7,4 +7,6 @@ pub enum TelegramBotCommand {
     Start,
     #[command(description = "Создать пользователя")]
     Register,
+    #[command(description = "Получить отчет")]
+    WeeklyReport,
 }

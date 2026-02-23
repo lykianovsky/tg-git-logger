@@ -13,8 +13,12 @@ services:
     stdin_open: true
     tty: true
     depends_on:
-      - db
-      - rabbitmq
+      rabbit_mq:
+        condition: service_healthy
+      db:
+        condition: service_started
+      redis:
+        condition: service_started
 
   db:
     image: mysql:8.0
@@ -28,7 +32,7 @@ services:
     volumes:
       - mysql-data:/var/lib/mysql
 
-  rabbitmq:
+  rabbit_mq:
     image: rabbitmq:3-management
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
@@ -38,6 +42,12 @@ services:
       - "${RABBITMQ_MANAGEMENT_PORT}:15672" # веб-менеджмент
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: [ "CMD", "rabbitmq-diagnostics", "ping" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   redis:
     image: redis:7
     ports:
