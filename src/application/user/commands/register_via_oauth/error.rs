@@ -1,9 +1,9 @@
 use crate::domain::auth::ports::oauth_client::OAuthClientExchangeCodeError;
 use crate::domain::notification::services::notification_service::NotificationServiceSendError;
-use crate::domain::user::ports::version_control_client::VersionControlClientGetUserError;
 use crate::domain::user::repositories::user_repository::CreateUserException;
-use crate::domain::user::repositories::user_social_services_repository::CreateSocialServiceException;
-use crate::domain::user::repositories::user_version_control_services::CreateVersionControlServiceException;
+use crate::domain::user::repositories::user_social_accounts_repository::CreateSocialServiceException;
+use crate::domain::user::repositories::user_vc_accounts_repository::CreateVersionControlServiceException;
+use crate::domain::version_control::ports::version_control_client::VersionControlClientGetUserError;
 use crate::utils::security::crypto::reversible::CipherError;
 use thiserror::Error;
 

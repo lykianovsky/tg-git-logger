@@ -1,5 +1,14 @@
 use crate::config::environment::ENV;
 
+pub struct ApplicationTaskTrackerConfig {
+    pub extract_pattern: String,
+}
+
+pub struct ApplicationKaitenConfig {
+    pub base: String,
+    pub api_token: String,
+}
+
 pub struct ApplicationSecretConfig {
     pub reversible_cipher_secret: String,
 }
@@ -51,6 +60,8 @@ pub struct ApplicationConfig {
     pub redis: ApplicationRedisConfig,
     pub github: ApplicationGithubConfig,
     pub secret: ApplicationSecretConfig,
+    pub kaiten: ApplicationKaitenConfig,
+    pub task_tracker: ApplicationTaskTrackerConfig,
 }
 
 impl ApplicationConfig {
@@ -63,6 +74,8 @@ impl ApplicationConfig {
         let redis = Self::build_redis_config();
         let github = Self::build_github_config();
         let secret = Self::build_secret_config();
+        let kaiten = Self::build_kaiten_config();
+        let task_tracker = Self::build_task_tracker_config();
 
         Self {
             port,
@@ -73,6 +86,8 @@ impl ApplicationConfig {
             redis,
             github,
             secret,
+            kaiten,
+            task_tracker,
         }
     }
 
@@ -157,5 +172,18 @@ impl ApplicationConfig {
         ApplicationSecretConfig {
             reversible_cipher_secret,
         }
+    }
+
+    pub fn build_kaiten_config() -> ApplicationKaitenConfig {
+        let base = ENV.get("KAITEN_BASE");
+        let api_token = ENV.get("KAITEN_API_TOKEN");
+
+        ApplicationKaitenConfig { base, api_token }
+    }
+
+    pub fn build_task_tracker_config() -> ApplicationTaskTrackerConfig {
+        let extract_pattern = ENV.get("TASK_TRACKER_EXTRACT_PATTERN_REGEXP");
+
+        ApplicationTaskTrackerConfig { extract_pattern }
     }
 }

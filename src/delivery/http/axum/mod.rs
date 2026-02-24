@@ -6,7 +6,7 @@ use crate::delivery::contract::ApplicationDelivery;
 use crate::delivery::http::axum::controllers::oauth::github::AxumOAuthGithubController;
 use crate::delivery::http::axum::controllers::webhook::github::AxumWebhookGithubController;
 use axum::routing::post;
-use axum::{routing::get, Extension, Router};
+use axum::{Extension, Router, routing::get};
 use std::sync::Arc;
 
 pub struct DeliveryHttpServerAxum {

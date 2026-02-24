@@ -3,6 +3,7 @@ use crate::domain::notification::services::notification_service::{
 };
 use crate::domain::user::value_objects::social_chat_id::SocialChatId;
 use crate::domain::user::value_objects::social_type::SocialType;
+use crate::utils::builder::message::MessageBuilder;
 use teloxide::prelude::*;
 use teloxide::types::{ChatId, ParseMode};
 
@@ -24,7 +25,7 @@ impl NotificationService for TelegramNotificationClient {
         &self,
         social_type: &SocialType,
         chat_id: &SocialChatId,
-        message: &str,
+        message: &MessageBuilder,
     ) -> Result<(), NotificationServiceSendError> {
         if *social_type != SocialType::Telegram {
             return Err(NotificationServiceSendError::UnsupportedSocialType(
@@ -33,8 +34,7 @@ impl NotificationService for TelegramNotificationClient {
         }
 
         self.bot
-            .send_message(ChatId(chat_id.0), message)
-            // TODO сделать парс мод что бы был передаваемый
+            .send_message(ChatId(chat_id.0), message.to_string())
             .parse_mode(ParseMode::Html)
             .await
             .map_err(|e| {

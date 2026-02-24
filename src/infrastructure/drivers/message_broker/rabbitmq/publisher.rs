@@ -1,27 +1,24 @@
-use std::sync::Arc;
-
-use crate::domain::shared::events::event::DomainEvent;
-use crate::domain::shared::events::publisher::{EventPublisher, EventPublisherError};
-use crate::infrastructure::drivers::message_broker::rabbitmq::connector::RabbitMQConnector;
-use async_trait::async_trait;
-use lapin::{
-    BasicProperties, Channel, Connection, ConnectionProperties,
-    options::{BasicPublishOptions, ExchangeDeclareOptions},
-    types::FieldTable,
+use crate::infrastructure::drivers::message_broker::contracts::envelope::MessageBrokerEnvelope;
+use crate::infrastructure::drivers::message_broker::contracts::publisher::{
+    MessageBrokerMessage, MessageBrokerPublisher, MessageBrokerPublisherPublishError,
 };
+use crate::infrastructure::drivers::message_broker::rabbitmq::broker::{
+    EXCHANGE_KIND, EXCHANGE_NAME,
+};
+use async_trait::async_trait;
+use lapin::options::{BasicPublishOptions, ExchangeDeclareOptions};
+use lapin::types::FieldTable;
+use lapin::{BasicProperties, Channel, Connection};
+use std::sync::Arc;
 use tokio::sync::Mutex;
-use tracing::error;
 
-pub const EXCHANGE_NAME: &str = "domain_events";
-pub const EXCHANGE_KIND: lapin::ExchangeKind = lapin::ExchangeKind::Topic;
-
-pub struct RabbitMqPublisher {
+pub struct MessageBrokerRabbitMQPublisher {
     channel: Arc<Mutex<Channel>>,
 }
 
-impl RabbitMqPublisher {
-    pub async fn new(connector: Arc<RabbitMQConnector>) -> Result<Self, lapin::Error> {
-        let channel = connector.create_channel().await?;
+impl MessageBrokerRabbitMQPublisher {
+    pub async fn new(connection: Arc<Connection>) -> Result<Self, lapin::Error> {
+        let channel = connection.create_channel().await?;
 
         channel
             .exchange_declare(
@@ -44,41 +41,31 @@ impl RabbitMqPublisher {
 }
 
 #[async_trait]
-impl EventPublisher for RabbitMqPublisher {
-    async fn publish(&self, event: &dyn DomainEvent) -> Result<(), EventPublisherError> {
-        let payload = serde_json::to_vec(event)
-            .map_err(|e| EventPublisherError::SerializationFailed(e.to_string()))?;
-
-        let routing_key = event.event_name();
+impl MessageBrokerPublisher for MessageBrokerRabbitMQPublisher {
+    async fn publish(
+        &self,
+        message: &dyn MessageBrokerMessage,
+    ) -> Result<(), MessageBrokerPublisherPublishError> {
+        let envelope = serde_json::to_vec(&MessageBrokerEnvelope {
+            name: message.name().to_string(),
+            payload: message,
+        })
+        .map_err(|e| MessageBrokerPublisherPublishError::SerializationFailed(e.to_string()))?;
 
         let channel = self.channel.lock().await;
 
-        let confirm = channel
+        channel
             .basic_publish(
                 EXCHANGE_NAME,
-                routing_key,
+                message.kind().routing_key(),
                 BasicPublishOptions::default(),
-                &payload,
-                BasicProperties::default()
-                    .with_content_type("application/json".into())
-                    .with_delivery_mode(2), // persistent
+                &envelope,
+                BasicProperties::default(),
             )
             .await
-            .map_err(|e| {
-                error!(
-                    routing_key,
-                    error = %e,
-                    "Failed to publish domain event"
-                );
-                EventPublisherError::PublishFailed(e.to_string())
-            })?;
-
-        confirm.await.map_err(|e| {
-            error!(routing_key, error = %e, "Broker rejected event");
-            EventPublisherError::PublishFailed(e.to_string())
-        })?;
-
-        tracing::debug!(routing_key, "Domain event published");
+            .map_err(|e| MessageBrokerPublisherPublishError::PublishCreateFailed(e.to_string()))?
+            .await
+            .map_err(|e| MessageBrokerPublisherPublishError::PublishConfirmFailed(e.to_string()))?;
 
         Ok(())
     }

@@ -1,5 +1,8 @@
-use crate::domain::shared::events::event::StaticDomainEvent;
+use crate::domain::shared::events::event::DomainEvent;
 use crate::domain::webhook::events::WebhookEvent;
+use crate::infrastructure::drivers::message_broker::contracts::publisher::{
+    MessageBrokerMessage, MessageBrokerMessageKind,
+};
 use crate::utils::builder::message::MessageBuilder;
 use serde::{Deserialize, Serialize};
 
@@ -118,6 +121,16 @@ impl WebhookEvent for WebhookWorkflowEvent {
     }
 }
 
-impl StaticDomainEvent for WebhookWorkflowEvent {
+impl DomainEvent for WebhookWorkflowEvent {
     const EVENT_NAME: &'static str = "webhook.workflow";
+}
+
+impl MessageBrokerMessage for WebhookWorkflowEvent {
+    fn name(&self) -> &'static str {
+        Self::EVENT_NAME
+    }
+
+    fn kind(&self) -> MessageBrokerMessageKind {
+        MessageBrokerMessageKind::Event
+    }
 }

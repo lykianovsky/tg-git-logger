@@ -13,12 +13,11 @@ pub struct GithubOAuthClient {
 }
 
 impl GithubOAuthClient {
-    pub fn new() -> Self {
+    pub fn new(base: String, client_id: String, client_secret: String) -> Self {
         Self {
-            // TODO
-            base: ENV.get("GITHUB_BASE"),
-            client_id: ENV.get("GITHUB_OAUTH_CLIENT_ID"),
-            client_secret: ENV.get("GITHUB_OAUTH_CLIENT_SECRET"),
+            base,
+            client_id,
+            client_secret,
             client: Client::new(),
         }
     }
@@ -53,7 +52,6 @@ impl OAuthClient for GithubOAuthClient {
 
         tracing::debug!("GitHub OAuth response body: {}", body_text);
 
-        // TODO: сделать что бы парсилось в данные из клиента, а потом в доменную сущность, а не сразу в доменную сущность, так как может быть разная структура данных от разных провайдеров
         Ok(
             serde_json::from_str::<OAuthClientExchangeCodeResponse>(&body_text).map_err(|e| {
                 tracing::error!("Failed to parse GitHub OAuth response: {}", e);

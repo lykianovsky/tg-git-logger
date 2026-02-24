@@ -4,6 +4,7 @@ use crate::domain::notification::services::notification_service::{
 use crate::domain::user::value_objects::social_chat_id::SocialChatId;
 use crate::domain::user::value_objects::social_type::SocialType;
 use crate::infrastructure::services::notification::telegram::TelegramNotificationClient;
+use crate::utils::builder::message::MessageBuilder;
 
 pub mod telegram;
 
@@ -25,7 +26,7 @@ impl NotificationService for CompositionNotificationService {
         &self,
         social_type: &SocialType,
         chat_id: &SocialChatId,
-        message: &str,
+        message: &MessageBuilder,
     ) -> Result<(), NotificationServiceSendError> {
         match social_type {
             SocialType::Telegram => self.telegram.send(social_type, chat_id, message).await,

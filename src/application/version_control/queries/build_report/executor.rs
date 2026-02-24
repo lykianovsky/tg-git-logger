@@ -1,19 +1,24 @@
-use crate::application::version_control::queries::build_report::command::BuildVersionControlDateRangeReportExecutorCommand;
+use crate::application::version_control::queries::build_report::command::{
+    BuildVersionControlDateRangeReportExecutorCommand,
+    BuildVersionControlDateRangeReportExecutorCommandForWho,
+};
 use crate::application::version_control::queries::build_report::error::BuildVersionControlDateRangeReportExecutorError;
 use crate::application::version_control::queries::build_report::response::BuildVersionControlDateRangeReportExecutorResponse;
-use crate::domain::user::entities::weekly_report::{
+use crate::domain::shared::command::CommandExecutor;
+use crate::domain::shared::date::range::DateRange;
+use crate::domain::user::repositories::user_social_accounts_repository::UserSocialAccountsRepository;
+use crate::domain::user::repositories::user_vc_accounts_repository::UserVersionControlAccountsRepository;
+use crate::domain::version_control::ports::version_control_client::{
+    VersionControlClient, VersionControlClientDateRangeReportError,
+};
+use crate::domain::version_control::value_objects::report::{
     VersionControlDateRangeReport, VersionControlDateRangeReportCommit,
     VersionControlDateRangeReportPullRequest,
 };
-use crate::domain::user::ports::version_control_client::VersionControlClient;
-use crate::domain::user::repositories::user_social_services_repository::UserSocialServicesRepository;
-use crate::domain::user::repositories::user_version_control_services::UserVersionControlServicesRepository;
 use crate::utils::builder::message::MessageBuilder;
 use crate::utils::security::crypto::reversible::ReversibleCipher;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
-
-// ── Константы ─────────────────────────────────────────────────────────────────
 
 const COMMITS_LIMIT: usize = 5;
 const PRS_LIMIT: usize = 5;
@@ -21,14 +26,13 @@ const TOP_COMMITS: usize = 3;
 const TOP_CONTRIBUTORS: usize = 5;
 const DIVIDER: &str = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n";
 
-// ── Агрегированная статистика ──────────────────────────────────────────────────
-
 struct PrStats<'a> {
     merged: Vec<&'a VersionControlDateRangeReportPullRequest>,
     open: Vec<&'a VersionControlDateRangeReportPullRequest>,
     closed: Vec<&'a VersionControlDateRangeReportPullRequest>,
 }
 
+// TODO: ВАЙБ-КОД
 impl<'a> PrStats<'a> {
     fn from(prs: &'a [VersionControlDateRangeReportPullRequest]) -> Self {
         Self {
@@ -79,61 +83,60 @@ struct ContribStats {
     deletions: i64,
 }
 
-// ── Executor ───────────────────────────────────────────────────────────────────
-
 pub struct BuildVersionControlDateRangeReportExecutor {
     pub reversible_cipher: Arc<ReversibleCipher>,
-    pub user_socials_repo: Arc<dyn UserSocialServicesRepository>,
-    pub user_version_control_service_repo: Arc<dyn UserVersionControlServicesRepository>,
+    pub user_socials_repo: Arc<dyn UserSocialAccountsRepository>,
+    pub user_version_control_service_repo: Arc<dyn UserVersionControlAccountsRepository>,
     pub version_control_client: Arc<dyn VersionControlClient>,
 }
 
 impl BuildVersionControlDateRangeReportExecutor {
-    pub async fn execute(
+    pub fn friendly_error_message(
         &self,
-        cmd: BuildVersionControlDateRangeReportExecutorCommand,
-    ) -> Result<
-        BuildVersionControlDateRangeReportExecutorResponse,
-        BuildVersionControlDateRangeReportExecutorError,
-    > {
-        let social_user = self
-            .user_socials_repo
-            .find_by_social_user_id(&cmd.social_user_id)
-            .await?;
+        error: &BuildVersionControlDateRangeReportExecutorError,
+    ) -> String {
+        tracing::error!("{error}");
 
-        let version_control_user = self
-            .user_version_control_service_repo
-            .find_by_user_id(&social_user.user_id)
-            .await?;
-
-        let decrypted_token = self
-            .reversible_cipher
-            .decrypt(&version_control_user.access_token.value())?;
-
-        let report = self
-            .version_control_client
-            .get_report(&decrypted_token, &cmd.date_range, None)
-            .await?;
-
-        tracing::debug!("Weekly report built: {:?}", report);
-
-        Ok(BuildVersionControlDateRangeReportExecutorResponse {
-            text: self.render(report),
-        })
-    }
-
-    // ── Точка входа ───────────────────────────────────────────────────────────
-
-    fn render(&self, report: VersionControlDateRangeReport) -> String {
-        if let Some(author) = &report.author.clone() {
-            return self.render_for_author(&report, author);
+        match error {
+            BuildVersionControlDateRangeReportExecutorError::VersionControlClientDateRangeReportError(
+                VersionControlClientDateRangeReportError::Unauthorized(reason)
+            ) => {
+                format!("🔐 Нет доступа к репозиторию.\nПричина: {}", reason)
+            }
+            BuildVersionControlDateRangeReportExecutorError::VersionControlClientDateRangeReportError(
+                VersionControlClientDateRangeReportError::Transport(reason)
+            ) => {
+                format!("🌐 Ошибка соединения: {}", reason)
+            }
+            BuildVersionControlDateRangeReportExecutorError::FindSocialServiceByIdException(..) => {
+                "🔐 Вы должны пройти регистрацию".to_string()
+            }
+            _ => {
+                "❌ Неизвестная ошибка".to_string()
+            }
         }
-        self.render_for_repository(&report)
     }
 
-    // ── Персональный отчёт ────────────────────────────────────────────────────
+    // TODO: ВАЙБ-КОД
+    fn render(
+        &self,
+        report: &VersionControlDateRangeReport,
+        author: &Option<String>,
+        date_range: &DateRange,
+    ) -> String {
+        if let Some(author) = &author {
+            return self.render_for_author(&report, &author, &date_range);
+        }
 
-    fn render_for_author(&self, report: &VersionControlDateRangeReport, author: &str) -> String {
+        self.render_for_repository(&report, &date_range)
+    }
+
+    fn render_for_author(
+        &self,
+        report: &VersionControlDateRangeReport,
+        author: &str,
+        date_range: &DateRange,
+    ) -> String {
         let mut b = MessageBuilder::new();
         let commits = &report.commits;
         let prs = &report.pull_requests;
@@ -144,7 +147,7 @@ impl BuildVersionControlDateRangeReportExecutor {
                 "👤 <b>Персональный отчёт:</b> <b>{}</b>",
                 MessageBuilder::escape_html(author)
             ),
-            report,
+            date_range,
         );
 
         if commits.is_empty() && prs.is_empty() {
@@ -190,14 +193,16 @@ impl BuildVersionControlDateRangeReportExecutor {
         b.build()
     }
 
-    // ── Репозиторный отчёт ────────────────────────────────────────────────────
-
-    fn render_for_repository(&self, report: &VersionControlDateRangeReport) -> String {
+    fn render_for_repository(
+        &self,
+        report: &VersionControlDateRangeReport,
+        date_range: &DateRange,
+    ) -> String {
         let mut b = MessageBuilder::new();
         let commits = &report.commits;
         let prs = &report.pull_requests;
 
-        b = self.render_header(&mut b, "🏢 <b>Отчёт по репозиторию</b>", report);
+        b = self.render_header(&mut b, "🏢 <b>Отчёт по репозиторию</b>", date_range);
 
         if commits.is_empty() && prs.is_empty() {
             return Self::render_empty(b);
@@ -241,18 +246,16 @@ impl BuildVersionControlDateRangeReportExecutor {
         b.build()
     }
 
-    // ── Переиспользуемые блоки ────────────────────────────────────────────────
-
     fn render_header(
         &self,
         _b: &mut MessageBuilder,
         title: &str,
-        report: &VersionControlDateRangeReport,
+        date_range: &DateRange,
     ) -> MessageBuilder {
         let period = format!(
             "{} — {}",
-            report.period.since.format("%d %b %Y"),
-            report.period.until.format("%d %b %Y")
+            date_range.since.format("%d %b %Y"),
+            date_range.until.format("%d %b %Y")
         );
         MessageBuilder::new()
             .raw(&format!("{}\n", title))
@@ -564,8 +567,6 @@ impl BuildVersionControlDateRangeReportExecutor {
         b.empty_line()
     }
 
-    // ── Утилиты ───────────────────────────────────────────────────────────────
-
     fn render_empty(b: MessageBuilder) -> String {
         b.raw("\n😴 <i>За этот период активности не обнаружено.</i>\n")
             .build()
@@ -579,5 +580,45 @@ impl BuildVersionControlDateRangeReportExecutor {
         } else {
             out
         }
+    }
+}
+
+impl CommandExecutor for BuildVersionControlDateRangeReportExecutor {
+    type Command = BuildVersionControlDateRangeReportExecutorCommand;
+    type Response = BuildVersionControlDateRangeReportExecutorResponse;
+    type Error = BuildVersionControlDateRangeReportExecutorError;
+
+    async fn execute(&self, cmd: &Self::Command) -> Result<Self::Response, Self::Error> {
+        let social_user = self
+            .user_socials_repo
+            .find_by_social_user_id(&cmd.social_user_id)
+            .await?;
+
+        let version_control_user = self
+            .user_version_control_service_repo
+            .find_by_user_id(&social_user.user_id)
+            .await?;
+
+        let decrypted_token = self
+            .reversible_cipher
+            .decrypt(&version_control_user.access_token.value())?;
+
+        let author = match cmd.for_who {
+            BuildVersionControlDateRangeReportExecutorCommandForWho::Me => {
+                Some(version_control_user.version_control_login)
+            }
+            BuildVersionControlDateRangeReportExecutorCommandForWho::Repository => None,
+        };
+
+        let report = self
+            .version_control_client
+            .get_details_by_range(&decrypted_token, &cmd.date_range, author.as_deref())
+            .await?;
+
+        tracing::debug!("Version control report built: {:?}", report);
+
+        Ok(BuildVersionControlDateRangeReportExecutorResponse {
+            text: self.render(&report, &author, &cmd.date_range),
+        })
     }
 }

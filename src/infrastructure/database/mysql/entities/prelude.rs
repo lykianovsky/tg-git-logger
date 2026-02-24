@@ -2,6 +2,6 @@
 
 pub use super::roles::Entity as Roles;
 pub use super::user_has_roles::Entity as UserHasRoles;
-pub use super::user_socials_services::Entity as UserSocialsServices;
-pub use super::user_version_control_services::Entity as UserVersionControlServices;
+pub use super::user_social_accounts::Entity as UserSocialAccounts;
+pub use super::user_version_control_accounts::Entity as UserVersionControlAccounts;
 pub use super::users::Entity as Users;

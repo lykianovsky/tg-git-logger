@@ -1,11 +1,5 @@
 use crate::infrastructure::drivers::cache::contract::CacheService;
-use hex::encode;
-use hmac::{Hmac, Mac};
 use redis::AsyncCommands;
-use serde::Serialize;
-use sha2::Sha256;
-
-type HmacSha256 = Hmac<Sha256>;
 
 pub struct RedisCache {
     client: redis::Client,
@@ -15,17 +9,6 @@ impl RedisCache {
     pub fn new(url: String) -> Self {
         let client = redis::Client::open(url).unwrap();
         Self { client }
-    }
-
-    fn make_key_by_payload<T: Serialize>(&self, secret: &str, payload: &T) -> String {
-        let json = serde_json::to_string(payload).expect("Failed to serialize payload");
-
-        let mut mac =
-            HmacSha256::new_from_slice(secret.as_bytes()).expect("HMAC can take key of any size");
-
-        mac.update(json.as_bytes());
-
-        encode(mac.finalize().into_bytes())
     }
 }
 

@@ -14,6 +14,9 @@ pub enum AssignRoleToUserException {
 pub enum GetAllUserRolesException {
     #[error("Database error: {0}")]
     DbError(String),
+
+    #[error("Invalid field: {0}")]
+    InvalidField(String),
 }
 
 #[async_trait::async_trait]

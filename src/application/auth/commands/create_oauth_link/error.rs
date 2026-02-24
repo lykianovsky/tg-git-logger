@@ -1,13 +1,9 @@
-use crate::domain::shared::events::publisher::EventPublisherError;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum CreateOAuthLinkExecutorError {
     #[error("Exist registered social account with this social_user_id: {0}")]
     ExistRegisteredSocialAccountError(String),
-
-    #[error("{0}")]
-    PublisherError(#[from] EventPublisherError),
 
     #[error("{0}")]
     UrlParse(#[from] url::ParseError),
