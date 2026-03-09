@@ -1,15 +1,15 @@
-pub trait DomainEvent: Send + Sync + erased_serde::Serialize {
+pub trait StaticDomainEvent: Send + Sync + erased_serde::Serialize {
     fn event_name(&self) -> &'static str;
 }
 
-pub trait StaticDomainEvent: DomainEvent {
+pub trait DomainEvent: StaticDomainEvent {
     const EVENT_NAME: &'static str;
 }
 
-impl<T: StaticDomainEvent> DomainEvent for T {
+impl<T: DomainEvent> StaticDomainEvent for T {
     fn event_name(&self) -> &'static str {
         T::EVENT_NAME
     }
 }
 
-erased_serde::serialize_trait_object!(DomainEvent);
+erased_serde::serialize_trait_object!(StaticDomainEvent);

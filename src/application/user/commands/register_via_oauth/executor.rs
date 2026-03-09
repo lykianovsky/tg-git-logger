@@ -4,15 +4,17 @@ use crate::application::user::commands::register_via_oauth::response::RegisterUs
 use crate::domain::auth::entities::oauth_state::OpenAuthorizationState;
 use crate::domain::auth::ports::oauth_client::OAuthClient;
 use crate::domain::notification::services::notification_service::NotificationService;
+use crate::domain::shared::command::CommandExecutor;
 use crate::domain::user::entities::user::User;
-use crate::domain::user::entities::user_social::UserSocial;
-use crate::domain::user::entities::user_vcs::UserVersionControlService;
-use crate::domain::user::ports::version_control_client::VersionControlClient;
+use crate::domain::user::entities::user_social_account::UserSocialAccount;
+use crate::domain::user::entities::user_vc_account::UserVersionControlAccount;
 use crate::domain::user::repositories::user_repository::UserRepository;
-use crate::domain::user::repositories::user_social_services_repository::UserSocialServicesRepository;
-use crate::domain::user::repositories::user_version_control_services::UserVersionControlServicesRepository;
+use crate::domain::user::repositories::user_social_accounts_repository::UserSocialAccountsRepository;
+use crate::domain::user::repositories::user_vc_accounts_repository::UserVersionControlAccountsRepository;
 use crate::domain::user::value_objects::version_control_user_id::VersionControlUserId;
+use crate::domain::version_control::ports::version_control_client::VersionControlClient;
 use crate::infrastructure::drivers::cache::contract::CacheService;
+use crate::utils::builder::message::MessageBuilder;
 use crate::utils::mutex::key_locker::KeyLocker;
 use crate::utils::security::crypto::reversible::ReversibleCipher;
 use sea_orm::{DatabaseConnection, TransactionTrait};
@@ -21,8 +23,8 @@ use std::sync::Arc;
 pub struct RegisterUserViaOAuthExecutor {
     pub db: Arc<DatabaseConnection>,
     pub user_repo: Arc<dyn UserRepository>,
-    pub user_socials_repo: Arc<dyn UserSocialServicesRepository>,
-    pub user_version_control_service_repo: Arc<dyn UserVersionControlServicesRepository>,
+    pub user_socials_repo: Arc<dyn UserSocialAccountsRepository>,
+    pub user_version_control_service_repo: Arc<dyn UserVersionControlAccountsRepository>,
     pub oauth_client: Arc<dyn OAuthClient>,
     pub version_control_client: Arc<dyn VersionControlClient>,
     pub notification_service: Arc<dyn NotificationService>,
@@ -32,10 +34,48 @@ pub struct RegisterUserViaOAuthExecutor {
 }
 
 impl RegisterUserViaOAuthExecutor {
-    pub async fn execute(
+    async fn retrieve_oauth_state(
         &self,
-        cmd: RegisterUserViaOAuthExecutorCommand,
-    ) -> Result<RegisterUserViaOAuthExecutorResponse, RegisterUserViaOAuthExecutorError> {
+        key: &str,
+    ) -> Result<OpenAuthorizationState, RegisterUserViaOAuthExecutorError> {
+        tracing::debug!(state_id = %key, "Retrieving OAuth state from cache");
+
+        let state_json = self
+            .cache
+            .take(key)
+            .await
+            .map_err(|e| {
+                tracing::error!(
+                    error = %e,
+                    state_id = %key,
+                    "Failed to retrieve state from cache"
+                );
+                RegisterUserViaOAuthExecutorError::Cache(e.to_string())
+            })?
+            .ok_or_else(|| {
+                tracing::warn!(
+                    state_id = %key,
+                    "OAuth state not found in cache (expired or invalid)"
+                );
+                RegisterUserViaOAuthExecutorError::InvalidState
+            })?;
+
+        tracing::trace!(
+            state_id = %key,
+            state_json_length = state_json.len(),
+            "OAuth state JSON retrieved from cache"
+        );
+
+        Ok(serde_json::from_str::<OpenAuthorizationState>(&state_json)?)
+    }
+}
+
+impl CommandExecutor for RegisterUserViaOAuthExecutor {
+    type Command = RegisterUserViaOAuthExecutorCommand;
+    type Response = RegisterUserViaOAuthExecutorResponse;
+    type Error = RegisterUserViaOAuthExecutorError;
+
+    async fn execute(&self, cmd: &Self::Command) -> Result<Self::Response, Self::Error> {
         let _guard = self.mutex.lock(cmd.state.clone()).await;
 
         let txn = self.db.begin().await?;
@@ -76,7 +116,7 @@ impl RegisterUserViaOAuthExecutor {
             )
             .await?;
 
-        let new_social_user = UserSocial {
+        let new_social_user = UserSocialAccount {
             id: Default::default(),
             user_id: user.id,
             social_type: state.social_type,
@@ -97,10 +137,10 @@ impl RegisterUserViaOAuthExecutor {
             .reversible_cipher
             .encrypt(&exchange_code_response.access_token)?;
 
-        let new_user_version_control_service = UserVersionControlService {
+        let new_user_version_control_service = UserVersionControlAccount {
             id: Default::default(),
             user_id: user.id,
-            version_control_type: state.version_control_type,
+            version_control_type: state.version_control_type.clone(),
             version_control_user_id: VersionControlUserId(version_control_client_user.id as i32),
             version_control_login: version_control_client_user.login.clone(),
             version_control_email: version_control_client_user.email.clone(),
@@ -118,57 +158,18 @@ impl RegisterUserViaOAuthExecutor {
             .create(&txn, &new_user_version_control_service)
             .await?;
 
+        let success_message = MessageBuilder::new().line(&format!(
+            "Вы успешно привязали аккаунт {}. Логин привязанного аккаунта: {}",
+            state.version_control_type.clone(),
+            version_control_client_user.login.clone()
+        ));
+
         self.notification_service
-            .send(
-                &state.social_type,
-                &state.social_chat_id,
-                &format!(
-                    "Вы успешно привязали аккаунт {} к своему профилю! (login: {})",
-                    state.social_type.to_string(),
-                    new_user_version_control_service
-                        .version_control_login
-                        .clone()
-                ),
-            )
+            .send(&state.social_type, &state.social_chat_id, &success_message)
             .await?;
 
         txn.commit().await?;
 
         Ok(RegisterUserViaOAuthExecutorResponse {})
-    }
-
-    async fn retrieve_oauth_state(
-        &self,
-        key: &str,
-    ) -> Result<OpenAuthorizationState, RegisterUserViaOAuthExecutorError> {
-        tracing::debug!(state_id = %key, "Retrieving OAuth state from cache");
-
-        let state_json = self
-            .cache
-            .take(key)
-            .await
-            .map_err(|e| {
-                tracing::error!(
-                    error = %e,
-                    state_id = %key,
-                    "Failed to retrieve state from cache"
-                );
-                RegisterUserViaOAuthExecutorError::Cache(e.to_string())
-            })?
-            .ok_or_else(|| {
-                tracing::warn!(
-                    state_id = %key,
-                    "OAuth state not found in cache (expired or invalid)"
-                );
-                RegisterUserViaOAuthExecutorError::InvalidState
-            })?;
-
-        tracing::trace!(
-            state_id = %key,
-            state_json_length = state_json.len(),
-            "OAuth state JSON retrieved from cache"
-        );
-
-        Ok(serde_json::from_str::<OpenAuthorizationState>(&state_json)?)
     }
 }

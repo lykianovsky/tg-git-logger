@@ -1,6 +1,9 @@
-use crate::domain::shared::events::event::StaticDomainEvent;
+use crate::domain::shared::events::event::DomainEvent;
 use crate::domain::webhook::entities::commit::WebhookCommit;
 use crate::domain::webhook::events::WebhookEvent;
+use crate::infrastructure::drivers::message_broker::contracts::publisher::{
+    MessageBrokerMessage, MessageBrokerMessageKind,
+};
 use crate::utils::builder::message::MessageBuilder;
 use serde::{Deserialize, Serialize};
 
@@ -111,6 +114,16 @@ impl WebhookEvent for WebhookPushEvent {
     }
 }
 
-impl StaticDomainEvent for WebhookPushEvent {
+impl DomainEvent for WebhookPushEvent {
     const EVENT_NAME: &'static str = "webhook.push";
+}
+
+impl MessageBrokerMessage for WebhookPushEvent {
+    fn name(&self) -> &'static str {
+        Self::EVENT_NAME
+    }
+
+    fn kind(&self) -> MessageBrokerMessageKind {
+        MessageBrokerMessageKind::Event
+    }
 }

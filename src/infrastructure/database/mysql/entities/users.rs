@@ -16,10 +16,10 @@ pub struct Model {
 pub enum Relation {
     #[sea_orm(has_many = "super::user_has_roles::Entity")]
     UserHasRoles,
-    #[sea_orm(has_many = "super::user_socials_services::Entity")]
-    UserSocialsServices,
-    #[sea_orm(has_many = "super::user_version_control_services::Entity")]
-    UserVersionControlServices,
+    #[sea_orm(has_many = "super::user_social_accounts::Entity")]
+    UserSocialAccounts,
+    #[sea_orm(has_many = "super::user_version_control_accounts::Entity")]
+    UserVersionControlAccounts,
 }
 
 impl Related<super::user_has_roles::Entity> for Entity {
@@ -28,15 +28,15 @@ impl Related<super::user_has_roles::Entity> for Entity {
     }
 }
 
-impl Related<super::user_socials_services::Entity> for Entity {
+impl Related<super::user_social_accounts::Entity> for Entity {
     fn to() -> RelationDef {
-        Relation::UserSocialsServices.def()
+        Relation::UserSocialAccounts.def()
     }
 }
 
-impl Related<super::user_version_control_services::Entity> for Entity {
+impl Related<super::user_version_control_accounts::Entity> for Entity {
     fn to() -> RelationDef {
-        Relation::UserVersionControlServices.def()
+        Relation::UserVersionControlAccounts.def()
     }
 }
 

@@ -127,7 +127,6 @@ impl ReversibleCipher {
     }
 }
 
-/// Utility to generate a new secret key (run once)
 pub fn generate_secret_key() -> String {
     let mut key = [0u8; 32];
     rand::thread_rng().fill_bytes(&mut key);

@@ -1,6 +1,7 @@
 use crate::application::user::commands::register_via_oauth::executor::RegisterUserViaOAuthExecutor;
 use crate::application::webhook::commands::dispatch_event::command::DispatchWebhookEventExecutorCommand;
 use crate::application::webhook::commands::dispatch_event::executor::DispatchWebhookEventExecutor;
+use crate::domain::shared::command::CommandExecutor;
 use crate::domain::webhook::value_objects::event_type::WebhookEventType;
 use crate::infrastructure::contracts::github::event_type::GithubEventType;
 use crate::infrastructure::contracts::github::headers::GithubHeaders;
@@ -56,7 +57,7 @@ impl AxumWebhookGithubController {
 
         let cmd = DispatchWebhookEventExecutorCommand { event };
 
-        match executor.execute(cmd).await {
+        match executor.execute(&cmd).await {
             Ok(result) => {
                 tracing::debug!("{:?}", result);
                 StatusCode::OK

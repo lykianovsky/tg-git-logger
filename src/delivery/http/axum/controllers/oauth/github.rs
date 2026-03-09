@@ -1,5 +1,6 @@
 use crate::application::user::commands::register_via_oauth::command::RegisterUserViaOAuthExecutorCommand;
 use crate::application::user::commands::register_via_oauth::executor::RegisterUserViaOAuthExecutor;
+use crate::domain::shared::command::CommandExecutor;
 use axum::extract::Query;
 use axum::Extension;
 use reqwest::StatusCode;
@@ -24,7 +25,7 @@ impl AxumOAuthGithubController {
             state: query.state.clone(),
         };
 
-        match executor.execute(cmd).await {
+        match executor.execute(&cmd).await {
             Ok(result) => {
                 tracing::debug!("{:?} {:?}", result, query);
                 StatusCode::OK

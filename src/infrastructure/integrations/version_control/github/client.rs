@@ -1,14 +1,18 @@
 use crate::domain::shared::date::range::DateRange;
-use crate::domain::user::entities::weekly_report::{
+use crate::domain::version_control::ports::version_control_client::{
+    VersionControlClient, VersionControlClientDateRangeReportError,
+    VersionControlClientGetUserError, VersionControlClientGetUserResponse,
+};
+use crate::domain::version_control::value_objects::report::{
     VersionControlDateRangeReport, VersionControlDateRangeReportAuthor,
     VersionControlDateRangeReportCommit, VersionControlDateRangeReportPullRequest,
 };
-use crate::domain::user::ports::version_control_client::{
-    VersionControlClient, VersionControlClientGetUserError, VersionControlClientGetUserResponse,
+use crate::infrastructure::integrations::version_control::github::error::{
+    GithubGraphQLError, GithubGraphQLErrorType, GithubGraphQLResponse,
 };
 use async_trait::async_trait;
 use chrono::Utc;
-use graphql_client::{GraphQLQuery, Response};
+use graphql_client::GraphQLQuery;
 use reqwest::Client;
 use thiserror::Error;
 
@@ -16,12 +20,53 @@ use thiserror::Error;
 pub enum GithubClientError {
     #[error("HTTP request error: {0}")]
     Http(#[from] reqwest::Error),
+
     #[error("Failed to parse response JSON: {0}")]
     Parse(#[from] serde_json::Error),
+
     #[error("Unexpected status code: {0}")]
     Status(reqwest::StatusCode),
-    #[error("GraphQL error: {0}")]
-    GraphQL(String),
+
+    #[error("GraphQL error")]
+    GraphQL(Vec<GithubGraphQLError>),
+
+    #[error("Invalid response: {0}")]
+    InvalidResponse(String),
+}
+
+impl GithubClientError {
+    pub fn is_not_found(&self) -> bool {
+        self.has_error_type(GithubGraphQLErrorType::NotFound)
+    }
+
+    pub fn is_forbidden(&self) -> bool {
+        self.has_error_type(GithubGraphQLErrorType::Forbidden)
+    }
+
+    pub fn is_rate_limited(&self) -> bool {
+        self.has_error_type(GithubGraphQLErrorType::RateLimited)
+    }
+
+    pub fn get_error_by_type(
+        &self,
+        error_type: GithubGraphQLErrorType,
+    ) -> Option<&GithubGraphQLError> {
+        match self {
+            GithubClientError::GraphQL(errors) => {
+                errors.iter().find(|e| e.error_type == error_type)
+            }
+            _ => None,
+        }
+    }
+
+    pub fn has_error_type(&self, error_type: GithubGraphQLErrorType) -> bool {
+        matches!(self, GithubClientError::GraphQL(errors)
+            if errors.iter().any(|e| {
+                tracing::debug!("Graphql Error Type {}", e.error_type);
+                e.error_type == error_type
+            })
+        )
+    }
 }
 
 type GitObjectID = String;
@@ -77,6 +122,7 @@ impl GithubVersionControlClient {
             .await?;
 
         let status = resp.status();
+
         if !status.is_success() {
             return Err(GithubClientError::Status(status));
         }
@@ -84,21 +130,15 @@ impl GithubVersionControlClient {
         let text = resp.text().await?;
         tracing::debug!("GitHub GraphQL response: {}", text);
 
-        let result: Response<Q::ResponseData> = serde_json::from_str(&text)?;
+        let result: GithubGraphQLResponse<Q::ResponseData> = serde_json::from_str(&text)?;
 
         if let Some(errors) = result.errors {
-            return Err(GithubClientError::GraphQL(
-                errors
-                    .iter()
-                    .map(|e| e.message.as_str())
-                    .collect::<Vec<_>>()
-                    .join(", "),
-            ));
+            return Err(GithubClientError::GraphQL(errors));
         }
 
         result
             .data
-            .ok_or_else(|| GithubClientError::GraphQL("empty response".to_string()))
+            .ok_or_else(|| GithubClientError::InvalidResponse("No data in response".to_string()))
     }
 }
 
@@ -111,11 +151,15 @@ impl VersionControlClient for GithubVersionControlClient {
         let data = self
             .graphql::<GithubUser>(access_token, github_user::Variables {})
             .await
-            .map_err(|e| match e {
-                GithubClientError::Status(s) if s == reqwest::StatusCode::UNAUTHORIZED => {
-                    VersionControlClientGetUserError::Unauthorized
+            .map_err(|e| {
+                if let Some(graphql_error) = e.get_error_by_type(GithubGraphQLErrorType::Forbidden)
+                {
+                    return VersionControlClientGetUserError::Unauthorized(
+                        graphql_error.message.to_string(),
+                    );
                 }
-                e => VersionControlClientGetUserError::Transport(e.to_string()),
+
+                return VersionControlClientGetUserError::Transport(e.to_string());
             })?;
 
         Ok(VersionControlClientGetUserResponse {
@@ -124,12 +168,12 @@ impl VersionControlClient for GithubVersionControlClient {
             email: Some(data.viewer.email),
         })
     }
-    async fn get_report(
+    async fn get_details_by_range(
         &self,
         access_token: &str,
         date_range: &DateRange,
         author: Option<&str>,
-    ) -> Result<VersionControlDateRangeReport, GithubClientError> {
+    ) -> Result<VersionControlDateRangeReport, VersionControlClientDateRangeReportError> {
         let author_filter = author.map(|a| format!(" author:{}", a)).unwrap_or_default();
 
         let pr_search = format!(
@@ -162,22 +206,26 @@ impl VersionControlClient for GithubVersionControlClient {
                     after: None,
                 },
             )
-            .await?;
+            .await
+            .map_err(|e| {
+                if let Some(graphql_error) = e.get_error_by_type(GithubGraphQLErrorType::Forbidden)
+                {
+                    return VersionControlClientDateRangeReportError::Unauthorized(
+                        graphql_error.message.to_string(),
+                    );
+                }
+
+                return VersionControlClientDateRangeReportError::Transport(e.to_string());
+            })?;
 
         Ok(VersionControlDateRangeReport::from_github_response(
-            author.and_then(|a| Some(a.to_string())),
-            date_range.clone(),
             response,
         ))
     }
 }
 
 impl VersionControlDateRangeReport {
-    pub fn from_github_response(
-        author: Option<String>,
-        period: DateRange,
-        response: github_date_range_report::ResponseData,
-    ) -> Self {
+    pub fn from_github_response(response: github_date_range_report::ResponseData) -> Self {
         let mut pull_requests = Vec::new();
         let mut commits = Vec::new();
 
@@ -230,10 +278,8 @@ impl VersionControlDateRangeReport {
         }
 
         VersionControlDateRangeReport {
-            author,
             pull_requests,
             commits,
-            period,
         }
     }
 }

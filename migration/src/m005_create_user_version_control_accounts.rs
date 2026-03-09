@@ -1,0 +1,171 @@
+use sea_orm_migration::prelude::*;
+
+#[derive(DeriveMigrationName)]
+pub struct Migration;
+
+#[async_trait::async_trait]
+impl MigrationTrait for Migration {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .create_table(
+                Table::create()
+                    .table(UserVersionControlAccounts::Table)
+                    .if_not_exists()
+                    .col(
+                        ColumnDef::new(UserVersionControlAccounts::Id)
+                            .integer()
+                            .not_null()
+                            .auto_increment()
+                            .primary_key(),
+                    )
+                    .col(
+                        ColumnDef::new(UserVersionControlAccounts::UserId)
+                            .integer()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(UserVersionControlAccounts::VersionControlType)
+                            .string_len(64)
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(UserVersionControlAccounts::VersionControlUserId)
+                            .big_integer()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(UserVersionControlAccounts::VersionControlLogin)
+                            .string_len(255)
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(UserVersionControlAccounts::VersionControlEmail)
+                            .string_len(255)
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(UserVersionControlAccounts::VersionControlAvatarUrl)
+                            .string_len(512)
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(UserVersionControlAccounts::AccessToken)
+                            .text()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(UserVersionControlAccounts::RefreshToken)
+                            .text()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(UserVersionControlAccounts::TokenType)
+                            .string_len(32)
+                            .default("Bearer"),
+                    )
+                    .col(
+                        ColumnDef::new(UserVersionControlAccounts::ExpiresAt)
+                            .big_integer()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(UserVersionControlAccounts::Scope)
+                            .text()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(UserVersionControlAccounts::CreatedAt)
+                            .timestamp_with_time_zone()
+                            .default(SimpleExpr::Keyword(Keyword::CurrentTimestamp))
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(UserVersionControlAccounts::UpdatedAt)
+                            .timestamp_with_time_zone()
+                            .default(SimpleExpr::Keyword(Keyword::CurrentTimestamp))
+                            .extra("ON UPDATE CURRENT_TIMESTAMP")
+                            .not_null(),
+                    )
+                    // ===== INDEXES =====
+                    .index(
+                        Index::create()
+                            .name("idx_user_version_control_services_user_id")
+                            .col(UserVersionControlAccounts::UserId),
+                    )
+                    .index(
+                        Index::create()
+                            .name("idx_user_version_control_services_provider")
+                            .col(UserVersionControlAccounts::VersionControlType),
+                    )
+                    .index(
+                        Index::create()
+                            .name("idx_user_version_control_services_provider_username")
+                            .col(UserVersionControlAccounts::VersionControlType)
+                            .col(UserVersionControlAccounts::VersionControlLogin),
+                    )
+                    .index(
+                        Index::create()
+                            .name("idx_user_version_control_services_expires_at")
+                            .col(UserVersionControlAccounts::ExpiresAt),
+                    )
+                    .index(
+                        Index::create()
+                            .unique()
+                            .name("unique_version_control_account")
+                            .col(UserVersionControlAccounts::VersionControlType)
+                            .col(UserVersionControlAccounts::VersionControlUserId),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("fk_user_version_control_services_user")
+                            .from(
+                                UserVersionControlAccounts::Table,
+                                UserVersionControlAccounts::UserId,
+                            )
+                            .to(Users::Table, Users::Id)
+                            .on_delete(ForeignKeyAction::Cascade)
+                            .on_update(ForeignKeyAction::Cascade),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+        Ok(())
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(
+                Table::drop()
+                    .table(UserVersionControlAccounts::Table)
+                    .to_owned(),
+            )
+            .await?;
+        Ok(())
+    }
+}
+
+#[derive(Iden)]
+enum UserVersionControlAccounts {
+    Table,
+    Id,
+    UserId,
+    VersionControlType,
+    VersionControlUserId,
+    VersionControlLogin,
+    VersionControlEmail,
+    VersionControlAvatarUrl,
+    AccessToken,
+    RefreshToken,
+    TokenType,
+    ExpiresAt,
+    Scope,
+    CreatedAt,
+    UpdatedAt,
+}
+
+#[derive(Iden)]
+enum Users {
+    Table,
+    #[iden = "id"]
+    Id,
+}

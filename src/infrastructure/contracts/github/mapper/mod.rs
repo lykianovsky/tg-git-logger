@@ -1,5 +1,3 @@
-use crate::domain::shared::events::event::{DomainEvent, StaticDomainEvent};
-use crate::domain::webhook::events::push::WebhookPushEvent;
 use crate::domain::webhook::events::WebhookEvent;
 use crate::infrastructure::contracts::github::event_type::{GithubEvent, GithubEventType};
 use crate::infrastructure::contracts::github::payloads::pull_request::GithubPullRequestEvent;

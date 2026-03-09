@@ -52,7 +52,7 @@ impl UserHasRolesRepository for MySQLUserHasRolesRepository {
     }
 
     async fn get_all(&self, user_id: UserId) -> Result<Vec<Role>, GetAllUserRolesException> {
-        let roles = roles::Entity::find()
+        let roles_data = roles::Entity::find()
             .join(
                 sea_orm::JoinType::InnerJoin,
                 roles::Relation::UserHasRoles.def(),
@@ -60,14 +60,19 @@ impl UserHasRolesRepository for MySQLUserHasRolesRepository {
             .filter(user_has_roles::Column::UserId.eq(user_id.0))
             .all(self.db.as_ref())
             .await
-            .map_err(|e| GetAllUserRolesException::DbError(e.to_string()))?
-            .iter()
-            .map(|role| Role {
+            .map_err(|e| GetAllUserRolesException::DbError(e.to_string()))?;
+
+        let mut roles = Vec::with_capacity(roles_data.len());
+
+        for role in roles_data {
+            let name = RoleName::from_str(&role.name)
+                .map_err(|e| GetAllUserRolesException::InvalidField(e.to_string()))?;
+
+            roles.push(Role {
                 id: RoleId(role.id),
-                // TODO
-                name: RoleName::from_str(role.name.as_str()).unwrap(),
-            })
-            .collect();
+                name,
+            });
+        }
 
         Ok(roles)
     }

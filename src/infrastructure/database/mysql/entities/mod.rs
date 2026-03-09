@@ -4,6 +4,6 @@ pub mod prelude;
 
 pub mod roles;
 pub mod user_has_roles;
-pub mod user_socials_services;
-pub mod user_version_control_services;
+pub mod user_social_accounts;
+pub mod user_version_control_accounts;
 pub mod users;
