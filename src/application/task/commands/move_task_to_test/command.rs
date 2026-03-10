@@ -1,1 +1,3 @@
-pub struct MoveTaskToTestExecutorCommand {}
+pub struct MoveTaskToTestExecutorCommand {
+    pub task_id: u64,
+}

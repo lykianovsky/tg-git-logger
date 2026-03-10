@@ -1,6 +1,7 @@
+use serde::{Deserialize, Serialize};
 use std::fmt;
 
-#[derive(Clone, Default, Debug)]
+#[derive(Clone, Default, Debug, Serialize, Deserialize)]
 pub struct MessageBuilder {
     parts: Vec<String>,
     max_length: Option<usize>,

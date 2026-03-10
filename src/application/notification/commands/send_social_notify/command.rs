@@ -2,7 +2,7 @@ use crate::domain::user::value_objects::social_chat_id::SocialChatId;
 use crate::domain::user::value_objects::social_type::SocialType;
 use crate::utils::builder::message::MessageBuilder;
 
-pub struct NotifyReceivedWebhookEventExecutorCommand {
+pub struct SendSocialNotifyExecutorCommand {
     pub social_type: SocialType,
     pub chat_id: SocialChatId,
     pub message: MessageBuilder,

@@ -1,9 +1,9 @@
 use crate::application::auth::commands::create_oauth_link::executor::CreateOAuthLinkExecutor;
+use crate::application::notification::commands::send_social_notify::executor::SendSocialNotifyExecutor;
 use crate::application::task::commands::move_task_to_test::executor::MoveTaskToTestExecutor;
 use crate::application::user::commands::register_via_oauth::executor::RegisterUserViaOAuthExecutor;
 use crate::application::version_control::queries::build_report::executor::BuildVersionControlDateRangeReportExecutor;
 use crate::application::webhook::commands::dispatch_event::executor::DispatchWebhookEventExecutor;
-use crate::application::webhook::commands::notify_received_event::executor::NotifyReceivedWebhookEventExecutor;
 use crate::config::application::ApplicationConfig;
 use crate::domain::auth::ports::oauth_client::OAuthClient;
 use crate::domain::task::ports::task_tracker_client::TaskTrackerClient;
@@ -36,7 +36,7 @@ pub struct ApplicationBoostrapExecutorsCommands {
     pub register_user_via_oauth: Arc<RegisterUserViaOAuthExecutor>,
     pub create_oauth_link: Arc<CreateOAuthLinkExecutor>,
     pub dispatch_webhook_event: Arc<DispatchWebhookEventExecutor>,
-    pub notify_received_webhook_event: Arc<NotifyReceivedWebhookEventExecutor>,
+    pub send_social_notify: Arc<SendSocialNotifyExecutor>,
     pub move_task_to_test: Arc<MoveTaskToTestExecutor>,
 }
 
@@ -126,12 +126,13 @@ impl ApplicationBoostrapExecutors {
             dispatch_webhook_event: Arc::new(DispatchWebhookEventExecutor {
                 publisher: publisher.clone(),
             }),
-            notify_received_webhook_event: Arc::new(NotifyReceivedWebhookEventExecutor::new(
+            send_social_notify: Arc::new(SendSocialNotifyExecutor::new(
                 notification_service.clone(),
             )),
             move_task_to_test: Arc::new(MoveTaskToTestExecutor::new(
                 task_tracker_client.clone(),
                 task_tracker_service.clone(),
+                config.task_tracker.test_column_id,
             )),
         };
 

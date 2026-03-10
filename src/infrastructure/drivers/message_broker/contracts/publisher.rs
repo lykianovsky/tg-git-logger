@@ -1,5 +1,7 @@
+use crate::bootstrap::queues::ApplicationQueueName;
 use async_trait::async_trait;
 use erased_serde::Serialize;
+use std::fmt;
 
 pub enum MessageBrokerPublisherPublishError {
     SerializationFailed(String),
@@ -7,16 +9,44 @@ pub enum MessageBrokerPublisherPublishError {
     PublishConfirmFailed(String),
 }
 
+pub enum MessageBrokerMessageKindJobPriority {
+    Critical,
+    Normal,
+    Background,
+}
+
+impl fmt::Display for MessageBrokerMessageKindJobPriority {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let str = match self {
+            MessageBrokerMessageKindJobPriority::Critical => "critical",
+            MessageBrokerMessageKindJobPriority::Normal => "normal",
+            MessageBrokerMessageKindJobPriority::Background => "background",
+        };
+
+        write!(f, "{}", str)
+    }
+}
+
 pub enum MessageBrokerMessageKind {
     Event,
-    Job,
+    Job(MessageBrokerMessageKindJobPriority),
 }
 
 impl MessageBrokerMessageKind {
-    pub fn routing_key(&self) -> &str {
+    pub fn routing_key(&self) -> String {
         match self {
-            MessageBrokerMessageKind::Event => "events",
-            MessageBrokerMessageKind::Job => "jobs",
+            MessageBrokerMessageKind::Event => ApplicationQueueName::Events.to_string(),
+            MessageBrokerMessageKind::Job(priority) => match priority {
+                MessageBrokerMessageKindJobPriority::Critical => {
+                    ApplicationQueueName::JobsCritical.to_string()
+                }
+                MessageBrokerMessageKindJobPriority::Normal => {
+                    ApplicationQueueName::JobsNormal.to_string()
+                }
+                MessageBrokerMessageKindJobPriority::Background => {
+                    ApplicationQueueName::JobsBackground.to_string()
+                }
+            },
         }
     }
 }

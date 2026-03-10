@@ -28,9 +28,9 @@ pub struct QueueNames {
 }
 
 pub struct RoutingKeys {
-    main: String,
-    retry: String,
-    dead: String,
+    pub main: String,
+    pub retry: String,
+    pub dead: String,
 }
 
 impl QueueNames {
@@ -129,7 +129,6 @@ impl MessageBrokerRabbitMQ {
         exchange_name: &str,
         queue_names: &QueueNames,
         routing_keys: &RoutingKeys,
-        retry_policy: &MessageBrokerQueueRetryPolicy,
     ) -> Result<(), lapin::Error> {
         let mut args = FieldTable::default();
         args.insert(
@@ -139,11 +138,6 @@ impl MessageBrokerRabbitMQ {
         args.insert(
             "x-dead-letter-routing-key".into(),
             AMQPValue::LongString(routing_keys.main.clone().into()),
-        );
-
-        args.insert(
-            "x-message-ttl".into(),
-            AMQPValue::LongUInt(retry_policy.delay_ms),
         );
 
         self.channel
@@ -196,7 +190,7 @@ impl MessageBrokerRabbitMQ {
             .await
     }
 
-    fn get_retry_attempts(delivery: &lapin::message::Delivery) -> i64 {
+    pub fn get_retry_attempts(delivery: &lapin::message::Delivery) -> i64 {
         delivery
             .properties
             .headers()
@@ -217,6 +211,33 @@ impl MessageBrokerRabbitMQ {
             .unwrap_or(0)
     }
 
+    fn get_error_history(delivery: &lapin::message::Delivery) -> Vec<String> {
+        delivery
+            .properties
+            .headers()
+            .as_ref()
+            // TODO: from const
+            .and_then(|h| h.inner().get("x-error-history"))
+            .and_then(|v| match v {
+                AMQPValue::LongString(s) => {
+                    serde_json::from_str::<Vec<serde_json::Value>>(s.to_string().as_str()).ok()
+                }
+                _ => None,
+            })
+            // TODO: from struct
+            .map(|vec| {
+                vec.into_iter()
+                    .map(|v| {
+                        v.get("reason")
+                            .and_then(|r| r.as_str())
+                            .unwrap_or("")
+                            .to_string()
+                    })
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
     async fn setup_queue(
         &self,
         exchange_name: &str,
@@ -230,10 +251,8 @@ impl MessageBrokerRabbitMQ {
         self.declare_main_queue(exchange_name, &queue_names, &routing_keys)
             .await?;
 
-        if let Some(retry_policy) = &queue.retry_policy {
-            self.declare_retry_queue(exchange_name, &queue_names, &routing_keys, retry_policy)
-                .await?;
-        }
+        self.declare_retry_queue(exchange_name, &queue_names, &routing_keys)
+            .await?;
 
         self.declare_dead_queue(exchange_name, &queue_names, &routing_keys)
             .await?;
@@ -280,13 +299,14 @@ impl MessageBroker for MessageBrokerRabbitMQ {
                             let acknowledger = RabbitMQAcknowledger {
                                 delivery: Arc::new(delivery),
                                 channel: channel.clone(),
-                                dead_routing_key: routing_keys.dead.clone(),
+                                routing_keys,
+                                retry_policy,
                             };
 
-                            if let Some(policy) = &retry_policy {
+                            if let Some(policy) = &acknowledger.retry_policy {
                                 let attempts = Self::get_retry_attempts(&acknowledger.delivery);
                                 if attempts >= policy.max_attempts {
-                                    acknowledger.reject("max retry attempts").await;
+                                    acknowledger.reject(Self::get_error_history(&acknowledger.delivery).join("\n").as_str()).await;
                                     return None;
                                 }
                             }

@@ -21,6 +21,7 @@ services:
       MYSQL_USER: ${MYSQL_USERNAME}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
     ports:
+      # TODO: закрыть порт наружу
       - "${MYSQL_PORT}:3306"
     volumes:
       - mysql-data:/var/lib/mysql

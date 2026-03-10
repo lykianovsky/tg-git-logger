@@ -21,8 +21,12 @@ impl BrokerDelivery {
         self.acknowledger.ack().await;
     }
 
-    pub async fn nack(self, requeue: bool) {
-        self.acknowledger.nack(requeue).await;
+    pub async fn requeue(self) {
+        self.acknowledger.requeue().await;
+    }
+
+    pub async fn retry(self, reason: &str) {
+        self.acknowledger.retry(reason).await;
     }
 
     pub async fn reject(self, reason: &str) {

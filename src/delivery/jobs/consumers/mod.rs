@@ -1,4 +1,5 @@
-pub mod send_email;
+pub mod move_task_to_test;
+pub mod send_social_notify;
 
 use crate::bootstrap::executors::ApplicationBoostrapExecutors;
 use crate::config::application::ApplicationConfig;
