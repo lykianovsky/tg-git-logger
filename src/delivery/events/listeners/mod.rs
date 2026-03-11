@@ -1,6 +1,7 @@
 pub mod github;
 
 use crate::bootstrap::executors::ApplicationBoostrapExecutors;
+use crate::bootstrap::shared_dependency::ApplicationSharedDependency;
 use crate::config::application::ApplicationConfig;
 use crate::delivery::contract::ApplicationDelivery;
 use crate::delivery::events::listeners::github::webhook::pull_request::WebhookPullRequestEventListener;
@@ -8,31 +9,26 @@ use crate::delivery::events::listeners::github::webhook::push::WebhookPushEventL
 use crate::delivery::events::listeners::github::webhook::release::WebhookReleaseEventListener;
 use crate::delivery::events::listeners::github::webhook::workflow::WebhookWorkflowEventListener;
 use crate::domain::user::value_objects::social_chat_id::SocialChatId;
-use crate::infrastructure::drivers::message_broker::contracts::publisher::MessageBrokerPublisher;
-use crate::infrastructure::processing::event_bus::EventBus;
 use async_trait::async_trait;
 use std::error::Error;
 use std::sync::Arc;
 
 pub struct DeliveryEventListeners {
-    event_bus: Arc<EventBus>,
-    publisher: Arc<dyn MessageBrokerPublisher>,
+    shared_dependency: Arc<ApplicationSharedDependency>,
     executors: Arc<ApplicationBoostrapExecutors>,
     config: Arc<ApplicationConfig>,
 }
 
 impl DeliveryEventListeners {
     pub fn new(
-        event_bus: Arc<EventBus>,
-        publisher: Arc<dyn MessageBrokerPublisher>,
         executors: Arc<ApplicationBoostrapExecutors>,
         config: Arc<ApplicationConfig>,
+        shared_dependency: Arc<ApplicationSharedDependency>,
     ) -> Self {
         Self {
-            event_bus,
-            publisher,
             executors,
             config,
+            shared_dependency,
         }
     }
 }
@@ -40,25 +36,30 @@ impl DeliveryEventListeners {
 #[async_trait]
 impl ApplicationDelivery for DeliveryEventListeners {
     async fn serve(&self) -> Result<(), Box<dyn Error>> {
-        self.event_bus
+        self.shared_dependency
+            .event_bus
             .on(WebhookPullRequestEventListener {
-                publisher: self.publisher.clone(),
+                publisher: self.shared_dependency.publisher.clone(),
                 chat_id: SocialChatId(self.config.telegram.chat_id),
+                task_tracker_service: self.shared_dependency.task_tracker_service.clone(),
             })
             .await;
-        self.event_bus
+        self.shared_dependency
+            .event_bus
             .on(WebhookPushEventListener {
-                publisher: self.publisher.clone(),
+                publisher: self.shared_dependency.publisher.clone(),
             })
             .await;
-        self.event_bus
+        self.shared_dependency
+            .event_bus
             .on(WebhookReleaseEventListener {
-                publisher: self.publisher.clone(),
+                publisher: self.shared_dependency.publisher.clone(),
             })
             .await;
-        self.event_bus
+        self.shared_dependency
+            .event_bus
             .on(WebhookWorkflowEventListener {
-                publisher: self.publisher.clone(),
+                publisher: self.shared_dependency.publisher.clone(),
             })
             .await;
 

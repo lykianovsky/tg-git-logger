@@ -1,11 +1,13 @@
 pub mod executors;
 pub mod queues;
 pub mod registry;
+pub mod shared_dependency;
 pub mod workers;
 
 use crate::bootstrap::executors::ApplicationBoostrapExecutors;
 use crate::bootstrap::queues::ApplicationQueues;
 use crate::bootstrap::registry::jobs::JobConsumersRegistry;
+use crate::bootstrap::shared_dependency::ApplicationSharedDependency;
 use crate::bootstrap::workers::ApplicationBoostrapWorkers;
 use crate::config::application::ApplicationConfig;
 use crate::delivery::bot::telegram::DeliveryBotMessengerTelegram;
@@ -15,13 +17,7 @@ use crate::delivery::http::axum::DeliveryHttpServerAxum;
 use crate::delivery::jobs::consumers::move_task_to_test::consumer::MoveTaskToTestJobConsumer;
 use crate::delivery::jobs::consumers::send_social_notify::consumer::SendSocialNotifyJobConsumer;
 use crate::infrastructure::database::mysql::MySQLDatabase;
-use crate::infrastructure::drivers::message_broker::contracts::broker::MessageBroker;
-use crate::infrastructure::drivers::message_broker::contracts::publisher::MessageBrokerPublisher;
 use crate::infrastructure::drivers::message_broker::contracts::queue_builder::MessageBrokerQueuesBuilder;
-use crate::infrastructure::drivers::message_broker::rabbitmq::broker::MessageBrokerRabbitMQ;
-use crate::infrastructure::drivers::message_broker::rabbitmq::publisher::MessageBrokerRabbitMQPublisher;
-use crate::infrastructure::processing::event_bus::EventBus;
-use serde::Serialize;
 use std::sync::Arc;
 
 pub struct ApplicationBootstrap;
@@ -38,14 +34,13 @@ impl ApplicationBootstrap {
 
         let mysql_pool = Arc::new(MySQLDatabase::new(config.mysql.url.clone()).connect().await);
 
-        let event_bus = Arc::new(EventBus::new());
-
-        let message_broker =
-            Arc::new(MessageBrokerRabbitMQ::new(&config.rabbit_mq.url.clone()).await?);
+        let shared_dependency =
+            Arc::new(ApplicationSharedDependency::new(config.clone(), mysql_pool.clone()).await?);
 
         let queues = Arc::new(ApplicationQueues::new());
 
-        message_broker
+        shared_dependency
+            .message_broker
             .setup(
                 MessageBrokerQueuesBuilder::new_with_capacity(4)
                     .bind(queues.events.clone())
@@ -57,13 +52,10 @@ impl ApplicationBootstrap {
             .await
             .expect("Failed to setup RabbitMQ scheme");
 
-        let publisher: Arc<dyn MessageBrokerPublisher> =
-            Arc::new(MessageBrokerRabbitMQPublisher::new(message_broker.connection.clone()).await?);
-
         let executors = Arc::new(ApplicationBoostrapExecutors::new(
             config.clone(),
             mysql_pool.clone(),
-            publisher.clone(),
+            shared_dependency.clone(),
         ));
 
         let job_consumers_registry = Arc::new(
@@ -91,19 +83,25 @@ impl ApplicationBootstrap {
         });
 
         let event_listeners_delivery = DeliveryEventListeners::new(
-            event_bus.clone(),
-            publisher.clone(),
             executors.clone(),
             config.clone(),
+            shared_dependency.clone(),
         );
 
         let event_listeners_handle = tokio::spawn(async move {
             event_listeners_delivery.serve().await.ok();
         });
 
-        let workers = ApplicationBoostrapWorkers::new(queues.clone(), message_broker.clone());
+        let workers = ApplicationBoostrapWorkers::new(
+            queues.clone(),
+            shared_dependency.message_broker.clone(),
+        );
 
-        workers.run_events(event_bus.clone()).await.ok();
+        workers
+            .run_events(shared_dependency.event_bus.clone())
+            .await
+            .ok();
+
         workers.run_jobs(job_consumers_registry.clone()).await.ok();
 
         // TODO: Handle shutdown signals and gracefully stop the servers

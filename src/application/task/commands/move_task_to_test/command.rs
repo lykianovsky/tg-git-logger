@@ -1,3 +1,5 @@
+use crate::domain::task::value_objects::task_id::TaskId;
+
 pub struct MoveTaskToTestExecutorCommand {
-    pub task_id: u64,
+    pub task_id: TaskId,
 }

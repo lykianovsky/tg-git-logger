@@ -1,3 +1,4 @@
+use crate::domain::task::value_objects::task_id::TaskId;
 use async_trait::async_trait;
 use thiserror::Error;
 
@@ -17,7 +18,7 @@ pub enum TaskTrackerClientMoveToColumnError {
 pub trait TaskTrackerClient: Send + Sync {
     async fn move_task_to_column(
         &self,
-        task_id: u64,
+        task_id: TaskId,
         column_id: u64,
     ) -> Result<(), TaskTrackerClientMoveToColumnError>;
 }
