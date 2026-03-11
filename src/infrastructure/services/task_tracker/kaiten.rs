@@ -16,10 +16,10 @@ impl TaskTrackerService for KaitenTaskTrackerService {
     fn extract_task_id_by_pattern(&self, text: &str) -> Option<TaskId> {
         let regex = Regex::new(self.extract_pattern.as_str()).ok()?;
 
-        regex.captures(text).and_then(|caps| caps.get(1)).map(|m| {
-            // TODO
-            let id = m.as_str().parse::<u64>().unwrap();
-            TaskId(id)
-        })
+        regex
+            .captures(text)
+            .and_then(|caps| caps.get(1))
+            .and_then(|m| m.as_str().parse::<u64>().ok())
+            .map(TaskId)
     }
 }

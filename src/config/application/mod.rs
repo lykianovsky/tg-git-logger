@@ -184,7 +184,7 @@ impl ApplicationConfig {
 
     pub fn build_task_tracker_config() -> ApplicationTaskTrackerConfig {
         let extract_pattern = ENV.get("TASK_TRACKER_EXTRACT_PATTERN_REGEXP");
-        let test_column_id = ENV.get("TASK_TRACKER_QA_COLUMN_ID").parse::<u64>().unwrap();
+        let test_column_id: u64 = ENV.get("TASK_TRACKER_QA_COLUMN_ID").parse().unwrap();
 
         ApplicationTaskTrackerConfig {
             extract_pattern,

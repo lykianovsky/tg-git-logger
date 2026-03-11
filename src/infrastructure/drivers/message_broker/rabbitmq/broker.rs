@@ -9,6 +9,7 @@ use crate::infrastructure::drivers::message_broker::contracts::queue::{
 };
 use crate::infrastructure::drivers::message_broker::contracts::queue_builder::MessageBrokerStream;
 use crate::infrastructure::drivers::message_broker::rabbitmq::acknowledged::RabbitMQAcknowledger;
+use crate::infrastructure::drivers::message_broker::rabbitmq::additional_headers::RabbitMQMessageBrokerAdditionalHeader;
 use async_trait::async_trait;
 use futures::StreamExt;
 use lapin::options::{
@@ -216,15 +217,19 @@ impl MessageBrokerRabbitMQ {
             .properties
             .headers()
             .as_ref()
-            // TODO: from const
-            .and_then(|h| h.inner().get("x-error-history"))
+            .and_then(|h| {
+                h.inner().get(
+                    RabbitMQMessageBrokerAdditionalHeader::ErrorHistory
+                        .to_string()
+                        .as_str(),
+                )
+            })
             .and_then(|v| match v {
                 AMQPValue::LongString(s) => {
                     serde_json::from_str::<Vec<serde_json::Value>>(s.to_string().as_str()).ok()
                 }
                 _ => None,
             })
-            // TODO: from struct
             .map(|vec| {
                 vec.into_iter()
                     .map(|v| {

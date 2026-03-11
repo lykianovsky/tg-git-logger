@@ -18,7 +18,7 @@ use teloxide::dispatching::dialogue::InMemStorage;
 use teloxide::payloads::EditMessageTextSetters;
 use teloxide::prelude::{Dialogue, Requester, ResponseResult};
 use teloxide::types::{CallbackQuery, InlineKeyboardMarkup, ParseMode};
-use teloxide::Bot;
+use teloxide::{Bot, RequestError};
 
 #[derive(Debug, Clone, Default)]
 pub enum TelegramBotReportByDateRangeDialogueState {
@@ -42,7 +42,7 @@ impl TelegramBotReportByDateRangeDialogue {
         bot: Bot,
         dialogue: ReportByDateRangeDialogue,
         q: CallbackQuery,
-    ) -> ResponseResult<()> {
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         bot.answer_callback_query(q.id).await?;
 
         let callback_data = q.data.as_deref().unwrap_or("");
@@ -68,8 +68,7 @@ impl TelegramBotReportByDateRangeDialogue {
 
         dialogue
             .update(TelegramBotReportByDateRangeDialogueState::DateRange { for_who_action })
-            .await
-            .expect("failed to update dialogue");
+            .await?;
 
         let msg = q.message.unwrap();
         let chat_id = msg.chat().id;
@@ -88,7 +87,7 @@ impl TelegramBotReportByDateRangeDialogue {
         for_who_action: TelegramBotForWhoAction,
         executors: Arc<ApplicationBoostrapExecutors>,
         q: CallbackQuery,
-    ) -> ResponseResult<()> {
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         bot.answer_callback_query(q.id).await?;
 
         let callback_data = q.data.as_deref().unwrap_or("");
@@ -150,7 +149,7 @@ impl TelegramBotReportByDateRangeDialogue {
             }
         };
 
-        dialogue.exit().await.ok();
+        dialogue.exit().await?;
 
         Ok(())
     }

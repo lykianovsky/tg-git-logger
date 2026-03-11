@@ -31,7 +31,7 @@ impl ApplicationBootstrap {
         Self {}
     }
 
-    pub async fn run(&self) {
+    pub async fn run(&self) -> Result<(), Box<dyn std::error::Error>> {
         let config = Arc::new(ApplicationConfig::new());
 
         self.setup_logging(&config);
@@ -40,11 +40,8 @@ impl ApplicationBootstrap {
 
         let event_bus = Arc::new(EventBus::new());
 
-        let message_broker = Arc::new(
-            MessageBrokerRabbitMQ::new(&config.rabbit_mq.url.clone())
-                .await
-                .expect("Failed to connect to RabbitMQ"),
-        );
+        let message_broker =
+            Arc::new(MessageBrokerRabbitMQ::new(&config.rabbit_mq.url.clone()).await?);
 
         let queues = Arc::new(ApplicationQueues::new());
 
@@ -60,11 +57,8 @@ impl ApplicationBootstrap {
             .await
             .expect("Failed to setup RabbitMQ scheme");
 
-        let publisher: Arc<dyn MessageBrokerPublisher> = Arc::new(
-            MessageBrokerRabbitMQPublisher::new(message_broker.connection.clone())
-                .await
-                .unwrap(),
-        );
+        let publisher: Arc<dyn MessageBrokerPublisher> =
+            Arc::new(MessageBrokerRabbitMQPublisher::new(message_broker.connection.clone()).await?);
 
         let executors = Arc::new(ApplicationBoostrapExecutors::new(
             config.clone(),
@@ -113,7 +107,9 @@ impl ApplicationBootstrap {
         workers.run_jobs(job_consumers_registry.clone()).await.ok();
 
         // TODO: Handle shutdown signals and gracefully stop the servers
-        tokio::try_join!(http_server_handle, bot_handle, event_listeners_handle).unwrap();
+        tokio::try_join!(http_server_handle, bot_handle, event_listeners_handle)?;
+
+        Ok(())
     }
 
     fn setup_logging(&self, config: &ApplicationConfig) {

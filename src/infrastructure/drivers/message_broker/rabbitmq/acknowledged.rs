@@ -1,8 +1,10 @@
 use crate::infrastructure::drivers::message_broker::contracts::acknowledger::BrokerMessageAcknowledger;
 use crate::infrastructure::drivers::message_broker::contracts::queue::MessageBrokerQueueRetryPolicy;
+use crate::infrastructure::drivers::message_broker::rabbitmq::additional_headers::RabbitMQMessageBrokerAdditionalHeader;
 use crate::infrastructure::drivers::message_broker::rabbitmq::broker::{
     MessageBrokerRabbitMQ, RoutingKeys, EXCHANGE_NAME,
 };
+use crate::infrastructure::drivers::message_broker::rabbitmq::retry_error::RabbitMQMessageBrokerRetryError;
 use async_trait::async_trait;
 use lapin::options::{BasicAckOptions, BasicNackOptions, BasicPublishOptions};
 use lapin::types::AMQPValue;
@@ -40,26 +42,29 @@ impl BrokerMessageAcknowledger for RabbitMQAcknowledger {
             .clone()
             .unwrap_or_default();
 
+        let error_history_header_key =
+            RabbitMQMessageBrokerAdditionalHeader::ErrorHistory.to_string();
+
         let mut history: Vec<serde_json::Value> = headers
             .inner()
-            .get("x-error-history")
+            .get(error_history_header_key.as_str())
             .and_then(|v| match v {
                 AMQPValue::LongString(s) => serde_json::from_str(s.to_string().as_str()).ok(),
                 _ => None,
             })
             .unwrap_or_default();
 
-        // TODO: Сделать структуру
-        history.push(serde_json::json!({
-            "reason": reason,
-            "at": chrono::Utc::now()
+        history.push(serde_json::json!(&RabbitMQMessageBrokerRetryError {
+            reason: reason.to_string(),
+            at: chrono::Utc::now()
         }));
 
-        // TODO: Сделать константу
-        headers.insert(
-            "x-error-history".into(),
-            AMQPValue::LongString(serde_json::to_string(&history).unwrap().into()),
-        );
+        if let Ok(json) = serde_json::to_string(&history) {
+            headers.insert(
+                error_history_header_key.as_str().into(),
+                AMQPValue::LongString(json.into()),
+            );
+        }
 
         let attempts = MessageBrokerRabbitMQ::get_retry_attempts(&self.delivery);
 
@@ -70,7 +75,8 @@ impl BrokerMessageAcknowledger for RabbitMQAcknowledger {
             properties = properties.with_expiration(new_expiration.to_string().into())
         }
 
-        self.channel
+        if let Ok(..) = self
+            .channel
             .basic_publish(
                 EXCHANGE_NAME,
                 &self.routing_keys.retry,
@@ -79,9 +85,9 @@ impl BrokerMessageAcknowledger for RabbitMQAcknowledger {
                 properties,
             )
             .await
-            .unwrap();
-
-        self.delivery.ack(Default::default()).await.ok();
+        {
+            self.delivery.ack(Default::default()).await.ok();
+        };
     }
 
     async fn reject(&self, reason: &str) {
@@ -92,9 +98,18 @@ impl BrokerMessageAcknowledger for RabbitMQAcknowledger {
             .clone()
             .unwrap_or_default();
 
-        headers.insert("x-dead-reason".into(), AMQPValue::LongString(reason.into()));
         headers.insert(
-            "x-dead-at".into(),
+            RabbitMQMessageBrokerAdditionalHeader::DeadReason
+                .to_string()
+                .as_str()
+                .into(),
+            AMQPValue::LongString(reason.into()),
+        );
+        headers.insert(
+            RabbitMQMessageBrokerAdditionalHeader::DeadAt
+                .to_string()
+                .as_str()
+                .into(),
             AMQPValue::LongString(chrono::Utc::now().to_rfc3339().into()),
         );
 

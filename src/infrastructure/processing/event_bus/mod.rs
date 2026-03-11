@@ -95,18 +95,15 @@ impl EventBus {
     pub async fn dispatch<E: DomainEvent + 'static>(&self, event: &E) {
         let listeners: Vec<Arc<dyn EventListener<E> + Send + Sync>> = {
             let map = self.listeners.lock().await;
+
             map.get(&TypeId::of::<E>())
-                .map(|v| {
-                    v.iter()
-                        .map(|w| {
-                            w.downcast_ref::<ListenerWrapper<E>>()
-                                .unwrap()
-                                .listener
-                                .clone()
-                        })
-                        .collect()
+                .into_iter()
+                .flat_map(|v| v.iter())
+                .filter_map(|w| {
+                    w.downcast_ref::<ListenerWrapper<E>>()
+                        .map(|wrapper| wrapper.listener.clone())
                 })
-                .unwrap_or_default()
+                .collect()
         };
 
         for listener in listeners {

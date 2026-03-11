@@ -55,7 +55,9 @@ impl ApplicationBoostrapExecutors {
             &config.secret.reversible_cipher_secret,
         ));
 
-        let cache: Arc<dyn CacheService> = Arc::new(RedisCache::new(config.redis.url.clone()));
+        let cache: Arc<dyn CacheService> = Arc::new(
+            RedisCache::new(config.redis.url.clone()).expect("Failed to connect to redis"),
+        );
 
         let role_repo = Arc::new(MySQLUserRepository::new(mysql_pool.clone()));
 

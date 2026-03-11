@@ -13,5 +13,7 @@ mod utils;
 
 #[tokio::main]
 async fn main() {
-    bootstrap::ApplicationBootstrap::new().run().await;
+    if let Err(error) = bootstrap::ApplicationBootstrap::new().run().await {
+        tracing::error!(error = %error, "Application boostrap was run with error")
+    }
 }

@@ -8,8 +8,6 @@ use crate::delivery::bot::telegram::keyboards::builder::KeyboardBuilder;
 use std::sync::Arc;
 use teloxide::payloads::SendMessageSetters;
 use teloxide::prelude::Requester;
-use teloxide::types::Message;
-use teloxide::RequestError;
 
 pub struct TelegramBotVersionControlReportCommandHandler {
     context: TelegramBotCommandContext,
@@ -30,7 +28,7 @@ impl TelegramBotVersionControlReportCommandHandler {
         }
     }
 
-    pub async fn execute(&self) -> Result<Message, RequestError> {
+    pub async fn execute(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let keyboard = KeyboardBuilder::new()
             .row::<TelegramBotForWhoAction>(vec![
                 TelegramBotForWhoAction::Me,
@@ -40,14 +38,15 @@ impl TelegramBotVersionControlReportCommandHandler {
 
         self.dialog
             .update(TelegramBotReportByDateRangeDialogueState::For)
-            .await
-            .expect("failed to update dialog2ue");
+            .await?;
 
         // Сразу отправляем клавиатуру
         self.context
             .bot
             .send_message(self.context.msg.chat.id, "🎯  Выберите для кого:")
             .reply_markup(keyboard)
-            .await
+            .await?;
+
+        Ok(())
     }
 }
