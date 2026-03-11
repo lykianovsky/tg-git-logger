@@ -50,18 +50,25 @@ impl MessageBrokerWorker for MessageBrokerJobsWorker {
                 delivery.envelope.name
             );
 
-            let handler = self
-                .jobs_registry
-                .get(&delivery.envelope.name)
-                .await
-                .unwrap();
+            let handler = match self.jobs_registry.get(&delivery.envelope.name).await {
+                Some(v) => v,
+                None => {
+                    let error = format!(
+                        "Failed get registry job from name: {}",
+                        &delivery.envelope.name
+                    );
+                    tracing::error!(error);
+                    delivery.reject(error.as_str()).await;
+                    continue;
+                }
+            };
 
             match handler.run(&delivery.envelope.payload).await {
                 Ok(response) => match response {
                     JobConsumerResponse::Ok => delivery.ack().await,
                     JobConsumerResponse::Reject(reason) => delivery.reject(reason.as_str()).await,
-                    JobConsumerResponse::Requeue => delivery.nack(true).await,
-                    JobConsumerResponse::Retry => delivery.nack(false).await,
+                    JobConsumerResponse::Requeue => delivery.requeue().await,
+                    JobConsumerResponse::Retry(reason) => delivery.retry(reason.as_str()).await,
                 },
                 Err(error) => {
                     tracing::error!(error = %error, "Failed handle run from job");

@@ -65,6 +65,8 @@ impl MessageBrokerWorker for MessageBrokerEventsWorker {
                 delivery.reject(&e.to_string()).await;
                 continue;
             }
+
+            delivery.ack().await;
         }
 
         Ok(())

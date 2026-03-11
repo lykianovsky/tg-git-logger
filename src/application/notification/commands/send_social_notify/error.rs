@@ -2,7 +2,7 @@ use crate::domain::notification::services::notification_service::NotificationSer
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-pub enum NotifyReceivedWebhookEventExecutorError {
+pub enum SendSocialNotifyExecutorError {
     #[error("{0}")]
     NotificationServiceSendError(#[from] NotificationServiceSendError),
 }

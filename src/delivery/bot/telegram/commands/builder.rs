@@ -7,7 +7,7 @@ use crate::delivery::bot::telegram::context::TelegramBotCommandContext;
 use crate::delivery::bot::telegram::dialogues::report::ReportByDateRangeDialogue;
 use std::sync::Arc;
 use teloxide::macros::BotCommands;
-use teloxide::prelude::{Requester, ResponseResult};
+use teloxide::prelude::Requester;
 use teloxide::types::{Message, User};
 use teloxide::Bot;
 
@@ -30,7 +30,7 @@ pub async fn handle(
     report_dialog: ReportByDateRangeDialogue,
     executors: Arc<ApplicationBoostrapExecutors>,
     config: Arc<ApplicationConfig>,
-) -> ResponseResult<()> {
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let context = TelegramBotCommandContext {
         bot,
         user,

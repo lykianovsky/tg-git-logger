@@ -9,16 +9,19 @@ use std::sync::Arc;
 pub struct MoveTaskToTestExecutor {
     task_tracker_client: Arc<dyn TaskTrackerClient>,
     task_tracker_service: Arc<dyn TaskTrackerService>,
+    test_column_id: u64,
 }
 
 impl MoveTaskToTestExecutor {
     pub fn new(
         task_tracker_client: Arc<dyn TaskTrackerClient>,
         task_tracker_service: Arc<dyn TaskTrackerService>,
+        test_column_id: u64,
     ) -> Self {
         Self {
             task_tracker_client,
             task_tracker_service,
+            test_column_id,
         }
     }
 }
@@ -29,9 +32,8 @@ impl CommandExecutor for MoveTaskToTestExecutor {
     type Error = MoveTaskToTestExecutorError;
 
     async fn execute(&self, cmd: &Self::Command) -> Result<Self::Response, Self::Error> {
-        let task = self
-            .task_tracker_client
-            .move_task_to_column(61581066, 3885353)
+        self.task_tracker_client
+            .move_task_to_column(cmd.task_id, self.test_column_id)
             .await?;
 
         Ok(MoveTaskToTestExecutorResponse {})

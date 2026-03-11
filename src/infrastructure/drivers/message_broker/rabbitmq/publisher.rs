@@ -57,7 +57,7 @@ impl MessageBrokerPublisher for MessageBrokerRabbitMQPublisher {
         channel
             .basic_publish(
                 EXCHANGE_NAME,
-                message.kind().routing_key(),
+                &message.kind().routing_key(),
                 BasicPublishOptions::default(),
                 &envelope,
                 BasicProperties::default(),

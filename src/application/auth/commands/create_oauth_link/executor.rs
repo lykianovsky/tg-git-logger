@@ -55,7 +55,15 @@ impl CreateOAuthLinkExecutor {
             state.social_user_id.0, state.social_type, state.social_chat_id.0
         );
 
-        let state_key = create_key_by_payload(&secret, &state);
+        let state_key = match create_key_by_payload(&secret, &state) {
+            Ok(cipher) => cipher,
+            Err(error) => {
+                tracing::error!(error = %error, "Create key by payload failed");
+                return Err(CreateOAuthLinkExecutorError::CipherCreatePayloadError(
+                    error.to_string(),
+                ));
+            }
+        };
 
         if let Some(..) = self
             .cache

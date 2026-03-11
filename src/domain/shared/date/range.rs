@@ -48,7 +48,9 @@ impl DateRange {
         let now = Utc::now();
         let since = Utc
             .with_ymd_and_hms(now.year(), now.month(), 1, 0, 0, 0)
-            .unwrap();
+            .single()
+            .expect("start of month is always valid in UTC");
+
         Self { since, until: now }
     }
 }

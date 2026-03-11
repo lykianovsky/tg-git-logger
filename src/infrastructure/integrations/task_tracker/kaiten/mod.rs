@@ -4,6 +4,7 @@ use serde::Deserialize;
 use crate::domain::task::ports::task_tracker_client::{
     TaskTrackerClient, TaskTrackerClientMoveToColumnError,
 };
+use crate::domain::task::value_objects::task_id::TaskId;
 use reqwest::{Client, Method};
 use serde::Serialize;
 use serde_json::json;
@@ -78,19 +79,19 @@ impl KaitenClient {
 impl TaskTrackerClient for KaitenClient {
     async fn move_task_to_column(
         &self,
-        task_id: u64,
+        task_id: TaskId,
         column_id: u64,
     ) -> Result<(), TaskTrackerClientMoveToColumnError> {
         let body = json!({ "column_id": column_id });
 
         let response: KaitenCard = self
-            .request(Method::PATCH, &format!("/cards/{}", task_id), Some(&body))
+            .request(Method::PATCH, &format!("/cards/{}", task_id.0), Some(&body))
             .await
             .map_err(|e| TaskTrackerClientMoveToColumnError::ClientError(e.to_string()))?;
 
         let span = tracing::debug_span!(
             "move_card",
-            task_id = task_id,
+            task_id = task_id.0,
             column_id = column_id,
             response_column_id = response.column_id
         );

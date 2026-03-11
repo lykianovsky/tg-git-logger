@@ -1,8 +1,6 @@
 use crate::application::webhook::commands::dispatch_event::command::DispatchWebhookEventExecutorCommand;
 use crate::application::webhook::commands::dispatch_event::error::DispatchWebhookEventExecutorError;
 use crate::application::webhook::commands::dispatch_event::response::DispatchWebhookEventExecutorResponse;
-use crate::bootstrap::TestEvent;
-use crate::delivery::jobs::consumers::send_email::payload::SendEmailJob;
 use crate::domain::shared::command::CommandExecutor;
 use crate::infrastructure::drivers::message_broker::contracts::publisher::{
     MessageBrokerMessage, MessageBrokerPublisher,
@@ -24,16 +22,7 @@ impl CommandExecutor for DispatchWebhookEventExecutor {
         tracing::debug!("Dispatching webhook event");
 
         self.publisher
-            .publish(&TestEvent {
-                keys: "keys??????".to_string(),
-            })
-            .await
-            .ok();
-
-        self.publisher
-            .publish(&SendEmailJob {
-                email: "test.email".to_string(),
-            })
+            .publish(cmd.event.as_ref() as &dyn MessageBrokerMessage)
             .await
             .ok();
 

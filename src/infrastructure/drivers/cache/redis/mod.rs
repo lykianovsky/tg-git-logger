@@ -1,14 +1,15 @@
 use crate::infrastructure::drivers::cache::contract::CacheService;
-use redis::AsyncCommands;
+use redis::{AsyncCommands, RedisResult};
 
 pub struct RedisCache {
     client: redis::Client,
 }
 
 impl RedisCache {
-    pub fn new(url: String) -> Self {
-        let client = redis::Client::open(url).unwrap();
-        Self { client }
+    pub fn new(url: String) -> RedisResult<Self> {
+        let client = redis::Client::open(url)?;
+
+        Ok(Self { client })
     }
 }
 
@@ -22,7 +23,7 @@ impl CacheService for RedisCache {
             .map_err(|e| e.to_string())?;
 
         // тут не присваиваем
-        let result: Option<()> = con
+        let _: Option<()> = con
             .set_ex(key, value, ttl_secs)
             .await
             .map_err(|e| e.to_string())?;

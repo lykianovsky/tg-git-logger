@@ -27,8 +27,6 @@ services:
       MYSQL_DATABASE: ${MYSQL_DATABASE_NAME}
       MYSQL_USER: ${MYSQL_USERNAME}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
-    ports:
-      - "${MYSQL_PORT}:3306"
     volumes:
       - mysql-data:/var/lib/mysql
 
@@ -38,7 +36,6 @@ services:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
     ports:
-      - "${RABBITMQ_PORT}:5672"        # основной порт AMQP
       - "${RABBITMQ_MANAGEMENT_PORT}:15672" # веб-менеджмент
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq
@@ -51,8 +48,6 @@ services:
 
   redis:
     image: redis:7
-    ports:
-      - "${REDIS_PORT}:6379"
     volumes:
       - redis-data:/data
 

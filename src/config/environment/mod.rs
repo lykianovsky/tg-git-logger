@@ -18,7 +18,7 @@ impl Environment {
             self.filename
         );
 
-        return env::var(name).expect(exception_message);
+        env::var(name).expect(exception_message)
     }
 
     pub fn get_or(&self, name: &str, default: &str) -> String {

@@ -3,7 +3,7 @@ use thiserror::Error;
 
 pub enum JobConsumerResponse {
     Ok,
-    Retry,
+    Retry(String),
     Reject(String),
     Requeue,
 }
