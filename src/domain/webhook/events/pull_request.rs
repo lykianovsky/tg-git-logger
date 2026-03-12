@@ -54,7 +54,7 @@ impl WebhookEvent for WebhookPullRequestEvent {
             "🟢 Открыт"
         };
 
-        let short_merge_commit = self
+        let _short_merge_commit = self
             .merge_commit
             .as_deref()
             .map(|h| &h[..7.min(h.len())])

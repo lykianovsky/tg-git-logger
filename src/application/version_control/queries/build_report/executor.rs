@@ -108,7 +108,7 @@ impl BuildVersionControlDateRangeReportExecutor {
             ) => {
                 format!("🌐 Ошибка соединения: {}", reason)
             }
-            BuildVersionControlDateRangeReportExecutorError::FindSocialServiceByIdException(..) => {
+            BuildVersionControlDateRangeReportExecutorError::FindSocialServiceByIdError(..) => {
                 "🔐 Вы должны пройти регистрацию".to_string()
             }
             _ => {
@@ -125,10 +125,10 @@ impl BuildVersionControlDateRangeReportExecutor {
         date_range: &DateRange,
     ) -> String {
         if let Some(author) = &author {
-            return self.render_for_author(&report, &author, &date_range);
+            return self.render_for_author(report, author, date_range);
         }
 
-        self.render_for_repository(&report, &date_range)
+        self.render_for_repository(report, date_range)
     }
 
     fn render_for_author(
@@ -601,7 +601,7 @@ impl CommandExecutor for BuildVersionControlDateRangeReportExecutor {
 
         let decrypted_token = self
             .reversible_cipher
-            .decrypt(&version_control_user.access_token.value())?;
+            .decrypt(version_control_user.access_token.value())?;
 
         let author = match cmd.for_who {
             BuildVersionControlDateRangeReportExecutorCommandForWho::Me => {

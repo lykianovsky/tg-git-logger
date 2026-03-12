@@ -159,7 +159,7 @@ impl VersionControlClient for GithubVersionControlClient {
                     );
                 }
 
-                return VersionControlClientGetUserError::Transport(e.to_string());
+                VersionControlClientGetUserError::Transport(e.to_string())
             })?;
 
         Ok(VersionControlClientGetUserResponse {
@@ -215,7 +215,7 @@ impl VersionControlClient for GithubVersionControlClient {
                     );
                 }
 
-                return VersionControlClientDateRangeReportError::Transport(e.to_string());
+                VersionControlClientDateRangeReportError::Transport(e.to_string())
             })?;
 
         Ok(VersionControlDateRangeReport::from_github_response(
@@ -255,9 +255,8 @@ impl VersionControlDateRangeReport {
             .repository
             .and_then(|r| r.default_branch_ref)
             .and_then(|b| b.target)
-        {
-            if let github_date_range_report::GithubDateRangeReportRepositoryDefaultBranchRefTarget::Commit(commit_target) = target {
-                if let Some(nodes) = commit_target.history.nodes {
+            && let github_date_range_report::GithubDateRangeReportRepositoryDefaultBranchRefTarget::Commit(commit_target) = target
+                && let Some(nodes) = commit_target.history.nodes {
                     for commit in nodes.into_iter().flatten() {
                         commits.push(VersionControlDateRangeReportCommit {
                             sha: commit.oid,
@@ -274,8 +273,6 @@ impl VersionControlDateRangeReport {
                         });
                     }
                 }
-            }
-        }
 
         VersionControlDateRangeReport {
             pull_requests,

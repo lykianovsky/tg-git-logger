@@ -1,15 +1,12 @@
-use crate::application::user::commands::register_via_oauth::executor::RegisterUserViaOAuthExecutor;
 use crate::application::webhook::commands::dispatch_event::command::DispatchWebhookEventExecutorCommand;
 use crate::application::webhook::commands::dispatch_event::executor::DispatchWebhookEventExecutor;
 use crate::domain::shared::command::CommandExecutor;
-use crate::domain::webhook::value_objects::event_type::WebhookEventType;
 use crate::infrastructure::contracts::github::event_type::GithubEventType;
 use crate::infrastructure::contracts::github::headers::GithubHeaders;
 use crate::infrastructure::contracts::github::mapper::GithubWebhookEventMapper;
 use axum::http::HeaderMap;
 use axum::{Extension, Json};
 use reqwest::StatusCode;
-use std::cmp::PartialEq;
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -41,7 +38,7 @@ impl AxumWebhookGithubController {
 
         tracing::debug!("Parsed GitHub event type: {:?}", github_event_type);
 
-        if (github_event_type == GithubEventType::Ping) {
+        if github_event_type == GithubEventType::Ping  {
             tracing::info!("Received ping-pong GitHub event type: {}", raw_event_type);
             return StatusCode::OK;
         }

@@ -10,13 +10,11 @@ use crate::delivery::bot::telegram::dialogues::{
 };
 use crate::delivery::bot::telegram::keyboards::actions::choose_role::TelegramBotChooseRoleAction;
 use crate::delivery::bot::telegram::keyboards::builder::KeyboardBuilder;
-use crate::domain::shared::command::CommandExecutor;
 use crate::domain::user::value_objects::social_chat_id::SocialChatId;
 use crate::domain::user::value_objects::social_type::SocialType;
 use crate::domain::user::value_objects::social_user_id::SocialUserId;
 use crate::domain::user::value_objects::version_control_type::VersionControlType;
 use std::sync::Arc;
-use teloxide::dispatching::dialogue::Storage;
 use teloxide::payloads::SendMessageSetters;
 use teloxide::prelude::Requester;
 
@@ -40,7 +38,7 @@ impl TelegramBotRegisterCommandHandler {
     }
 
     pub async fn execute(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        let cmd = CreateOAuthLinkExecutorCommand {
+        let _cmd = CreateOAuthLinkExecutorCommand {
             social: CreateOAuthLinkExecutorCommandSocial {
                 r#type: SocialType::Telegram,
                 chat_id: SocialChatId(self.context.msg.chat.id.0),

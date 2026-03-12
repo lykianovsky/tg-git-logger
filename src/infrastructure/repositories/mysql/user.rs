@@ -1,6 +1,6 @@
 use crate::domain::user::entities::user::User;
 use crate::domain::user::repositories::user_repository::{
-    CreateUserException, FindUserByIdException, UserRepository,
+    CreateUserError, FindUserByIdError, UserRepository,
 };
 use crate::domain::user::value_objects::user_id::UserId;
 use crate::infrastructure::database::mysql::entities::users;
@@ -27,7 +27,7 @@ impl UserRepository for MySQLUserRepository {
         &self,
         txn: &DatabaseTransaction,
         user: &User,
-    ) -> Result<User, CreateUserException> {
+    ) -> Result<User, CreateUserError> {
         let user_model = users::ActiveModel {
             is_active: Set(user.is_active as i8),
             ..Default::default()
@@ -36,18 +36,18 @@ impl UserRepository for MySQLUserRepository {
         let user = user_model
             .insert(txn)
             .await
-            .map_err(|e| CreateUserException::DbError(e.to_string()))?;
+            .map_err(|e| CreateUserError::DbError(e.to_string()))?;
 
         Ok(User::from_mysql(user))
     }
 
-    async fn find_by_id(&self, id: UserId) -> Result<User, FindUserByIdException> {
+    async fn find_by_id(&self, id: UserId) -> Result<User, FindUserByIdError> {
         let user = users::Entity::find()
             .filter(users::Column::Id.eq(id.0))
             .one(self.db.as_ref())
             .await
-            .map_err(|e| FindUserByIdException::DbError(e.to_string()))?
-            .ok_or(FindUserByIdException::NotFound)?;
+            .map_err(|e| FindUserByIdError::DbError(e.to_string()))?
+            .ok_or(FindUserByIdError::NotFound)?;
 
         Ok(User::from_mysql(user))
     }

@@ -18,8 +18,8 @@ impl UserRole {
 impl fmt::Display for UserRole {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            UserRole::Admin => write!(f, "{}", self.to_str().to_string()),
-            UserRole::User => write!(f, "{}", self.to_str().to_string()),
+            UserRole::Admin => write!(f, "{}", self.to_str()),
+            UserRole::User => write!(f, "{}", self.to_str()),
         }
     }
 }

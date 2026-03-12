@@ -9,16 +9,16 @@ impl Environment {
     pub fn new(filename: &'static str) -> Self {
         dotenv::from_filename(filename).ok();
 
-        return Self { filename };
+        Self { filename }
     }
 
     pub fn get(&self, name: &str) -> String {
-        let exception_message = &format!(
+        let error_message = &format!(
             "Environment: {name} is not defined in environment file {}",
             self.filename
         );
 
-        env::var(name).expect(exception_message)
+        env::var(name).expect(error_message)
     }
 
     pub fn get_or(&self, name: &str, default: &str) -> String {
@@ -26,6 +26,4 @@ impl Environment {
     }
 }
 
-pub static ENV: Lazy<Environment> = Lazy::new(|| {
-    return Environment::new(".env.local");
-});
+pub static ENV: Lazy<Environment> = Lazy::new(|| Environment::new(".env.local"));

@@ -50,7 +50,7 @@ impl MessageBrokerPublisher for MessageBrokerRabbitMQPublisher {
             name: message.name().to_string(),
             payload: message,
         })
-        .map_err(|e| MessageBrokerPublisherPublishError::SerializationFailed(e.to_string()))?;
+        .map_err(|e| MessageBrokerPublisherPublishError::Serialization(e.to_string()))?;
 
         let channel = self.channel.lock().await;
 
@@ -63,9 +63,9 @@ impl MessageBrokerPublisher for MessageBrokerRabbitMQPublisher {
                 BasicProperties::default(),
             )
             .await
-            .map_err(|e| MessageBrokerPublisherPublishError::PublishCreateFailed(e.to_string()))?
+            .map_err(|e| MessageBrokerPublisherPublishError::PublishCreation(e.to_string()))?
             .await
-            .map_err(|e| MessageBrokerPublisherPublishError::PublishConfirmFailed(e.to_string()))?;
+            .map_err(|e| MessageBrokerPublisherPublishError::PublishConfirmation(e.to_string()))?;
 
         Ok(())
     }

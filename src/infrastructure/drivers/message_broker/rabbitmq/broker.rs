@@ -4,9 +4,7 @@ use crate::infrastructure::drivers::message_broker::contracts::broker::{
 };
 use crate::infrastructure::drivers::message_broker::contracts::delivery::BrokerDelivery;
 use crate::infrastructure::drivers::message_broker::contracts::envelope::MessageBrokerEnvelope;
-use crate::infrastructure::drivers::message_broker::contracts::queue::{
-    MessageBrokerQueue, MessageBrokerQueueRetryPolicy,
-};
+use crate::infrastructure::drivers::message_broker::contracts::queue::MessageBrokerQueue;
 use crate::infrastructure::drivers::message_broker::contracts::queue_builder::MessageBrokerStream;
 use crate::infrastructure::drivers::message_broker::rabbitmq::acknowledged::RabbitMQAcknowledger;
 use crate::infrastructure::drivers::message_broker::rabbitmq::additional_headers::RabbitMQMessageBrokerAdditionalHeader;
@@ -16,7 +14,7 @@ use lapin::options::{
     BasicConsumeOptions, ExchangeDeclareOptions, QueueBindOptions, QueueDeclareOptions,
 };
 use lapin::types::AMQPValue;
-use lapin::{types::FieldTable, Channel, Connection, ConnectionProperties, ExchangeKind};
+use lapin::{types::FieldTable, Channel, Connection, ConnectionProperties};
 use std::sync::Arc;
 
 pub const EXCHANGE_NAME: &str = "domain.exchange";
@@ -62,7 +60,7 @@ pub struct MessageBrokerRabbitMQ {
 impl MessageBrokerRabbitMQ {
     pub async fn new(url: &str) -> Result<Self, lapin::Error> {
         let connection =
-            Arc::new(Connection::connect(&url, ConnectionProperties::default()).await?);
+            Arc::new(Connection::connect(url, ConnectionProperties::default()).await?);
 
         let channel = connection.create_channel().await?;
 

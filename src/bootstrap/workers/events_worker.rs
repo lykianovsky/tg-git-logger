@@ -7,7 +7,6 @@ use crate::infrastructure::processing::worker::{
 };
 use async_trait::async_trait;
 use futures::StreamExt;
-use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 pub struct MessageBrokerEventsWorker {
@@ -42,7 +41,7 @@ impl MessageBrokerWorker for MessageBrokerEventsWorker {
             .message_broker
             .consume(self.name.as_str(), queue)
             .await
-            .map_err(|e| MessageBrokerWorkerStartError::Test)?;
+            .map_err(|_e| MessageBrokerWorkerStartError::Test)?;
 
         while let Some(delivery) = stream.next().await {
             tracing::debug!(
