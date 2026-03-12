@@ -1,6 +1,6 @@
 use crate::domain::role::entities::role_entity::Role;
 use crate::domain::role::repositories::role_repository::{
-    CreateRoleException, FindRoleByIdException, RoleRepository,
+    CreateRoleError, FindRoleByIdError, RoleRepository,
 };
 use crate::domain::role::value_objects::role_id::RoleId;
 use crate::domain::role::value_objects::role_name::RoleName;
@@ -34,11 +34,7 @@ impl MySQLRoleRepository {
 
 #[async_trait]
 impl RoleRepository for MySQLRoleRepository {
-    async fn create(
-        &self,
-        txn: &DatabaseTransaction,
-        role: &Role,
-    ) -> Result<(), CreateRoleException> {
+    async fn create(&self, txn: &DatabaseTransaction, role: &Role) -> Result<(), CreateRoleError> {
         let role_model = roles::ActiveModel {
             name: Set(role.name.to_string()),
             ..Default::default()
@@ -47,19 +43,19 @@ impl RoleRepository for MySQLRoleRepository {
         role_model
             .insert(txn)
             .await
-            .map_err(|e| CreateRoleException::DbError(e.to_string()))?;
+            .map_err(|e| CreateRoleError::DbError(e.to_string()))?;
 
         Ok(())
     }
 
-    async fn find_by_id(&self, id: RoleId) -> Result<Role, FindRoleByIdException> {
+    async fn find_by_id(&self, id: RoleId) -> Result<Role, FindRoleByIdError> {
         let role = roles::Entity::find()
             .filter(users::Column::Id.eq(id.0))
             .one(self.db.as_ref())
             .await
-            .map_err(|e| FindRoleByIdException::DbError(e.to_string()))?
-            .ok_or(FindRoleByIdException::NotFound)?;
+            .map_err(|e| FindRoleByIdError::DbError(e.to_string()))?
+            .ok_or(FindRoleByIdError::NotFound)?;
 
-        Ok(Role::from_mysql(role).map_err(|e| FindRoleByIdException::DbError(e.to_string()))?)
+        Ok(Role::from_mysql(role).map_err(|e| FindRoleByIdError::DbError(e.to_string()))?)
     }
 }

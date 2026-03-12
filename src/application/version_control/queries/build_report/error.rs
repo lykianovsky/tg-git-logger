@@ -1,5 +1,5 @@
-use crate::domain::user::repositories::user_social_accounts_repository::FindSocialServiceByIdException;
-use crate::domain::user::repositories::user_vc_accounts_repository::FindVersionControlServiceByUserIdException;
+use crate::domain::user::repositories::user_social_accounts_repository::FindSocialServiceByIdError;
+use crate::domain::user::repositories::user_vc_accounts_repository::FindVersionControlServiceByUserIdError;
 use crate::domain::version_control::ports::version_control_client::VersionControlClientDateRangeReportError;
 use crate::utils::security::crypto::reversible::CipherError;
 use thiserror::Error;
@@ -13,8 +13,8 @@ pub enum BuildVersionControlDateRangeReportExecutorError {
     CipherError(#[from] CipherError),
 
     #[error("{0}")]
-    FindVersionControlServiceByUserIdException(#[from] FindVersionControlServiceByUserIdException),
+    FindVersionControlServiceByUserIdError(#[from] FindVersionControlServiceByUserIdError),
 
     #[error("{0}")]
-    FindSocialServiceByIdException(#[from] FindSocialServiceByIdException),
+    FindSocialServiceByIdError(#[from] FindSocialServiceByIdError),
 }

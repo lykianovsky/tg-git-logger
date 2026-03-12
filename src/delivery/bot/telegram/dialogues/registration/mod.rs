@@ -1,15 +1,9 @@
-use crate::delivery::bot::telegram::dialogues::{
-    TelegramBotDialogueState, TelegramBotDialogueType,
-};
+use crate::delivery::bot::telegram::dialogues::TelegramBotDialogueType;
 use crate::delivery::bot::telegram::keyboards::actions::choose_role::TelegramBotChooseRoleAction;
-use crate::delivery::bot::telegram::keyboards::actions::date_range::TelegramBotDateRangeAction;
 use crate::delivery::bot::telegram::keyboards::actions::TelegramBotKeyboardAction;
-use futures::FutureExt;
 use std::error::Error;
-use teloxide::dispatching::dialogue::InMemStorage;
-use teloxide::dispatching::{DpHandlerDescription, HandlerExt};
+use teloxide::dispatching::DpHandlerDescription;
 use teloxide::dptree::case;
-use teloxide::payloads::EditMessageTextSetters;
 use teloxide::prelude::*;
 use teloxide::{dptree, Bot};
 
@@ -56,7 +50,7 @@ impl TelegramBotDialogueRegistrationDispatcher {
         bot.edit_message_text(
             chat_id,
             message_id,
-            &format!("Выбранная роль: {}", selected_role.to_callback_data()),
+            format!("Выбранная роль: {}", selected_role.to_callback_data()),
         )
         .await?;
 

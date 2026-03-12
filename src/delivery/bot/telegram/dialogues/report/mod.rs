@@ -3,9 +3,6 @@ use crate::application::version_control::queries::build_report::command::{
     BuildVersionControlDateRangeReportExecutorCommandForWho,
 };
 use crate::bootstrap::executors::ApplicationBoostrapExecutors;
-use crate::delivery::bot::telegram::dialogues::registration::{
-    TelegramBotDialogueRegistrationDispatcher, TelegramBotDialogueRegistrationState,
-};
 use crate::delivery::bot::telegram::dialogues::{
     TelegramBotDialogueState, TelegramBotDialogueType,
 };
@@ -22,7 +19,7 @@ use teloxide::dispatching::dialogue::InMemStorage;
 use teloxide::dispatching::{DpHandlerDescription, HandlerExt, UpdateFilterExt};
 use teloxide::dptree::{case, Handler};
 use teloxide::payloads::EditMessageTextSetters;
-use teloxide::prelude::{Dialogue, Requester, Update};
+use teloxide::prelude::{Requester, Update};
 use teloxide::types::{CallbackQuery, InlineKeyboardMarkup, ParseMode};
 use teloxide::{dptree, Bot};
 

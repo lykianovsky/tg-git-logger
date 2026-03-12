@@ -1,4 +1,3 @@
-use crate::config::environment::ENV;
 use crate::domain::auth::ports::oauth_client::{
     OAuthClient, OAuthClientExchangeCodeError, OAuthClientExchangeCodeResponse,
 };

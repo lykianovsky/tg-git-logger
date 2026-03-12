@@ -16,7 +16,7 @@ impl TelegramBotKeyboardAction for TelegramBotForWhoAction {
     }
 
     fn from_callback_data(data: &str) -> Result<Self, String> {
-        Self::from_str(data).map_err(|e| String::from(e.to_string()))
+        Self::from_str(data).map_err(|e| e.to_string())
     }
 
     fn label(&self) -> &'static str {

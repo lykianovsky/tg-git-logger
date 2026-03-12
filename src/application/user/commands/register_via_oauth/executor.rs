@@ -91,7 +91,7 @@ impl CommandExecutor for RegisterUserViaOAuthExecutor {
         {
             return Err(
                 RegisterUserViaOAuthExecutorError::UserBySocialUserIdAlreadyExists(
-                    state.social_user_id.0.clone(),
+                    state.social_user_id.0,
                 ),
             );
         }

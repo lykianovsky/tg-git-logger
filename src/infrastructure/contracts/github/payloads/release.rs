@@ -47,7 +47,7 @@ impl GithubEvent for GithubReleaseEvent {
     where
         Self: Sized,
     {
-        Ok(serde_json::from_value(value)?)
+        serde_json::from_value(value)
     }
 
     fn to_webhook_event(&self) -> Self::WebhookEvent {

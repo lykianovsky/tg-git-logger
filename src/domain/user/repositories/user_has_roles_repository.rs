@@ -5,13 +5,13 @@ use sea_orm::DatabaseTransaction;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
-pub enum AssignRoleToUserException {
+pub enum AssignRoleToUserError {
     #[error("Database error: {0}")]
     DbError(String),
 }
 
 #[derive(Debug, Error)]
-pub enum GetAllUserRolesException {
+pub enum GetAllUserRolesError {
     #[error("Database error: {0}")]
     DbError(String),
 
@@ -26,7 +26,7 @@ pub trait UserHasRolesRepository: Send + Sync {
         txn: &DatabaseTransaction,
         user_id: UserId,
         role_name: RoleName,
-    ) -> Result<(), AssignRoleToUserException>;
+    ) -> Result<(), AssignRoleToUserError>;
 
-    async fn get_all(&self, user_id: UserId) -> Result<Vec<Role>, GetAllUserRolesException>;
+    async fn get_all(&self, user_id: UserId) -> Result<Vec<Role>, GetAllUserRolesError>;
 }

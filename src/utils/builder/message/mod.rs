@@ -108,12 +108,11 @@ impl MessageBuilder {
     pub fn build(self) -> String {
         let mut result = self.parts.concat();
 
-        if let Some(max_length) = self.max_length {
-            if result.len() > max_length {
+        if let Some(max_length) = self.max_length
+            && result.len() > max_length {
                 result = result.chars().take(max_length - 3).collect::<String>();
                 result.push_str("...");
             }
-        }
 
         result
     }
@@ -147,9 +146,9 @@ impl fmt::Display for MessageBuilder {
 }
 
 // Into<String> для удобного использования
-impl Into<String> for MessageBuilder {
-    fn into(self) -> String {
-        self.build()
+impl From<MessageBuilder> for String {
+    fn from(val: MessageBuilder) -> Self {
+        val.build()
     }
 }
 

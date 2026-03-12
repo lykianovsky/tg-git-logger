@@ -1,8 +1,8 @@
 use crate::domain::auth::ports::oauth_client::OAuthClientExchangeCodeError;
 use crate::domain::notification::services::notification_service::NotificationServiceSendError;
-use crate::domain::user::repositories::user_repository::CreateUserException;
-use crate::domain::user::repositories::user_social_accounts_repository::CreateSocialServiceException;
-use crate::domain::user::repositories::user_vc_accounts_repository::CreateVersionControlServiceException;
+use crate::domain::user::repositories::user_repository::CreateUserError;
+use crate::domain::user::repositories::user_social_accounts_repository::CreateSocialServiceError;
+use crate::domain::user::repositories::user_vc_accounts_repository::CreateVersionControlServiceError;
 use crate::domain::version_control::ports::version_control_client::VersionControlClientGetUserError;
 use crate::utils::security::crypto::reversible::CipherError;
 use thiserror::Error;
@@ -22,13 +22,13 @@ pub enum RegisterUserViaOAuthExecutorError {
     VersionControlClientError(#[from] VersionControlClientGetUserError),
 
     #[error("{0}")]
-    CreateUserException(#[from] CreateUserException),
+    CreateUserError(#[from] CreateUserError),
 
     #[error("{0}")]
-    CreateSocialServiceException(#[from] CreateSocialServiceException),
+    CreateSocialServiceError(#[from] CreateSocialServiceError),
 
     #[error("{0}")]
-    CreateVersionControlServiceException(#[from] CreateVersionControlServiceException),
+    CreateVersionControlServiceError(#[from] CreateVersionControlServiceError),
 
     #[error("{0}")]
     NotificationServiceSendError(#[from] NotificationServiceSendError),

@@ -76,8 +76,8 @@ impl WebhookEvent for WebhookReleaseEvent {
         }
 
         // ── Описание ───────────────────────────────────────
-        if let Some(body) = &self.body {
-            if !body.trim().is_empty() {
+        if let Some(body) = &self.body
+            && !body.trim().is_empty() {
                 let truncated = if body.len() > 500 {
                     format!("{}…", &body[..500])
                 } else {
@@ -86,7 +86,6 @@ impl WebhookEvent for WebhookReleaseEvent {
 
                 builder = builder.bold("📋 Описание").line(&truncated).empty_line();
             }
-        }
 
         // ── Ссылки ─────────────────────────────────────────
         if let Some(url) = &self.html_url {

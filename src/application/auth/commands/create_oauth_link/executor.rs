@@ -115,7 +115,7 @@ impl CommandExecutor for CreateOAuthLinkExecutor {
             );
         }
 
-        let link = self.create_oauth_link(&cmd).await?;
+        let link = self.create_oauth_link(cmd).await?;
 
         Ok(CreateOAuthLinkExecutorResponse {
             url: link.to_string(),

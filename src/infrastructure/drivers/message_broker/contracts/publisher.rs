@@ -4,9 +4,9 @@ use erased_serde::Serialize;
 use std::fmt;
 
 pub enum MessageBrokerPublisherPublishError {
-    SerializationFailed(String),
-    PublishCreateFailed(String),
-    PublishConfirmFailed(String),
+    Serialization(String),
+    PublishCreation(String),
+    PublishConfirmation(String),
 }
 
 pub enum MessageBrokerMessageKindJobPriority {

@@ -5,13 +5,13 @@ use sea_orm::DatabaseTransaction;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
-pub enum CreateVersionControlServiceException {
+pub enum CreateVersionControlServiceError {
     #[error("Database error: {0}")]
     DbError(String),
 }
 
 #[derive(Debug, Error)]
-pub enum FindVersionControlServiceByIdException {
+pub enum FindVersionControlServiceByIdError {
     #[error("Database error: {0}")]
     DbError(String),
 
@@ -20,7 +20,7 @@ pub enum FindVersionControlServiceByIdException {
 }
 
 #[derive(Debug, Error)]
-pub enum FindVersionControlServiceByUserIdException {
+pub enum FindVersionControlServiceByUserIdError {
     #[error("Database error: {0}")]
     DbError(String),
 
@@ -34,15 +34,15 @@ pub trait UserVersionControlAccountsRepository: Send + Sync {
         &self,
         txn: &DatabaseTransaction,
         user: &UserVersionControlAccount,
-    ) -> Result<UserVersionControlAccount, CreateVersionControlServiceException>;
+    ) -> Result<UserVersionControlAccount, CreateVersionControlServiceError>;
 
     async fn find_by_version_control_user_id(
         &self,
         id: &VersionControlUserId,
-    ) -> Result<UserVersionControlAccount, FindVersionControlServiceByIdException>;
+    ) -> Result<UserVersionControlAccount, FindVersionControlServiceByIdError>;
 
     async fn find_by_user_id(
         &self,
         id: &UserId,
-    ) -> Result<UserVersionControlAccount, FindVersionControlServiceByUserIdException>;
+    ) -> Result<UserVersionControlAccount, FindVersionControlServiceByUserIdError>;
 }

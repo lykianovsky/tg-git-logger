@@ -4,13 +4,13 @@ use sea_orm::DatabaseTransaction;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
-pub enum CreateSocialServiceException {
+pub enum CreateSocialServiceError {
     #[error("Database error: {0}")]
     DbError(String),
 }
 
 #[derive(Debug, Error)]
-pub enum FindSocialServiceByIdException {
+pub enum FindSocialServiceByIdError {
     #[error("Database error: {0}")]
     DbError(String),
 
@@ -24,10 +24,10 @@ pub trait UserSocialAccountsRepository: Send + Sync {
         &self,
         txn: &DatabaseTransaction,
         user_social: &UserSocialAccount,
-    ) -> Result<UserSocialAccount, CreateSocialServiceException>;
+    ) -> Result<UserSocialAccount, CreateSocialServiceError>;
 
     async fn find_by_social_user_id(
         &self,
         social_user_id: &SocialUserId,
-    ) -> Result<UserSocialAccount, FindSocialServiceByIdException>;
+    ) -> Result<UserSocialAccount, FindSocialServiceByIdError>;
 }

@@ -41,7 +41,7 @@ impl MessageBrokerWorker for MessageBrokerJobsWorker {
             .message_broker
             .consume(self.name.as_str(), queue)
             .await
-            .map_err(|e| MessageBrokerWorkerStartError::Test)?;
+            .map_err(|_e| MessageBrokerWorkerStartError::Test)?;
 
         while let Some(delivery) = stream.next().await {
             tracing::debug!(

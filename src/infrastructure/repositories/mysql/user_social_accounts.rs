@@ -1,6 +1,6 @@
 use crate::domain::user::entities::user_social_account::UserSocialAccount;
 use crate::domain::user::repositories::user_social_accounts_repository::{
-    CreateSocialServiceException, FindSocialServiceByIdException, UserSocialAccountsRepository,
+    CreateSocialServiceError, FindSocialServiceByIdError, UserSocialAccountsRepository,
 };
 use crate::domain::user::value_objects::social_chat_id::SocialChatId;
 use crate::domain::user::value_objects::social_type::SocialType;
@@ -29,7 +29,7 @@ impl UserSocialAccountsRepository for MySQLUserSocialServicesRepository {
         &self,
         txn: &DatabaseTransaction,
         user_social: &UserSocialAccount,
-    ) -> Result<UserSocialAccount, CreateSocialServiceException> {
+    ) -> Result<UserSocialAccount, CreateSocialServiceError> {
         let model = user_social_accounts::ActiveModel {
             id: Default::default(),
             user_id: Set(user_social.user_id.0),
@@ -46,25 +46,23 @@ impl UserSocialAccountsRepository for MySQLUserSocialServicesRepository {
         let result = model
             .insert(txn)
             .await
-            .map_err(|e| CreateSocialServiceException::DbError(e.to_string()))?;
+            .map_err(|e| CreateSocialServiceError::DbError(e.to_string()))?;
 
-        Ok(UserSocialAccount::from_mysql(result)
-            .map_err(|e| CreateSocialServiceException::DbError(e))?)
+        Ok(UserSocialAccount::from_mysql(result).map_err(CreateSocialServiceError::DbError)?)
     }
 
     async fn find_by_social_user_id(
         &self,
         social_user_id: &SocialUserId,
-    ) -> Result<UserSocialAccount, FindSocialServiceByIdException> {
+    ) -> Result<UserSocialAccount, FindSocialServiceByIdError> {
         let user = user_social_accounts::Entity::find()
             .filter(user_social_accounts::Column::SocialUserId.eq(social_user_id.0))
             .one(self.db.as_ref())
             .await
-            .map_err(|e| FindSocialServiceByIdException::DbError(e.to_string()))?
-            .ok_or(FindSocialServiceByIdException::NotFound)?;
+            .map_err(|e| FindSocialServiceByIdError::DbError(e.to_string()))?
+            .ok_or(FindSocialServiceByIdError::NotFound)?;
 
-        Ok(UserSocialAccount::from_mysql(user)
-            .map_err(|e| FindSocialServiceByIdException::DbError(e))?)
+        Ok(UserSocialAccount::from_mysql(user).map_err(FindSocialServiceByIdError::DbError)?)
     }
 }
 

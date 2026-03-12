@@ -5,13 +5,13 @@ use sea_orm::DatabaseTransaction;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
-pub enum CreateRoleException {
+pub enum CreateRoleError {
     #[error("Database error: {0}")]
     DbError(String),
 }
 
 #[derive(Debug, Error)]
-pub enum FindRoleByIdException {
+pub enum FindRoleByIdError {
     #[error("Database error: {0}")]
     DbError(String),
 
@@ -21,10 +21,6 @@ pub enum FindRoleByIdException {
 
 #[async_trait]
 pub trait RoleRepository {
-    async fn create(
-        &self,
-        txn: &DatabaseTransaction,
-        role: &Role,
-    ) -> Result<(), CreateRoleException>;
-    async fn find_by_id(&self, id: RoleId) -> Result<Role, FindRoleByIdException>;
+    async fn create(&self, txn: &DatabaseTransaction, role: &Role) -> Result<(), CreateRoleError>;
+    async fn find_by_id(&self, id: RoleId) -> Result<Role, FindRoleByIdError>;
 }
