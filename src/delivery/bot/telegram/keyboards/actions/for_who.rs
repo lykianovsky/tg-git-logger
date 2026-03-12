@@ -1,28 +1,22 @@
 use crate::delivery::bot::telegram::keyboards::actions::TelegramBotKeyboardAction;
+use std::str::FromStr;
+use strum_macros::{AsRefStr, EnumString};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, EnumString, AsRefStr)]
 pub enum TelegramBotForWhoAction {
+    #[strum(serialize = "me")]
     Me,
+    #[strum(serialize = "repository")]
     Repository,
 }
 
 impl TelegramBotKeyboardAction for TelegramBotForWhoAction {
-    fn to_callback_data(&self) -> &'static str {
-        match self {
-            TelegramBotForWhoAction::Me => "who:me",
-            TelegramBotForWhoAction::Repository => "who:repository",
-        }
+    fn to_callback_data(&self) -> &str {
+        self.as_ref()
     }
 
-    fn from_callback_data(data: &str) -> Result<Self, String>
-    where
-        Self: Sized,
-    {
-        match data {
-            "who:me" => Ok(Self::Me),
-            "who:repository" => Ok(Self::Repository),
-            _ => Err(format!("Unknown action type: {data}")),
-        }
+    fn from_callback_data(data: &str) -> Result<Self, String> {
+        Self::from_str(data).map_err(|e| String::from(e.to_string()))
     }
 
     fn label(&self) -> &'static str {

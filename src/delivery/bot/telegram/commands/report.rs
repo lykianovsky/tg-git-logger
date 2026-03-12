@@ -1,31 +1,23 @@
-use crate::application::version_control::queries::build_report::executor::BuildVersionControlDateRangeReportExecutor;
 use crate::delivery::bot::telegram::context::TelegramBotCommandContext;
-use crate::delivery::bot::telegram::dialogues::report::{
-    ReportByDateRangeDialogue, TelegramBotReportByDateRangeDialogueState,
+use crate::delivery::bot::telegram::dialogues::report::TelegramBotDialogueReportByDateRangeState;
+use crate::delivery::bot::telegram::dialogues::{
+    TelegramBotDialogueState, TelegramBotDialogueType,
 };
 use crate::delivery::bot::telegram::keyboards::actions::for_who::TelegramBotForWhoAction;
 use crate::delivery::bot::telegram::keyboards::builder::KeyboardBuilder;
 use std::sync::Arc;
+use teloxide::dispatching::dialogue::Storage;
 use teloxide::payloads::SendMessageSetters;
 use teloxide::prelude::Requester;
 
 pub struct TelegramBotVersionControlReportCommandHandler {
     context: TelegramBotCommandContext,
-    executor: Arc<BuildVersionControlDateRangeReportExecutor>,
-    dialog: Arc<ReportByDateRangeDialogue>,
+    dialogue: Arc<TelegramBotDialogueType>,
 }
 
 impl TelegramBotVersionControlReportCommandHandler {
-    pub fn new(
-        context: TelegramBotCommandContext,
-        executor: Arc<BuildVersionControlDateRangeReportExecutor>,
-        dialog: Arc<ReportByDateRangeDialogue>,
-    ) -> Self {
-        Self {
-            context,
-            executor,
-            dialog,
-        }
+    pub fn new(context: TelegramBotCommandContext, dialogue: Arc<TelegramBotDialogueType>) -> Self {
+        Self { context, dialogue }
     }
 
     pub async fn execute(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -36,11 +28,12 @@ impl TelegramBotVersionControlReportCommandHandler {
             ])
             .build();
 
-        self.dialog
-            .update(TelegramBotReportByDateRangeDialogueState::For)
+        self.dialogue
+            .update(TelegramBotDialogueState::ReportByDateRange(
+                TelegramBotDialogueReportByDateRangeState::For,
+            ))
             .await?;
 
-        // Сразу отправляем клавиатуру
         self.context
             .bot
             .send_message(self.context.msg.chat.id, "🎯  Выберите для кого:")

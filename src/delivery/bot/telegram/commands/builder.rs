@@ -4,7 +4,7 @@ use crate::delivery::bot::telegram::commands::register::TelegramBotRegisterComma
 use crate::delivery::bot::telegram::commands::report::TelegramBotVersionControlReportCommandHandler;
 use crate::delivery::bot::telegram::commands::start::TelegramBotStartCommandHandler;
 use crate::delivery::bot::telegram::context::TelegramBotCommandContext;
-use crate::delivery::bot::telegram::dialogues::report::ReportByDateRangeDialogue;
+use crate::delivery::bot::telegram::dialogues::TelegramBotDialogueType;
 use std::sync::Arc;
 use teloxide::macros::BotCommands;
 use teloxide::prelude::Requester;
@@ -27,7 +27,7 @@ pub async fn handle(
     user: User,
     msg: Message,
     cmd: TelegramBotCommand,
-    report_dialog: ReportByDateRangeDialogue,
+    dialogue: TelegramBotDialogueType,
     executors: Arc<ApplicationBoostrapExecutors>,
     config: Arc<ApplicationConfig>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -61,18 +61,15 @@ pub async fn handle(
             TelegramBotRegisterCommandHandler::new(
                 context,
                 executors.commands.create_oauth_link.clone(),
+                Arc::new(dialogue),
             )
             .execute()
             .await?;
         }
         TelegramBotCommand::Report => {
-            TelegramBotVersionControlReportCommandHandler::new(
-                context,
-                executors.queries.build_report_by_range.clone(),
-                Arc::new(report_dialog),
-            )
-            .execute()
-            .await?;
+            TelegramBotVersionControlReportCommandHandler::new(context, Arc::new(dialogue))
+                .execute()
+                .await?;
         }
     }
 

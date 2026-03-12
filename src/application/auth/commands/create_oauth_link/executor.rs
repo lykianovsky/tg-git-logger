@@ -10,6 +10,7 @@ use crate::utils::security::crypto::key_by_payload::create_key_by_payload;
 use std::sync::Arc;
 use url::Url;
 
+// TODO: Вынести в конфиг
 const OAUTH_STATE_TTL_SECONDS: u64 = 600;
 
 pub struct CreateOAuthLinkExecutor {

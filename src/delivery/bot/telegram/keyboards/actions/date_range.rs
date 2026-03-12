@@ -1,30 +1,26 @@
 use crate::delivery::bot::telegram::keyboards::actions::TelegramBotKeyboardAction;
+use std::str::FromStr;
+use strum_macros::{AsRefStr, EnumString};
 
+#[derive(EnumString, AsRefStr)]
 pub enum TelegramBotDateRangeAction {
+    #[strum(serialize = "last_week")]
     LastWeek,
+    #[strum(serialize = "last_2_weeks")]
     Last2Weeks,
+    #[strum(serialize = "last_month")]
     LastMonth,
+    #[strum(serialize = "this_month")]
     ThisMonth,
 }
 
 impl TelegramBotKeyboardAction for TelegramBotDateRangeAction {
-    fn to_callback_data(&self) -> &'static str {
-        match self {
-            TelegramBotDateRangeAction::LastWeek => "date:last_week",
-            TelegramBotDateRangeAction::Last2Weeks => "date:last_2_weeks",
-            TelegramBotDateRangeAction::LastMonth => "date:last_month",
-            TelegramBotDateRangeAction::ThisMonth => "date:this_month",
-        }
+    fn to_callback_data(&self) -> &str {
+        self.as_ref()
     }
 
     fn from_callback_data(data: &str) -> Result<Self, String> {
-        match data {
-            "date:last_week" => Ok(Self::LastWeek),
-            "date:last_2_weeks" => Ok(Self::Last2Weeks),
-            "date:last_month" => Ok(Self::LastMonth),
-            "date:this_month" => Ok(Self::ThisMonth),
-            _ => Err(format!("Unknown action type: {data}")),
-        }
+        Self::from_str(data).map_err(|e| String::from(e.to_string()))
     }
 
     fn label(&self) -> &'static str {

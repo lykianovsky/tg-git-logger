@@ -5,9 +5,9 @@ mod keyboards;
 
 use crate::bootstrap::executors::ApplicationBoostrapExecutors;
 use crate::config::application::ApplicationConfig;
-use crate::delivery::bot::telegram::dialogues::report::{
-    TelegramBotReportByDateRangeDialogue, TelegramBotReportByDateRangeDialogueState,
-};
+use crate::delivery::bot::telegram::dialogues::registration::TelegramBotDialogueRegistrationDispatcher;
+use crate::delivery::bot::telegram::dialogues::report::TelegramBotDialogueReportByDateRangeDispatcher;
+use crate::delivery::bot::telegram::dialogues::TelegramBotDialogueState;
 use crate::delivery::contract::ApplicationDelivery;
 use std::sync::Arc;
 use teloxide::dispatching::dialogue::InMemStorage;
@@ -43,29 +43,21 @@ impl ApplicationDelivery for DeliveryBotMessengerTelegram {
             .filter_map(|update: Update| update.from().cloned())
             .endpoint(commands::builder::handle);
 
-        let dialog_message_handler = Update::filter_message()
-            .enter_dialogue::<Message, InMemStorage<TelegramBotReportByDateRangeDialogueState>, TelegramBotReportByDateRangeDialogueState>();
-
-        let callback_handler = Update::filter_callback_query()
-            .enter_dialogue::<CallbackQuery, InMemStorage<TelegramBotReportByDateRangeDialogueState>, TelegramBotReportByDateRangeDialogueState>()
+        let handler = dptree::entry()
+            .enter_dialogue::<Update, InMemStorage<TelegramBotDialogueState>, TelegramBotDialogueState>()
+            .branch(commands_handler)
             .branch(
-                case![TelegramBotReportByDateRangeDialogueState::For]
-                    .endpoint(TelegramBotReportByDateRangeDialogue::choose_for_who)
+                case![TelegramBotDialogueState::Registration(state)]
+                    .branch(TelegramBotDialogueRegistrationDispatcher::new())
             )
             .branch(
-                case![TelegramBotReportByDateRangeDialogueState::DateRange{for_who_action}]
-                    .endpoint(TelegramBotReportByDateRangeDialogue::create_report_by_date_range)
+                case![TelegramBotDialogueState::ReportByDateRange(state)]
+                    .branch(TelegramBotDialogueReportByDateRangeDispatcher::new())
             );
-
-        let handler = dptree::entry()
-            .enter_dialogue::<Update, InMemStorage<TelegramBotReportByDateRangeDialogueState>, TelegramBotReportByDateRangeDialogueState>()
-            .branch(commands_handler)
-            .branch(callback_handler)
-            .branch(dialog_message_handler);
 
         Dispatcher::builder(bot, handler)
             .dependencies(dptree::deps![
-                InMemStorage::<TelegramBotReportByDateRangeDialogueState>::new(),
+                InMemStorage::<TelegramBotDialogueState>::new(),
                 self.executors.clone(),
                 self.config.clone()
             ])

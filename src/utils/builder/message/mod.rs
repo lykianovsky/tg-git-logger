@@ -78,7 +78,8 @@ impl MessageBuilder {
     }
 
     pub fn link(mut self, text: &str, url: &str) -> Self {
-        self.parts.push(format!("<a href=\"{}\">{}</a>", url, text));
+        self.parts
+            .push(format!("<a href=\"{}\">{}</a>\n", url, text));
         self
     }
 

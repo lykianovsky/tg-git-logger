@@ -1,3 +1,12 @@
 {
-  "hello": "Привет, %{name}"
+  "hello": "Привет, %{name}",
+  "telegram_bot": {
+    "commands": {
+      "register": {
+        "title": "\uD83D\uDD17 Для привязки GitHub аккаунта:",
+        "body": "\uD83D\uDC49 Авторизоваться через GitHub",
+        "expiration_time": "⏱ Ссылка действительна 10 минут"
+      }
+    }
+  }
 }
