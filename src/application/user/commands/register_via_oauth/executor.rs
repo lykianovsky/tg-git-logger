@@ -4,10 +4,12 @@ use crate::application::user::commands::register_via_oauth::response::RegisterUs
 use crate::domain::auth::entities::oauth_state::OpenAuthorizationState;
 use crate::domain::auth::ports::oauth_client::OAuthClient;
 use crate::domain::notification::services::notification_service::NotificationService;
+use crate::domain::role::repositories::role_repository::RoleRepository;
 use crate::domain::shared::command::CommandExecutor;
 use crate::domain::user::entities::user::User;
 use crate::domain::user::entities::user_social_account::UserSocialAccount;
 use crate::domain::user::entities::user_vc_account::UserVersionControlAccount;
+use crate::domain::user::repositories::user_has_roles_repository::UserHasRolesRepository;
 use crate::domain::user::repositories::user_repository::UserRepository;
 use crate::domain::user::repositories::user_social_accounts_repository::UserSocialAccountsRepository;
 use crate::domain::user::repositories::user_vc_accounts_repository::UserVersionControlAccountsRepository;
@@ -22,6 +24,7 @@ use std::sync::Arc;
 
 pub struct RegisterUserViaOAuthExecutor {
     pub db: Arc<DatabaseConnection>,
+    pub user_has_role: Arc<dyn UserHasRolesRepository>,
     pub user_repo: Arc<dyn UserRepository>,
     pub user_socials_repo: Arc<dyn UserSocialAccountsRepository>,
     pub user_version_control_service_repo: Arc<dyn UserVersionControlAccountsRepository>,
@@ -115,6 +118,8 @@ impl CommandExecutor for RegisterUserViaOAuthExecutor {
                 },
             )
             .await?;
+
+        self.user_has_role.assign(&txn, user.id, state.role).await?;
 
         let new_social_user = UserSocialAccount {
             id: Default::default(),

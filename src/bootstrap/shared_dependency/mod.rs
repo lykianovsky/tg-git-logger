@@ -1,7 +1,12 @@
 use crate::config::application::ApplicationConfig;
 use crate::domain::auth::ports::oauth_client::OAuthClient;
+use crate::domain::role::repositories::role_repository::RoleRepository;
 use crate::domain::task::ports::task_tracker_client::TaskTrackerClient;
 use crate::domain::task::services::task_tracker_service::TaskTrackerService;
+use crate::domain::user::repositories::user_has_roles_repository::UserHasRolesRepository;
+use crate::domain::user::repositories::user_repository::UserRepository;
+use crate::domain::user::repositories::user_social_accounts_repository::UserSocialAccountsRepository;
+use crate::domain::user::repositories::user_vc_accounts_repository::UserVersionControlAccountsRepository;
 use crate::domain::version_control::ports::version_control_client::VersionControlClient;
 use crate::infrastructure::drivers::cache::contract::CacheService;
 use crate::infrastructure::drivers::cache::redis::RedisCache;
@@ -15,6 +20,7 @@ use crate::infrastructure::integrations::task_tracker::kaiten::{
 };
 use crate::infrastructure::integrations::version_control::github::client::GithubVersionControlClient;
 use crate::infrastructure::processing::event_bus::EventBus;
+use crate::infrastructure::repositories::mysql::role::MySQLRoleRepository;
 use crate::infrastructure::repositories::mysql::user::MySQLUserRepository;
 use crate::infrastructure::repositories::mysql::user_has_roles::MySQLUserHasRolesRepository;
 use crate::infrastructure::repositories::mysql::user_social_accounts::MySQLUserSocialServicesRepository;
@@ -31,10 +37,11 @@ pub struct ApplicationSharedDependency {
     pub publisher: Arc<dyn MessageBrokerPublisher>,
     pub reversible_cipher: Arc<ReversibleCipher>,
     pub cache: Arc<dyn CacheService>,
-    pub user_repo: Arc<MySQLUserRepository>,
-    pub user_has_roles_repo: Arc<MySQLUserHasRolesRepository>,
-    pub user_socials_repo: Arc<MySQLUserSocialServicesRepository>,
-    pub user_version_controls_repo: Arc<MySQLUserVersionControlServicesRepository>,
+    pub role_repo: Arc<dyn RoleRepository>,
+    pub user_repo: Arc<dyn UserRepository>,
+    pub user_has_roles_repo: Arc<dyn UserHasRolesRepository>,
+    pub user_socials_repo: Arc<dyn UserSocialAccountsRepository>,
+    pub user_version_controls_repo: Arc<dyn UserVersionControlAccountsRepository>,
     pub notification_service: Arc<CompositionNotificationService>,
     pub oauth_client: Arc<dyn OAuthClient>,
     pub task_tracker_client: Arc<dyn TaskTrackerClient>,
@@ -62,6 +69,8 @@ impl ApplicationSharedDependency {
 
         let publisher: Arc<dyn MessageBrokerPublisher> =
             Arc::new(MessageBrokerRabbitMQPublisher::new(message_broker.connection.clone()).await?);
+
+        let role_repo = Arc::new(MySQLRoleRepository::new(mysql_pool.clone()));
 
         let user_repo = Arc::new(MySQLUserRepository::new(mysql_pool.clone()));
 
@@ -106,6 +115,7 @@ impl ApplicationSharedDependency {
             publisher,
             reversible_cipher,
             cache,
+            role_repo,
             user_repo,
             user_has_roles_repo,
             user_socials_repo,

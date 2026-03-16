@@ -2,6 +2,7 @@ use crate::application::user::commands::register_via_oauth::command::RegisterUse
 use crate::application::user::commands::register_via_oauth::executor::RegisterUserViaOAuthExecutor;
 use crate::domain::shared::command::CommandExecutor;
 use axum::extract::Query;
+use axum::response::{IntoResponse, Redirect};
 use axum::Extension;
 use reqwest::StatusCode;
 use serde::Deserialize;
@@ -19,7 +20,7 @@ impl AxumOAuthGithubController {
     pub async fn handle_post(
         Extension(executor): Extension<Arc<RegisterUserViaOAuthExecutor>>,
         Query(query): Query<AxumOAuthGithubControllerPostQuery>,
-    ) -> StatusCode {
+    ) -> impl IntoResponse {
         let cmd = RegisterUserViaOAuthExecutorCommand {
             code: query.code.clone(),
             state: query.state.clone(),
@@ -28,12 +29,13 @@ impl AxumOAuthGithubController {
         match executor.execute(&cmd).await {
             Ok(result) => {
                 tracing::debug!("{:?} {:?}", result, query);
-                StatusCode::OK
             }
             Err(error) => {
                 tracing::error!("{:?} {:?}", error, query);
-                StatusCode::BAD_REQUEST
             }
         }
+
+        // TODO: Вынести к конфиг
+        Redirect::to("https://t.me/zb_git_log_bot")
     }
 }

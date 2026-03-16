@@ -52,6 +52,7 @@ impl ApplicationBoostrapExecutors {
             )),
             register_user_via_oauth: Arc::new(RegisterUserViaOAuthExecutor {
                 db: mysql_pool.clone(),
+                user_has_role: shared_dependency.user_has_roles_repo.clone(),
                 user_repo: shared_dependency.user_repo.clone(),
                 user_socials_repo: shared_dependency.user_socials_repo.clone(),
                 user_version_control_service_repo: shared_dependency

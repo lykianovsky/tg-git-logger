@@ -1,3 +1,4 @@
+use crate::domain::role::value_objects::role_name::RoleName;
 use crate::domain::user::value_objects::social_chat_id::SocialChatId;
 use crate::domain::user::value_objects::social_type::SocialType;
 use crate::domain::user::value_objects::social_user_id::SocialUserId;
@@ -26,4 +27,5 @@ pub struct CreateOAuthLinkExecutorCommandVersionControl {
 pub struct CreateOAuthLinkExecutorCommand {
     pub social: CreateOAuthLinkExecutorCommandSocial,
     pub version_control: CreateOAuthLinkExecutorCommandVersionControl,
+    pub role: RoleName,
 }

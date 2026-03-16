@@ -20,7 +20,7 @@ pub enum FindRoleByIdError {
 }
 
 #[async_trait]
-pub trait RoleRepository {
+pub trait RoleRepository: Send + Sync {
     async fn create(&self, txn: &DatabaseTransaction, role: &Role) -> Result<(), CreateRoleError>;
     async fn find_by_id(&self, id: RoleId) -> Result<Role, FindRoleByIdError>;
 }

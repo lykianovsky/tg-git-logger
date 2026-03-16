@@ -1,5 +1,6 @@
 use crate::domain::auth::ports::oauth_client::OAuthClientExchangeCodeError;
 use crate::domain::notification::services::notification_service::NotificationServiceSendError;
+use crate::domain::user::repositories::user_has_roles_repository::AssignRoleToUserError;
 use crate::domain::user::repositories::user_repository::CreateUserError;
 use crate::domain::user::repositories::user_social_accounts_repository::CreateSocialServiceError;
 use crate::domain::user::repositories::user_vc_accounts_repository::CreateVersionControlServiceError;
@@ -32,6 +33,9 @@ pub enum RegisterUserViaOAuthExecutorError {
 
     #[error("{0}")]
     NotificationServiceSendError(#[from] NotificationServiceSendError),
+
+    #[error("{0}")]
+    AssignRoleError(#[from] AssignRoleToUserError),
 
     #[error("Cache error: {0}")]
     Cache(String),

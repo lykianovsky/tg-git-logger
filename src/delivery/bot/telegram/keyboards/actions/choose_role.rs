@@ -1,6 +1,7 @@
 use crate::delivery::bot::telegram::keyboards::actions::TelegramBotKeyboardAction;
 use std::str::FromStr;
 
+use crate::domain::role::value_objects::role_name::RoleName;
 use strum_macros::{AsRefStr, EnumString};
 
 #[derive(EnumString, AsRefStr, Debug, Clone)]
@@ -9,6 +10,15 @@ pub enum TelegramBotChooseRoleAction {
     QualityAssurance,
     #[strum(serialize = "developer")]
     Developer,
+}
+
+impl From<TelegramBotChooseRoleAction> for RoleName {
+    fn from(value: TelegramBotChooseRoleAction) -> Self {
+        match value {
+            TelegramBotChooseRoleAction::Developer => RoleName::Developer,
+            TelegramBotChooseRoleAction::QualityAssurance => RoleName::QualityAssurance,
+        }
+    }
 }
 
 impl TelegramBotKeyboardAction for TelegramBotChooseRoleAction {

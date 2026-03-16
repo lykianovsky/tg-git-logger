@@ -1,5 +1,7 @@
 pub mod entities;
+pub mod seeders;
 
+use crate::infrastructure::database::mysql::seeders::MySQLSeedersRunner;
 use migration::{Migrator, MigratorTrait};
 use sea_orm::{Database, DatabaseConnection};
 
@@ -26,6 +28,11 @@ impl MySQLDatabase {
         Migrator::up(&pool, None)
             .await
             .expect("Database migration failed.");
+
+        MySQLSeedersRunner::new(&pool)
+            .run()
+            .await
+            .expect("Failed to seed initialization data to database");
 
         tracing::info!("Database migrate successfully connected to mysql database");
 

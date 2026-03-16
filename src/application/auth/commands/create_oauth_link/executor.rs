@@ -49,6 +49,7 @@ impl CreateOAuthLinkExecutor {
             social_user_email: cmd.social.user_email.clone(),
             social_user_login: cmd.social.user_login.clone(),
             social_user_avatar_url: cmd.social.user_avatar_url.clone(),
+            role: cmd.role.clone(),
         };
 
         let secret = format!(
