@@ -59,10 +59,16 @@ pub struct MessageBrokerRabbitMQ {
 
 impl MessageBrokerRabbitMQ {
     pub async fn new(url: &str) -> Result<Self, lapin::Error> {
-        let connection =
-            Arc::new(Connection::connect(url, ConnectionProperties::default()).await?);
+        tracing::info!("Connecting to rabbitmq by url: {}", url);
+
+        let connection = Arc::new(Connection::connect(url, ConnectionProperties::default()).await?);
 
         let channel = connection.create_channel().await?;
+
+        tracing::info!(
+            "Connection to rabbitmq by url complete successfully: {}",
+            url
+        );
 
         Ok(Self {
             connection,

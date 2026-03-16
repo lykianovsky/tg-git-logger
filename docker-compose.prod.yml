@@ -5,13 +5,36 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.prod
-    volumes:
-      - .env.local:/usr/src/app/.env.local:ro
+    environment:
+      - RUST_LOG=debug
+    env_file:
+      - .env.local
     ports:
       - "${APPLICATION_PORT}:${APPLICATION_PORT}"
     depends_on:
-      - db
-      - rabbitmq
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbit_mq:
+        condition: service_healthy
+    networks:
+      - app-network
+
+  redis:
+    image: redis:7
+    ports:
+      - "${REDIS_PORT}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+    networks:
+      - app-network
 
   db:
     image: mysql:8.0
@@ -20,19 +43,43 @@ services:
       MYSQL_DATABASE: ${MYSQL_DATABASE_NAME}
       MYSQL_USER: ${MYSQL_USERNAME}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    ports:
+      - "${MYSQL_PORT}:3306"
     volumes:
       - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost" ]
+      interval: 5s
+      timeout: 10s
+      retries: 10
+      start_period: 10s
+    networks:
+      - app-network
 
-  rabbitmq:
+  rabbit_mq:
     image: rabbitmq:3-management
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
     ports:
+      - "${RABBITMQ_PORT}:5672"
       - "${RABBITMQ_MANAGEMENT_PORT}:15672"
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: [ "CMD", "rabbitmq-diagnostics", "check_port_connectivity" ]
+      interval: 5s
+      timeout: 10s
+      retries: 10
+      start_period: 10s
+    networks:
+      - app-network
 
 volumes:
   mysql-data:
   rabbitmq-data:
+  redis-data:
+
+networks:
+  app-network:
+    driver: bridge

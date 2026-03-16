@@ -6,19 +6,25 @@ services:
       context: .
       dockerfile: Dockerfile.dev
     volumes:
-      - .:/usr/src/app             # монтируем код
-      - cargo-target:/usr/src/app/target  # кэш сборки
+      - .:/usr/src/app
+      - cargo-target:/usr/src/app/target
     ports:
       - "${APPLICATION_PORT}:${APPLICATION_PORT}"
+    environment:
+      - RUST_LOG=debug
+    env_file:
+      - .env.local
     stdin_open: true
     tty: true
     depends_on:
       rabbit_mq:
         condition: service_healthy
       db:
-        condition: service_started
+        condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
+    networks:
+      - app-network
 
   db:
     image: mysql:8.0
@@ -28,10 +34,17 @@ services:
       MYSQL_USER: ${MYSQL_USERNAME}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
     ports:
-      # TODO: закрыть порт наружу
       - "${MYSQL_PORT}:3306"
     volumes:
       - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost" ]
+      interval: 5s
+      timeout: 10s
+      retries: 10
+      start_period: 10s
+    networks:
+      - app-network
 
   rabbit_mq:
     image: rabbitmq:3-management
@@ -39,8 +52,8 @@ services:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
     ports:
-      - "${RABBITMQ_PORT}:5672"        # основной порт AMQP
-      - "${RABBITMQ_MANAGEMENT_PORT}:15672" # веб-менеджмент
+      - "${RABBITMQ_PORT}:5672"
+      - "${RABBITMQ_MANAGEMENT_PORT}:15672"
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq
     healthcheck:
@@ -49,6 +62,8 @@ services:
       timeout: 10s
       retries: 10
       start_period: 10s
+    networks:
+      - app-network
 
   redis:
     image: redis:7
@@ -56,9 +71,21 @@ services:
       - "${REDIS_PORT}:6379"
     volumes:
       - redis-data:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+    networks:
+      - app-network
 
 volumes:
   cargo-target:
   mysql-data:
   rabbitmq-data:
   redis-data:
+
+networks:
+  app-network:
+    driver: bridge

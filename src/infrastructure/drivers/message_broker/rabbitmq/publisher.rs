@@ -18,6 +18,8 @@ pub struct MessageBrokerRabbitMQPublisher {
 
 impl MessageBrokerRabbitMQPublisher {
     pub async fn new(connection: Arc<Connection>) -> Result<Self, lapin::Error> {
+        tracing::info!("Connection to rabbitmq and create publisher channel");
+
         let channel = connection.create_channel().await?;
 
         channel
