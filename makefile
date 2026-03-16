@@ -38,6 +38,7 @@ prod-run:
 # Docker Prod
 # ========================
 
+# Сборка Rust-приложения
 docker-prod-build:
 	docker-compose -f docker-compose.prod.yml --env-file .env.local build rust-app
 
@@ -45,10 +46,14 @@ docker-prod-up:
 	docker-compose -f docker-compose.prod.yml --env-file .env.local up -d
 
 docker-prod-down:
-	docker-compose -f docker-compose.prod.yml down
+	docker-compose -f docker-compose.prod.yml --env-file .env.local down -v --remove-orphans
 
 docker-prod-logs:
-	docker-compose -f docker-compose.prod.yml logs -f rust-app
+	docker-compose -f docker-compose.prod.yml --env-file .env.local logs -f rust-app
+
+docker-prod-restart:
+	docker-compose -f docker-compose.prod.yml --env-file .env.local down -v --remove-orphans
+	docker-compose -f docker-compose.prod.yml --env-file .env.local up -d
 
 # ========================
 # Utilities
