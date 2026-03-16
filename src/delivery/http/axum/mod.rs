@@ -1,12 +1,14 @@
 mod controllers;
+mod middlewares;
 
 use crate::bootstrap::executors::ApplicationBoostrapExecutors;
 use crate::config::application::ApplicationConfig;
 use crate::delivery::contract::ApplicationDelivery;
 use crate::delivery::http::axum::controllers::oauth::github::AxumOAuthGithubController;
 use crate::delivery::http::axum::controllers::webhook::github::AxumWebhookGithubController;
+use crate::delivery::http::axum::middlewares::GithubWebhookAuthorizationMiddleware;
 use axum::routing::post;
-use axum::{Extension, Router, routing::get};
+use axum::{routing::get, Extension, Router};
 use std::sync::Arc;
 
 pub struct DeliveryHttpServerAxum {
@@ -20,6 +22,7 @@ impl DeliveryHttpServerAxum {
         executors: Arc<ApplicationBoostrapExecutors>,
         config: Arc<ApplicationConfig>,
     ) -> Self {
+        let middleware_config = config.clone();
         // TODO разбить роуты на модули и вынести в отдельные функции для лучшей читаемости
         let router = Router::new()
             .route("/ping", get(|| async { "PONG" }))
@@ -37,7 +40,13 @@ impl DeliveryHttpServerAxum {
                 Router::new().route(
                     "/github",
                     post(AxumWebhookGithubController::handle_post)
-                        .layer(Extension(executors.commands.dispatch_webhook_event.clone())),
+                        .layer(Extension(executors.commands.dispatch_webhook_event.clone()))
+                        .layer(axum::middleware::from_fn(move |req, next| {
+                            let middleware_clone = GithubWebhookAuthorizationMiddleware::new(
+                                middleware_config.github.webhook_secret.clone(),
+                            );
+                            async move { middleware_clone.handle(req, next).await }
+                        })),
                 ),
             );
 
