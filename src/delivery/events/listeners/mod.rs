@@ -48,18 +48,21 @@ impl ApplicationDelivery for DeliveryEventListeners {
             .event_bus
             .on(WebhookPushEventListener {
                 publisher: self.shared_dependency.publisher.clone(),
+                chat_id: SocialChatId(self.config.telegram.chat_id),
             })
             .await;
         self.shared_dependency
             .event_bus
             .on(WebhookReleaseEventListener {
                 publisher: self.shared_dependency.publisher.clone(),
+                chat_id: SocialChatId(self.config.telegram.chat_id),
             })
             .await;
         self.shared_dependency
             .event_bus
             .on(WebhookWorkflowEventListener {
                 publisher: self.shared_dependency.publisher.clone(),
+                chat_id: SocialChatId(self.config.telegram.chat_id),
             })
             .await;
 

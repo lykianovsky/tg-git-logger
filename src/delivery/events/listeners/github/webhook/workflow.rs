@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 pub struct WebhookWorkflowEventListener {
     pub publisher: Arc<dyn MessageBrokerPublisher>,
+    pub chat_id: SocialChatId,
 }
 
 #[async_trait]
@@ -19,7 +20,7 @@ impl EventListener<WebhookWorkflowEvent> for WebhookWorkflowEventListener {
         self.publisher
             .publish(&SendSocialNotifyJob {
                 social_type: SocialType::Telegram,
-                chat_id: SocialChatId(-5143156647),
+                chat_id: self.chat_id,
                 message: MessageBuilder::new().raw(payload.build_text().as_str()),
             })
             .await
