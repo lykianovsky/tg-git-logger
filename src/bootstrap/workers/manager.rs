@@ -28,8 +28,10 @@ where
         tracing::info!("Spawning {} workers", initial_count);
 
         for i in 0..initial_count {
-            let worker = (self.factory)(format!("worker_{}", i));
+            let worker_name = format!("worker_{}", i);
+            let worker = (self.factory)(worker_name.clone());
             self.workers.push(worker);
+            tracing::info!("Spawn {} worker", worker_name);
         }
 
         tracing::info!("All {} workers created successfully", self.workers.len());
@@ -39,11 +41,11 @@ where
                 let worker_name = worker.name().to_string();
                 match worker.start().await {
                     Ok(_) => {
-                        tracing::info!("Worker {} spawn complete successfully", worker_name);
+                        tracing::info!("Worker {} completed execution successfully", worker_name);
                     }
                     Err(e) => {
                         tracing::error!(
-                            "Worker {} spawn finished with error: {}",
+                            "Worker {} completed execution with error: {}",
                             worker_name,
                             e.to_string()
                         );

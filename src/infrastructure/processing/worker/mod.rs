@@ -3,8 +3,8 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum MessageBrokerWorkerStartError {
-    #[error("")]
-    Test,
+    #[error("Failed to create consumer stream: {0}")]
+    FailedToCreateConsumerStream(String),
 }
 
 #[async_trait]
