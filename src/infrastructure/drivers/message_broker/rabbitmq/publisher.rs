@@ -10,10 +10,9 @@ use lapin::options::{BasicPublishOptions, ExchangeDeclareOptions};
 use lapin::types::FieldTable;
 use lapin::{BasicProperties, Channel, Connection};
 use std::sync::Arc;
-use tokio::sync::Mutex;
 
 pub struct MessageBrokerRabbitMQPublisher {
-    channel: Arc<Mutex<Channel>>,
+    channel: Arc<Channel>,
 }
 
 impl MessageBrokerRabbitMQPublisher {
@@ -37,7 +36,7 @@ impl MessageBrokerRabbitMQPublisher {
         tracing::info!(exchange = EXCHANGE_NAME, "RabbitMQ exchange declared");
 
         Ok(Self {
-            channel: Arc::new(Mutex::new(channel)),
+            channel: Arc::new(channel),
         })
     }
 }
@@ -56,14 +55,14 @@ impl MessageBrokerPublisher for MessageBrokerRabbitMQPublisher {
         })
         .map_err(|e| MessageBrokerPublisherPublishError::Serialization(e.to_string()))?;
 
-        tracing::debug!("Lock execution, and get publisher channel");
+        let routing_key = message.kind().routing_key();
 
-        let channel = self.channel.lock().await;
+        tracing::debug!(routing_key = %routing_key, "Start publish to channel");
 
-        channel
+        self.channel
             .basic_publish(
                 EXCHANGE_NAME,
-                &message.kind().routing_key(),
+                &routing_key,
                 BasicPublishOptions::default(),
                 &envelope,
                 BasicProperties::default(),
@@ -73,7 +72,7 @@ impl MessageBrokerPublisher for MessageBrokerRabbitMQPublisher {
             .await
             .map_err(|e| MessageBrokerPublisherPublishError::PublishConfirmation(e.to_string()))?;
 
-        tracing::debug!(event_name = %message.name(), "Publish message to RabbitMQ complete successfully");
+        tracing::debug!(event_name = %message.name(), routing_key = %routing_key, "Publish message to RabbitMQ complete successfully");
 
         Ok(())
     }

@@ -38,7 +38,7 @@ impl MessageBrokerWorker for MessageBrokerJobsWorker {
         self.name.as_str()
     }
 
-    async fn start(self) -> Result<(), MessageBrokerWorkerStartError> {
+    async fn start(self: Box<Self>) -> Result<(), MessageBrokerWorkerStartError> {
         let queue = &*self.queue.clone();
 
         let mut stream = self

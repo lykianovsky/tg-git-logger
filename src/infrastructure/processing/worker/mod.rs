@@ -8,8 +8,8 @@ pub enum MessageBrokerWorkerStartError {
 }
 
 #[async_trait]
-pub trait MessageBrokerWorker: Send + 'static {
+pub trait MessageBrokerWorker: Send + Sync + 'static {
     fn name(&self) -> &str;
 
-    async fn start(self) -> Result<(), MessageBrokerWorkerStartError>;
+    async fn start(self: Box<Self>) -> Result<(), MessageBrokerWorkerStartError>;
 }
