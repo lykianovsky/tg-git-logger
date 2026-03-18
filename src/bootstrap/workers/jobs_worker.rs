@@ -34,6 +34,10 @@ impl MessageBrokerJobsWorker {
 
 #[async_trait]
 impl MessageBrokerWorker for MessageBrokerJobsWorker {
+    fn name(&self) -> &str {
+        self.name.as_str()
+    }
+
     async fn start(self) -> Result<(), MessageBrokerWorkerStartError> {
         let queue = &*self.queue.clone();
 

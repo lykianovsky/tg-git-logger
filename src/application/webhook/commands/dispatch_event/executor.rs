@@ -19,7 +19,7 @@ impl CommandExecutor for DispatchWebhookEventExecutor {
     type Error = DispatchWebhookEventExecutorError;
 
     async fn execute(&self, cmd: &Self::Command) -> Result<Self::Response, Self::Error> {
-        tracing::debug!("Dispatching webhook event");
+        tracing::debug!("Dispatching webhook event: {}", cmd.event.event_name());
 
         self.publisher
             .publish(cmd.event.as_ref() as &dyn MessageBrokerMessage)

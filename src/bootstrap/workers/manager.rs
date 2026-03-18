@@ -24,16 +24,35 @@ where
     pub async fn run(mut self, initial_count: usize) {
         let mut set = JoinSet::new();
 
+        tracing::info!("Starting MessageBrokerWorkerManager");
+        tracing::info!("Spawning {} workers", initial_count);
+
         for i in 0..initial_count {
             let worker = (self.factory)(format!("worker_{}", i));
             self.workers.push(worker);
         }
 
+        tracing::info!("All {} workers created successfully", self.workers.len());
+
         for worker in self.workers {
             set.spawn(async move {
-                worker.start().await.ok();
+                let worker_name = worker.name().to_string();
+                match worker.start().await {
+                    Ok(_) => {
+                        tracing::info!("Worker {} spawn complete successfully", worker_name);
+                    }
+                    Err(e) => {
+                        tracing::error!(
+                            "Worker {} spawn finished with error: {}",
+                            worker_name,
+                            e.to_string()
+                        );
+                    }
+                };
             });
         }
+
+        tracing::info!("All workers started, listening for messages...");
 
         while let Some(result) = set.join_next().await {
             if let Err(e) = result {

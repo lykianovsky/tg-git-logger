@@ -48,11 +48,15 @@ impl MessageBrokerPublisher for MessageBrokerRabbitMQPublisher {
         &self,
         message: &dyn MessageBrokerMessage,
     ) -> Result<(), MessageBrokerPublisherPublishError> {
+        tracing::debug!("Create publish message for: {}", message.name());
+
         let envelope = serde_json::to_vec(&MessageBrokerEnvelope {
             name: message.name().to_string(),
             payload: message,
         })
         .map_err(|e| MessageBrokerPublisherPublishError::Serialization(e.to_string()))?;
+
+        tracing::debug!("Lock execution, and get publisher channel");
 
         let channel = self.channel.lock().await;
 
@@ -68,6 +72,8 @@ impl MessageBrokerPublisher for MessageBrokerRabbitMQPublisher {
             .map_err(|e| MessageBrokerPublisherPublishError::PublishCreation(e.to_string()))?
             .await
             .map_err(|e| MessageBrokerPublisherPublishError::PublishConfirmation(e.to_string()))?;
+
+        tracing::debug!(event_name = %message.name(), "Publish message to RabbitMQ complete successfully");
 
         Ok(())
     }
