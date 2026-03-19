@@ -8,7 +8,7 @@ use crate::bootstrap::executors::ApplicationBoostrapExecutors;
 use crate::bootstrap::queues::ApplicationQueues;
 use crate::bootstrap::registry::jobs::JobConsumersRegistry;
 use crate::bootstrap::shared_dependency::ApplicationSharedDependency;
-use crate::bootstrap::workers::ApplicationBoostrapWorkers;
+use crate::bootstrap::workers::manager::ApplicationBoostrapWorkersManager;
 use crate::config::application::ApplicationConfig;
 use crate::delivery::bot::telegram::DeliveryBotMessengerTelegram;
 use crate::delivery::contract::ApplicationDelivery;
@@ -92,20 +92,24 @@ impl ApplicationBootstrap {
             event_listeners_delivery.serve().await.ok();
         });
 
-        let workers = ApplicationBoostrapWorkers::new(
+        let workers_manager = ApplicationBoostrapWorkersManager::new(
             queues.clone(),
             shared_dependency.message_broker.clone(),
+            shared_dependency.event_bus.clone(),
+            job_consumers_registry.clone(),
         );
 
-        workers
-            .run_events(shared_dependency.event_bus.clone())
-            .await
-            .ok();
-
-        workers.run_jobs(job_consumers_registry.clone()).await.ok();
+        let workers_handle = tokio::spawn(async move {
+            workers_manager.run().await;
+        });
 
         // TODO: Handle shutdown signals and gracefully stop the servers
-        tokio::try_join!(http_server_handle, bot_handle, event_listeners_handle)?;
+        tokio::try_join!(
+            http_server_handle,
+            bot_handle,
+            event_listeners_handle,
+            workers_handle
+        )?;
 
         Ok(())
     }

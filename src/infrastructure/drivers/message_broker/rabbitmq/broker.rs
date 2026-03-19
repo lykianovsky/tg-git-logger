@@ -16,6 +16,7 @@ use lapin::options::{
 use lapin::types::AMQPValue;
 use lapin::{types::FieldTable, Channel, Connection, ConnectionProperties};
 use std::sync::Arc;
+use std::time::Duration;
 
 pub const EXCHANGE_NAME: &str = "domain.exchange";
 pub const EXCHANGE_KIND: lapin::ExchangeKind = lapin::ExchangeKind::Topic;
