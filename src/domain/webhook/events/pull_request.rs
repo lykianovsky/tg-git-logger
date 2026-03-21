@@ -5,6 +5,44 @@ use crate::infrastructure::drivers::message_broker::contracts::publisher::{
 };
 use crate::utils::builder::message::MessageBuilder;
 use serde::{Deserialize, Serialize};
+use strum_macros::{AsRefStr, EnumString};
+
+#[derive(Debug, Serialize, Deserialize, EnumString, AsRefStr)]
+#[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
+pub enum WebhookPullRequestEventActionType {
+    Opened,      // PR создан
+    Closed,      // PR закрыт (merged или просто closed — смотри pr.merged)
+    Reopened,    // PR переоткрыт
+    Edited,      // изменили title/body/base branch
+    Synchronize, // новый коммит запушен в ветку PR
+
+    // Ревью реквесты
+    ReviewRequested,      // попросили кого-то зарепьюить
+    ReviewRequestRemoved, // убрали реквест на ревью
+
+    // Assignee
+    Assigned,   // назначили assignee
+    Unassigned, // убрали assignee
+
+    // Лейблы
+    Labeled,   // добавили лейбл
+    Unlabeled, // убрали лейбл
+
+    // Draft
+    ConvertedToDraft, // перевели в драфт
+    ReadyForReview,   // вывели из драфта
+
+    // Locked/Unlocked
+    Locked,
+    Unlocked,
+    Milestoned,
+    Demilestoned,
+    AutoMergeEnabled,
+    AutoMergeDisabled,
+
+    Unknown,
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct WebhookPullRequestEvent {
@@ -14,7 +52,7 @@ pub struct WebhookPullRequestEvent {
     pub repo_url: Option<String>,
     pub title: String, // заголовок PR
     pub number: u64,   // номер PR
-    pub action: String,
+    pub action: WebhookPullRequestEventActionType,
     pub merged: bool,
     pub merged_by: Option<String>, // кто смержил
     pub draft: bool,
@@ -37,7 +75,7 @@ pub struct WebhookPullRequestEvent {
 
 impl WebhookEvent for WebhookPullRequestEvent {
     fn build_text(&self) -> String {
-        let title = match self.action.as_str() {
+        let title = match self.action.as_ref() {
             "opened" => "🔀 Открыт Pull Request",
             "closed" if self.merged => "🎉 Pull Request смержен",
             "closed" => "❌ Pull Request закрыт",

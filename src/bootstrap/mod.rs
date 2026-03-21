@@ -16,6 +16,7 @@ use crate::delivery::events::listeners::DeliveryEventListeners;
 use crate::delivery::http::axum::DeliveryHttpServerAxum;
 use crate::delivery::jobs::consumers::move_task_to_test::consumer::MoveTaskToTestJobConsumer;
 use crate::delivery::jobs::consumers::send_social_notify::consumer::SendSocialNotifyJobConsumer;
+use crate::delivery::scheduler::DeliveryScheduler;
 use crate::infrastructure::database::mysql::MySQLDatabase;
 use crate::infrastructure::drivers::message_broker::contracts::queue_builder::MessageBrokerQueuesBuilder;
 use std::sync::Arc;
@@ -103,12 +104,20 @@ impl ApplicationBootstrap {
             workers_manager.run().await;
         });
 
+        let scheduler_handle = tokio::spawn(async move {
+            DeliveryScheduler::new(executors.clone(), config.clone())
+                .serve()
+                .await
+                .expect("Delivery scheduler error");
+        });
+
         // TODO: Handle shutdown signals and gracefully stop the servers
         tokio::try_join!(
             http_server_handle,
             bot_handle,
             event_listeners_handle,
-            workers_handle
+            workers_handle,
+            scheduler_handle
         )?;
 
         Ok(())

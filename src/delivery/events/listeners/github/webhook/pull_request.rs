@@ -29,14 +29,16 @@ impl EventListener<WebhookPullRequestEvent> for WebhookPullRequestEventListener 
             .await
             .ok();
 
-        if let Some(task_id) = self
-            .task_tracker_service
-            .extract_task_id_by_pattern(&payload.title)
-        {
-            self.publisher
-                .publish(&MoveTaskToTestJob { task_id })
-                .await
-                .ok();
+        if payload.merged {
+            if let Some(task_id) = self
+                .task_tracker_service
+                .extract_task_id_by_pattern(&payload.title)
+            {
+                self.publisher
+                    .publish(&MoveTaskToTestJob { task_id })
+                    .await
+                    .ok();
+            }
         }
     }
 }

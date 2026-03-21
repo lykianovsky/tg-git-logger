@@ -1,8 +1,11 @@
-use crate::domain::webhook::events::pull_request::WebhookPullRequestEvent;
+use crate::domain::webhook::events::pull_request::{
+    WebhookPullRequestEvent, WebhookPullRequestEventActionType,
+};
 use crate::infrastructure::contracts::github::event_type::GithubEvent;
 use chrono::{DateTime, Local};
 use serde::Deserialize;
 use serde_json::Value;
+use std::str::FromStr;
 
 #[derive(Debug, Deserialize)]
 pub struct GithubPullRequestEvent {
@@ -88,7 +91,8 @@ impl GithubEvent for GithubPullRequestEvent {
             repo_url: self.repository.html_url.clone(),
             title: pr.title.clone(),
             number: self.number,
-            action: self.action.clone(),
+            action: WebhookPullRequestEventActionType::from_str(self.action.as_str())
+                .unwrap_or(WebhookPullRequestEventActionType::Unknown),
             merged: pr.merged,
             merged_by: pr.merged_by.as_ref().map(|u| u.login.clone()),
             draft: pr.draft,
