@@ -61,7 +61,6 @@ impl ApplicationBoostrapExecutors {
                 oauth_client: shared_dependency.oauth_client.clone(),
                 version_control_client: shared_dependency.version_control_client.clone(),
                 reversible_cipher: shared_dependency.reversible_cipher.clone(),
-                notification_service: shared_dependency.notification_service.clone(),
                 cache: shared_dependency.cache.clone(),
                 mutex: Arc::new(KeyLocker::new()),
             }),

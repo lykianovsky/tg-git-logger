@@ -37,15 +37,9 @@ pub enum RegisterUserViaOAuthExecutorError {
     #[error("{0}")]
     AssignRoleError(#[from] AssignRoleToUserError),
 
-    #[error("Cache error: {0}")]
-    Cache(String),
-
     #[error("{0}")]
     Serialization(#[from] serde_json::Error),
 
     #[error("{0}")]
     CipherError(#[from] CipherError),
-
-    #[error("Invalid state error")]
-    InvalidState,
 }

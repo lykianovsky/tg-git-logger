@@ -1,4 +1,5 @@
 pub mod github;
+pub mod user;
 
 use crate::bootstrap::executors::ApplicationBoostrapExecutors;
 use crate::bootstrap::shared_dependency::ApplicationSharedDependency;
@@ -8,6 +9,8 @@ use crate::delivery::events::listeners::github::webhook::pull_request::WebhookPu
 use crate::delivery::events::listeners::github::webhook::push::WebhookPushEventListener;
 use crate::delivery::events::listeners::github::webhook::release::WebhookReleaseEventListener;
 use crate::delivery::events::listeners::github::webhook::workflow::WebhookWorkflowEventListener;
+use crate::delivery::events::listeners::user::registration::failed::UserRegistrationFailedListener;
+use crate::delivery::events::listeners::user::registration::success::UserRegistrationSuccessListener;
 use crate::domain::user::value_objects::social_chat_id::SocialChatId;
 use async_trait::async_trait;
 use std::error::Error;
@@ -36,6 +39,7 @@ impl DeliveryEventListeners {
 #[async_trait]
 impl ApplicationDelivery for DeliveryEventListeners {
     async fn serve(&self) -> Result<(), Box<dyn Error>> {
+        // Version Control Webhooks
         self.shared_dependency
             .event_bus
             .on(WebhookPullRequestEventListener {
@@ -63,6 +67,20 @@ impl ApplicationDelivery for DeliveryEventListeners {
             .on(WebhookWorkflowEventListener {
                 publisher: self.shared_dependency.publisher.clone(),
                 chat_id: SocialChatId(self.config.telegram.chat_id),
+            })
+            .await;
+
+        // UserRegistration
+        self.shared_dependency
+            .event_bus
+            .on(UserRegistrationSuccessListener {
+                publisher: self.shared_dependency.publisher.clone(),
+            })
+            .await;
+        self.shared_dependency
+            .event_bus
+            .on(UserRegistrationFailedListener {
+                publisher: self.shared_dependency.publisher.clone(),
             })
             .await;
 

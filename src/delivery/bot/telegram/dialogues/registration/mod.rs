@@ -9,6 +9,7 @@ use crate::delivery::bot::telegram::keyboards::actions::choose_role::TelegramBot
 use crate::delivery::bot::telegram::keyboards::actions::TelegramBotKeyboardAction;
 use crate::domain::shared::command::CommandExecutor;
 use crate::domain::user::value_objects::social_chat_id::SocialChatId;
+use crate::domain::user::value_objects::social_message_id::SocialMessageId;
 use crate::domain::user::value_objects::social_type::SocialType;
 use crate::domain::user::value_objects::social_user_id::SocialUserId;
 use crate::domain::user::value_objects::version_control_type::VersionControlType;
@@ -64,17 +65,11 @@ impl TelegramBotDialogueRegistrationDispatcher {
         let chat_id = msg.chat().id;
         let message_id = msg.id();
 
-        bot.edit_message_text(
-            chat_id,
-            message_id,
-            format!("Выбранная роль: {}", selected_role.to_callback_data()),
-        )
-        .await?;
-
         let cmd = CreateOAuthLinkExecutorCommand {
             social: CreateOAuthLinkExecutorCommandSocial {
                 r#type: SocialType::Telegram,
                 chat_id: SocialChatId(chat_id.0),
+                message_id: SocialMessageId(message_id.0),
                 user_id: SocialUserId(user.id.0 as i32),
                 user_login: user.username.clone(),
                 user_email: None,
@@ -102,12 +97,13 @@ impl TelegramBotDialogueRegistrationDispatcher {
                     .empty_line()
                     .line(t!("telegram_bot.commands.register.expiration_time").as_ref());
 
-                bot.send_message(chat_id, message)
+                bot.edit_message_text(chat_id, message_id, message)
                     .parse_mode(ParseMode::Html)
                     .await?;
             }
             Err(error) => {
-                bot.send_message(chat_id, error.to_string()).await?;
+                bot.edit_message_text(chat_id, message_id, error.to_string())
+                    .await?;
             }
         }
 

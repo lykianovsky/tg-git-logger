@@ -3,8 +3,9 @@ use crate::domain::user::value_objects::version_control_type::VersionControlType
 use crate::domain::user::value_objects::version_control_user_id::VersionControlUserId;
 use crate::utils::security::crypto::reversible::ReversibleCipherValue;
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct UserVersionControlAccount {
     pub id: i32,
     pub user_id: UserId,

@@ -7,7 +7,7 @@ use crate::utils::builder::message::MessageBuilder;
 use serde::{Deserialize, Serialize};
 use strum_macros::{AsRefStr, EnumString};
 
-#[derive(Debug, Serialize, Deserialize, EnumString, AsRefStr)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, EnumString, AsRefStr)]
 #[serde(rename_all = "snake_case")]
 #[strum(serialize_all = "snake_case")]
 pub enum WebhookPullRequestEventActionType {

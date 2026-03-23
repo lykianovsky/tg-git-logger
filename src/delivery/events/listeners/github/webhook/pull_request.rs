@@ -4,7 +4,9 @@ use crate::domain::shared::events::event_listener::EventListener;
 use crate::domain::task::services::task_tracker_service::TaskTrackerService;
 use crate::domain::user::value_objects::social_chat_id::SocialChatId;
 use crate::domain::user::value_objects::social_type::SocialType;
-use crate::domain::webhook::events::pull_request::WebhookPullRequestEvent;
+use crate::domain::webhook::events::pull_request::{
+    WebhookPullRequestEvent, WebhookPullRequestEventActionType,
+};
 use crate::domain::webhook::events::WebhookEvent;
 use crate::infrastructure::drivers::message_broker::contracts::publisher::MessageBrokerPublisher;
 use crate::utils::builder::message::MessageBuilder;
@@ -29,7 +31,7 @@ impl EventListener<WebhookPullRequestEvent> for WebhookPullRequestEventListener 
             .await
             .ok();
 
-        if payload.merged {
+        if payload.merged && payload.action == WebhookPullRequestEventActionType::Closed {
             if let Some(task_id) = self
                 .task_tracker_service
                 .extract_task_id_by_pattern(&payload.title)

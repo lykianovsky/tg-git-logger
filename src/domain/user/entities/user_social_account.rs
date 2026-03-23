@@ -3,8 +3,9 @@ use crate::domain::user::value_objects::social_type::SocialType;
 use crate::domain::user::value_objects::social_user_id::SocialUserId;
 use crate::domain::user::value_objects::user_id::UserId;
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct UserSocialAccount {
     pub id: i32,
     pub user_id: UserId,

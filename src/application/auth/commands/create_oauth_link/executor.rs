@@ -46,6 +46,7 @@ impl CreateOAuthLinkExecutor {
             social_user_id: cmd.social.user_id,
             social_type: cmd.social.r#type,
             social_chat_id: cmd.social.chat_id,
+            social_message_id: cmd.social.message_id,
             social_user_email: cmd.social.user_email.clone(),
             social_user_login: cmd.social.user_login.clone(),
             social_user_avatar_url: cmd.social.user_avatar_url.clone(),

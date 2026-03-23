@@ -4,6 +4,7 @@ use aes_gcm::{
 };
 use base64::{engine::general_purpose, Engine as _};
 use rand::RngCore;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -27,7 +28,7 @@ pub enum CipherError {
     InvalidUtf8(#[from] std::string::FromUtf8Error),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReversibleCipherValue(String);
 
 impl ReversibleCipherValue {

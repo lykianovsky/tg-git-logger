@@ -19,7 +19,7 @@ impl GithubWebhookAuthorizationMiddleware {
     }
 
     pub async fn handle(self, request: Request<Body>, next: Next) -> Result<Response, StatusCode> {
-        if (self.secret == "") {
+        if self.secret == "" {
             return Ok(next.run(request).await);
         }
 
@@ -71,7 +71,7 @@ impl GithubWebhookAuthorizationMiddleware {
             }
         };
 
-        if (!verified) {
+        if !verified {
             return Err(StatusCode::FORBIDDEN);
         }
 

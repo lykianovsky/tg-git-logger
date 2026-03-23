@@ -71,7 +71,11 @@ impl ApplicationBootstrap {
                 .await,
         );
 
-        let http_server_delivery = DeliveryHttpServerAxum::new(executors.clone(), config.clone());
+        let http_server_delivery = DeliveryHttpServerAxum::new(
+            executors.clone(),
+            shared_dependency.clone(),
+            config.clone(),
+        );
 
         let http_server_handle = tokio::spawn(async move {
             http_server_delivery.serve().await.ok();

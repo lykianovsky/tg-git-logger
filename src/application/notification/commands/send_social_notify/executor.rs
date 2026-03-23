@@ -24,7 +24,7 @@ impl CommandExecutor for SendSocialNotifyExecutor {
 
     async fn execute(&self, cmd: &Self::Command) -> Result<Self::Response, Self::Error> {
         self.notification_service
-            .send(&cmd.social_type, &cmd.chat_id, &cmd.message)
+            .send_message(&cmd.social_type, &cmd.chat_id, &cmd.message)
             .await?;
 
         Ok(SendSocialNotifyExecutorResponse {})

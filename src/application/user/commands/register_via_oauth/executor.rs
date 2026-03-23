@@ -4,7 +4,6 @@ use crate::application::user::commands::register_via_oauth::response::RegisterUs
 use crate::domain::auth::entities::oauth_state::OpenAuthorizationState;
 use crate::domain::auth::ports::oauth_client::OAuthClient;
 use crate::domain::notification::services::notification_service::NotificationService;
-use crate::domain::role::repositories::role_repository::RoleRepository;
 use crate::domain::shared::command::CommandExecutor;
 use crate::domain::user::entities::user::User;
 use crate::domain::user::entities::user_social_account::UserSocialAccount;
@@ -30,47 +29,9 @@ pub struct RegisterUserViaOAuthExecutor {
     pub user_version_control_service_repo: Arc<dyn UserVersionControlAccountsRepository>,
     pub oauth_client: Arc<dyn OAuthClient>,
     pub version_control_client: Arc<dyn VersionControlClient>,
-    pub notification_service: Arc<dyn NotificationService>,
     pub reversible_cipher: Arc<ReversibleCipher>,
     pub cache: Arc<dyn CacheService>,
     pub mutex: Arc<KeyLocker<String>>,
-}
-
-impl RegisterUserViaOAuthExecutor {
-    async fn retrieve_oauth_state(
-        &self,
-        key: &str,
-    ) -> Result<OpenAuthorizationState, RegisterUserViaOAuthExecutorError> {
-        tracing::debug!(state_id = %key, "Retrieving OAuth state from cache");
-
-        let state_json = self
-            .cache
-            .take(key)
-            .await
-            .map_err(|e| {
-                tracing::error!(
-                    error = %e,
-                    state_id = %key,
-                    "Failed to retrieve state from cache"
-                );
-                RegisterUserViaOAuthExecutorError::Cache(e.to_string())
-            })?
-            .ok_or_else(|| {
-                tracing::warn!(
-                    state_id = %key,
-                    "OAuth state not found in cache (expired or invalid)"
-                );
-                RegisterUserViaOAuthExecutorError::InvalidState
-            })?;
-
-        tracing::trace!(
-            state_id = %key,
-            state_json_length = state_json.len(),
-            "OAuth state JSON retrieved from cache"
-        );
-
-        Ok(serde_json::from_str::<OpenAuthorizationState>(&state_json)?)
-    }
 }
 
 impl CommandExecutor for RegisterUserViaOAuthExecutor {
@@ -79,22 +40,20 @@ impl CommandExecutor for RegisterUserViaOAuthExecutor {
     type Error = RegisterUserViaOAuthExecutorError;
 
     async fn execute(&self, cmd: &Self::Command) -> Result<Self::Response, Self::Error> {
-        let _guard = self.mutex.lock(cmd.state.clone()).await;
+        let _guard = self.mutex.lock(cmd.code.clone()).await;
 
         let txn = self.db.begin().await?;
 
-        let state = self.retrieve_oauth_state(&cmd.state).await?;
-
-        tracing::debug!("{:?}", state);
+        tracing::debug!("{:?}", cmd.state);
 
         if let Ok(..) = self
             .user_socials_repo
-            .find_by_social_user_id(&state.social_user_id)
+            .find_by_social_user_id(&cmd.state.social_user_id)
             .await
         {
             return Err(
                 RegisterUserViaOAuthExecutorError::UserBySocialUserIdAlreadyExists(
-                    state.social_user_id.0,
+                    cmd.state.social_user_id.0,
                 ),
             );
         }
@@ -119,17 +78,19 @@ impl CommandExecutor for RegisterUserViaOAuthExecutor {
             )
             .await?;
 
-        self.user_has_role.assign(&txn, user.id, state.role).await?;
+        self.user_has_role
+            .assign(&txn, user.id, cmd.state.role.clone())
+            .await?;
 
         let new_social_user = UserSocialAccount {
             id: Default::default(),
             user_id: user.id,
-            social_type: state.social_type,
-            social_user_id: state.social_user_id,
-            social_chat_id: state.social_chat_id,
-            social_user_login: state.social_user_login,
-            social_user_email: state.social_user_email,
-            social_user_avatar_url: state.social_user_avatar_url,
+            social_type: cmd.state.social_type.clone(),
+            social_user_id: cmd.state.social_user_id,
+            social_chat_id: cmd.state.social_chat_id,
+            social_user_login: cmd.state.social_user_login.clone(),
+            social_user_email: cmd.state.social_user_email.clone(),
+            social_user_avatar_url: cmd.state.social_user_avatar_url.clone(),
             created_at: Default::default(),
             updated_at: Default::default(),
         };
@@ -145,7 +106,7 @@ impl CommandExecutor for RegisterUserViaOAuthExecutor {
         let new_user_version_control_service = UserVersionControlAccount {
             id: Default::default(),
             user_id: user.id,
-            version_control_type: state.version_control_type.clone(),
+            version_control_type: cmd.state.version_control_type.clone(),
             version_control_user_id: VersionControlUserId(version_control_client_user.id as i32),
             version_control_login: version_control_client_user.login.clone(),
             version_control_email: version_control_client_user.email.clone(),
@@ -163,18 +124,12 @@ impl CommandExecutor for RegisterUserViaOAuthExecutor {
             .create(&txn, &new_user_version_control_service)
             .await?;
 
-        let success_message = MessageBuilder::new().line(&format!(
-            "Вы успешно привязали аккаунт {}. Логин привязанного аккаунта: {}",
-            state.version_control_type.clone(),
-            version_control_client_user.login.clone()
-        ));
-
-        self.notification_service
-            .send(&state.social_type, &state.social_chat_id, &success_message)
-            .await?;
-
         txn.commit().await?;
 
-        Ok(RegisterUserViaOAuthExecutorResponse {})
+        Ok(RegisterUserViaOAuthExecutorResponse {
+            user,
+            user_social_account: new_social_user,
+            user_version_control_account: new_user_version_control_service,
+        })
     }
 }

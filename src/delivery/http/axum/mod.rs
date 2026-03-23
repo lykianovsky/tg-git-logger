@@ -2,6 +2,7 @@ mod controllers;
 mod middlewares;
 
 use crate::bootstrap::executors::ApplicationBoostrapExecutors;
+use crate::bootstrap::shared_dependency::ApplicationSharedDependency;
 use crate::config::application::ApplicationConfig;
 use crate::delivery::contract::ApplicationDelivery;
 use crate::delivery::http::axum::controllers::oauth::github::AxumOAuthGithubController;
@@ -13,6 +14,7 @@ use std::sync::Arc;
 
 pub struct DeliveryHttpServerAxum {
     executors: Arc<ApplicationBoostrapExecutors>,
+    shared_dependency: Arc<ApplicationSharedDependency>,
     config: Arc<ApplicationConfig>,
     router: Router,
 }
@@ -20,6 +22,7 @@ pub struct DeliveryHttpServerAxum {
 impl DeliveryHttpServerAxum {
     pub fn new(
         executors: Arc<ApplicationBoostrapExecutors>,
+        shared_dependency: Arc<ApplicationSharedDependency>,
         config: Arc<ApplicationConfig>,
     ) -> Self {
         let middleware_config = config.clone();
@@ -48,10 +51,12 @@ impl DeliveryHttpServerAxum {
                             async move { middleware_clone.handle(req, next).await }
                         })),
                 ),
-            );
+            )
+            .layer(Extension(shared_dependency.clone()));
 
         Self {
             executors,
+            shared_dependency,
             config,
             router,
         }

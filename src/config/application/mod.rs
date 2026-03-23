@@ -158,7 +158,7 @@ impl ApplicationConfig {
 
         let webhook_secret = ENV.get_or("GITHUB_WEBHOOK_SECRET", "");
 
-        if (webhook_secret == "") {
+        if webhook_secret == "" {
             tracing::warn!(
                 "GITHUB_WEBHOOK_SECRET is not set or empty. Please provide it in your .env.local file for better security."
             )
