@@ -1,7 +1,7 @@
-use chrono::{DateTime, Datelike, TimeZone, Utc};
-use serde::Serialize;
+use chrono::{DateTime, Datelike, NaiveTime, TimeZone, Utc};
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct DateRange {
     pub since: DateTime<Utc>,
     pub until: DateTime<Utc>,
@@ -10,6 +10,13 @@ pub struct DateRange {
 impl DateRange {
     pub fn new(since: DateTime<Utc>, until: DateTime<Utc>) -> Self {
         Self { since, until }
+    }
+
+    pub fn normalize_to_day(mut self) -> Self {
+        self.since = self.since.date_naive().and_time(NaiveTime::MIN).and_utc();
+        self.until = self.until.date_naive().and_time(NaiveTime::MIN).and_utc();
+
+        self
     }
 
     pub fn last_week() -> Self {

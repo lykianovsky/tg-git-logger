@@ -17,4 +17,10 @@ pub enum BuildVersionControlDateRangeReportExecutorError {
 
     #[error("{0}")]
     FindSocialServiceByIdError(#[from] FindSocialServiceByIdError),
+
+    #[error("Cache error: {0}")]
+    Cache(String),
+
+    #[error("{0}")]
+    Serialization(#[from] serde_json::Error),
 }

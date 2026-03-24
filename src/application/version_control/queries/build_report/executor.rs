@@ -8,6 +8,7 @@ use crate::domain::shared::command::CommandExecutor;
 use crate::domain::shared::date::range::DateRange;
 use crate::domain::user::repositories::user_social_accounts_repository::UserSocialAccountsRepository;
 use crate::domain::user::repositories::user_vc_accounts_repository::UserVersionControlAccountsRepository;
+use crate::domain::user::value_objects::social_user_id::SocialUserId;
 use crate::domain::version_control::ports::version_control_client::{
     VersionControlClient, VersionControlClientDateRangeReportError,
 };
@@ -15,10 +16,14 @@ use crate::domain::version_control::value_objects::report::{
     VersionControlDateRangeReport, VersionControlDateRangeReportCommit,
     VersionControlDateRangeReportPullRequest,
 };
+use crate::infrastructure::drivers::cache::contract::CacheService;
 use crate::utils::builder::message::MessageBuilder;
 use crate::utils::security::crypto::reversible::ReversibleCipher;
+use chrono::{Datelike, TimeZone, Timelike, Utc};
+use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
+use std::time::Duration;
 
 const COMMITS_LIMIT: usize = 5;
 const PRS_LIMIT: usize = 5;
@@ -88,6 +93,7 @@ pub struct BuildVersionControlDateRangeReportExecutor {
     pub user_socials_repo: Arc<dyn UserSocialAccountsRepository>,
     pub user_version_control_service_repo: Arc<dyn UserVersionControlAccountsRepository>,
     pub version_control_client: Arc<dyn VersionControlClient>,
+    pub cache: Arc<dyn CacheService>,
 }
 
 impl BuildVersionControlDateRangeReportExecutor {
@@ -581,6 +587,23 @@ impl BuildVersionControlDateRangeReportExecutor {
             out
         }
     }
+
+    fn create_stable_key_by_command(
+        &self,
+        cmd: &<BuildVersionControlDateRangeReportExecutor as CommandExecutor>::Command,
+    ) -> Result<String, <BuildVersionControlDateRangeReportExecutor as CommandExecutor>::Error>
+    {
+        let mut cmd = cmd.clone();
+
+        cmd.date_range = cmd.date_range.normalize_to_day();
+
+        let json = serde_json::to_string(&mut cmd)?;
+        let hash = format!("{:x}", Sha256::digest(json.as_bytes()));
+
+        tracing::debug!("Generate user report cache key: {hash}");
+
+        Ok(format!("user_report:{}", hash))
+    }
 }
 
 impl CommandExecutor for BuildVersionControlDateRangeReportExecutor {
@@ -589,6 +612,20 @@ impl CommandExecutor for BuildVersionControlDateRangeReportExecutor {
     type Error = BuildVersionControlDateRangeReportExecutorError;
 
     async fn execute(&self, cmd: &Self::Command) -> Result<Self::Response, Self::Error> {
+        let cache_key = self.create_stable_key_by_command(&cmd)?;
+
+        let cached_report =
+            self.cache.get(&cache_key).await.map_err(|e| {
+                BuildVersionControlDateRangeReportExecutorError::Cache(e.to_string())
+            })?;
+
+        if let Some(report) = cached_report {
+            tracing::debug!(
+                "A report by cache_key: {cache_key} is found in the cache, send it in response"
+            );
+            return Ok(BuildVersionControlDateRangeReportExecutorResponse { text: report });
+        }
+
         let social_user = self
             .user_socials_repo
             .find_by_social_user_id(&cmd.social_user_id)
@@ -617,8 +654,18 @@ impl CommandExecutor for BuildVersionControlDateRangeReportExecutor {
 
         tracing::debug!("Version control report built: {:?}", report);
 
-        Ok(BuildVersionControlDateRangeReportExecutorResponse {
-            text: self.render(&report, &author, &cmd.date_range),
-        })
+        let render_text = self.render(&report, &author, &cmd.date_range);
+
+        self.cache
+            .set(
+                &cache_key,
+                render_text.as_str(),
+                // TODO: Вынести в ENV
+                Duration::from_hours(24).as_secs(),
+            )
+            .await
+            .map_err(|e| BuildVersionControlDateRangeReportExecutorError::Cache(e.to_string()))?;
+
+        Ok(BuildVersionControlDateRangeReportExecutorResponse { text: render_text })
     }
 }

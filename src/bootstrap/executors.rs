@@ -41,6 +41,7 @@ impl ApplicationBoostrapExecutors {
                     .user_version_controls_repo
                     .clone(),
                 version_control_client: shared_dependency.version_control_client.clone(),
+                cache: shared_dependency.cache.clone(),
             }),
         };
 

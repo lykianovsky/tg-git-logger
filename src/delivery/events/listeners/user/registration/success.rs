@@ -16,15 +16,13 @@ impl EventListener<UserRegistrationSuccessEvent> for UserRegistrationSuccessList
         let message = MessageBuilder::new()
             .line("✅ Регистрация успешно завершена!")
             .empty_line()
-            .empty_line()
-            .line(&format!("👤 Пользователь: {}", payload.user.id.0))
+            .line(&format!("👤 Пользователь (user_id): {}", payload.user.id.0))
             .line(&format!(
                 "🔗 GitHub: {}",
                 payload.user_version_control_account.version_control_login
             ))
             .line(&format!("📱 Соц. сеть: {:?}", payload.social_type))
             .line(&format!("🆔 Chat ID: {}", payload.chat_id.0))
-            .empty_line()
             .empty_line()
             .line("🚀 Теперь можно пользоваться ботом!");
 
