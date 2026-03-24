@@ -171,6 +171,7 @@ impl VersionControlClient for GithubVersionControlClient {
     async fn get_details_by_range(
         &self,
         access_token: &str,
+        branch: String,
         date_range: &DateRange,
         author: Option<&str>,
     ) -> Result<VersionControlDateRangeReport, VersionControlClientDateRangeReportError> {
@@ -199,6 +200,7 @@ impl VersionControlClient for GithubVersionControlClient {
                 github_date_range_report::Variables {
                     owner: self.owner.to_string(),
                     repo: self.repository.to_string(),
+                    branch,
                     since: date_range.since,
                     until: date_range.until,
                     pr_search,
@@ -253,26 +255,29 @@ impl VersionControlDateRangeReport {
 
         if let Some(target) = response
             .repository
-            .and_then(|r| r.default_branch_ref)
+            .and_then(|r| r.ref_)
             .and_then(|b| b.target)
-            && let github_date_range_report::GithubDateRangeReportRepositoryDefaultBranchRefTarget::Commit(commit_target) = target
-                && let Some(nodes) = commit_target.history.nodes {
-                    for commit in nodes.into_iter().flatten() {
-                        commits.push(VersionControlDateRangeReportCommit {
-                            sha: commit.oid,
-                            message: commit.message,
-                            authored_at: commit.committed_date,
-                            additions: commit.additions,
-                            deletions: commit.deletions,
-                            changed_files: commit.changed_files_if_available,
-                            author: commit.author.map(|a| VersionControlDateRangeReportAuthor {
-                                login: a.user.and_then(|u| u.login.into()),
-                                name: a.name,
-                                email: a.email,
-                            }),
-                        });
-                    }
-                }
+            && let github_date_range_report::GithubDateRangeReportRepositoryRefTarget::Commit(
+                commit_target,
+            ) = target
+            && let Some(nodes) = commit_target.history.nodes
+        {
+            for commit in nodes.into_iter().flatten() {
+                commits.push(VersionControlDateRangeReportCommit {
+                    sha: commit.oid,
+                    message: commit.message,
+                    authored_at: commit.committed_date,
+                    additions: commit.additions,
+                    deletions: commit.deletions,
+                    changed_files: commit.changed_files_if_available,
+                    author: commit.author.map(|a| VersionControlDateRangeReportAuthor {
+                        login: a.user.and_then(|u| u.login.into()),
+                        name: a.name,
+                        email: a.email,
+                    }),
+                });
+            }
+        }
 
         VersionControlDateRangeReport {
             pull_requests,

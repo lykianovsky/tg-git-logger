@@ -19,7 +19,7 @@ use crate::domain::version_control::value_objects::report::{
 use crate::infrastructure::drivers::cache::contract::CacheService;
 use crate::utils::builder::message::MessageBuilder;
 use crate::utils::security::crypto::reversible::ReversibleCipher;
-use chrono::{Datelike, TimeZone, Timelike, Utc};
+use chrono::{TimeZone, Timelike, Utc};
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
@@ -305,7 +305,7 @@ impl BuildVersionControlDateRangeReportExecutor {
             .raw("💻 <b>Изменения в коде</b>\n")
             .raw(&format!("  ➕ Добавлено: <b>{}</b>\n", additions))
             .raw(&format!("  ➖ Удалено: <b>{}</b>\n", deletions))
-            .raw(&format!("  📈 Баланс: <b>{}{}</b>\n", sign, net));
+            .raw(&format!("  📈 Изменений: <b>{}{}</b>\n", sign, net));
         if let Some(avg) = avg_commit_size {
             b = b.raw(&format!("  📏 Средний коммит: <b>+{} строк</b>\n", avg));
         }
@@ -649,7 +649,13 @@ impl CommandExecutor for BuildVersionControlDateRangeReportExecutor {
 
         let report = self
             .version_control_client
-            .get_details_by_range(&decrypted_token, &cmd.date_range, author.as_deref())
+            .get_details_by_range(
+                &decrypted_token,
+                // TODO: Сделать передачу для выбранной ветки
+                String::from("refs/heads/dev"),
+                &cmd.date_range,
+                author.as_deref(),
+            )
             .await?;
 
         tracing::debug!("Version control report built: {:?}", report);
