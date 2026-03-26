@@ -49,6 +49,7 @@ pub struct ApplicationMysqlConfig {
 pub struct ApplicationTelegramConfig {
     pub url_base: String,
     pub bot_token: String,
+    pub bot_url: String,
     pub chat_id: i64,
     pub admin_user_id: i64,
 }
@@ -96,12 +97,14 @@ impl ApplicationConfig {
     pub fn build_telegram_config() -> ApplicationTelegramConfig {
         let url_base = ENV.get("TELEGRAM_URL_BASE");
         let bot_token = ENV.get("TELEGRAM_BOT_TOKEN");
+        let bot_url = ENV.get("TELEGRAM_BOT_URL");
         let chat_id: i64 = ENV.get("TELEGRAM_CHAT_ID").parse().unwrap();
         let admin_user_id: i64 = ENV.get("TELEGRAM_ADMIN_USER_ID").parse().unwrap();
 
         ApplicationTelegramConfig {
             url_base,
             bot_token,
+            bot_url,
             chat_id,
             admin_user_id,
         }

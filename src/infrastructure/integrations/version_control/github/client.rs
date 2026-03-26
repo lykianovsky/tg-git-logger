@@ -171,7 +171,9 @@ impl VersionControlClient for GithubVersionControlClient {
     async fn get_details_by_range(
         &self,
         access_token: &str,
-        branch: String,
+        owner: &str,
+        repo: &str,
+        branch: &str,
         date_range: &DateRange,
         author: Option<&str>,
     ) -> Result<VersionControlDateRangeReport, VersionControlClientDateRangeReportError> {
@@ -179,16 +181,16 @@ impl VersionControlClient for GithubVersionControlClient {
 
         let pr_search = format!(
             "repo:{}/{} is:pr created:{}..{}{}",
-            self.owner,
-            self.repository,
+            owner,
+            repo,
             date_range.since.format("%Y-%m-%d"),
             date_range.until.format("%Y-%m-%d"),
             author_filter,
         );
         let issue_search = format!(
             "repo:{}/{} is:issue created:{}..{}{}",
-            self.owner,
-            self.repository,
+            owner,
+            repo,
             date_range.since.format("%Y-%m-%d"),
             date_range.until.format("%Y-%m-%d"),
             author_filter,
@@ -198,9 +200,9 @@ impl VersionControlClient for GithubVersionControlClient {
             .graphql::<GithubDateRangeReport>(
                 access_token,
                 github_date_range_report::Variables {
-                    owner: self.owner.to_string(),
-                    repo: self.repository.to_string(),
-                    branch,
+                    owner: owner.to_string(),
+                    repo: repo.to_string(),
+                    branch: branch.to_string(),
                     since: date_range.since,
                     until: date_range.until,
                     pr_search,
@@ -219,6 +221,19 @@ impl VersionControlClient for GithubVersionControlClient {
 
                 VersionControlClientDateRangeReportError::Transport(e.to_string())
             })?;
+
+        // If the repository exists but the ref is None, the branch does not exist
+        if response.repository.is_some()
+            && response
+                .repository
+                .as_ref()
+                .and_then(|r| r.ref_.as_ref())
+                .is_none()
+        {
+            return Err(VersionControlClientDateRangeReportError::BranchNotFound(
+                branch.to_string(),
+            ));
+        }
 
         Ok(VersionControlDateRangeReport::from_github_response(
             response,
@@ -239,8 +254,10 @@ impl VersionControlDateRangeReport {
                     pull_requests.push(VersionControlDateRangeReportPullRequest {
                         number: pr.number,
                         title: pr.title,
-                        // TODO
-                        state: "TODO".to_string(),
+                        state: serde_json::to_value(&pr.state)
+                            .ok()
+                            .and_then(|v| v.as_str().map(|s| s.to_lowercase()))
+                            .unwrap_or_else(|| "unknown".to_string()),
                         created_at: pr.created_at,
                         merged_at: pr.merged_at,
                         closed_at: pr.closed_at,

@@ -1,8 +1,9 @@
 use crate::domain::repository::value_objects::repository_id::RepositoryId;
 use crate::domain::user::entities::user_connection_repository::UserConnectionRepository;
 use crate::domain::user::repositories::user_connection_repositories_repository::{
-    CreateUserConnectionRepositoryError, FindUserConnectionRepositoriesByUserIdError,
-    UserConnectionRepositoriesRepository,
+    CreateUserConnectionRepositoryError, DeleteUserConnectionRepositoryError,
+    FindUserConnectionRepositoriesByUserIdError,
+    FindUserConnectionRepositoryByUserAndRepoError, UserConnectionRepositoriesRepository,
 };
 use crate::domain::user::value_objects::user_id::UserId;
 use crate::infrastructure::database::mysql::entities::user_connection_repositories;
@@ -59,6 +60,40 @@ impl UserConnectionRepositoriesRepository for MySQLUserConnectionRepositoriesRep
             .into_iter()
             .map(UserConnectionRepository::from_mysql)
             .collect())
+    }
+
+    async fn find_by_user_id_and_repository_id(
+        &self,
+        user_id: UserId,
+        repository_id: RepositoryId,
+    ) -> Result<Option<UserConnectionRepository>, FindUserConnectionRepositoryByUserAndRepoError>
+    {
+        let result = user_connection_repositories::Entity::find()
+            .filter(user_connection_repositories::Column::UserId.eq(user_id.0))
+            .filter(user_connection_repositories::Column::RepositoryId.eq(repository_id.0))
+            .one(self.db.as_ref())
+            .await
+            .map_err(|e| {
+                FindUserConnectionRepositoryByUserAndRepoError::DbError(e.to_string())
+            })?;
+
+        Ok(result.map(UserConnectionRepository::from_mysql))
+    }
+
+    async fn delete_by_user_id_and_repository_id(
+        &self,
+        txn: &DatabaseTransaction,
+        user_id: UserId,
+        repository_id: RepositoryId,
+    ) -> Result<(), DeleteUserConnectionRepositoryError> {
+        user_connection_repositories::Entity::delete_many()
+            .filter(user_connection_repositories::Column::UserId.eq(user_id.0))
+            .filter(user_connection_repositories::Column::RepositoryId.eq(repository_id.0))
+            .exec(txn)
+            .await
+            .map_err(|e| DeleteUserConnectionRepositoryError::DbError(e.to_string()))?;
+
+        Ok(())
     }
 }
 

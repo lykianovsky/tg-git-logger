@@ -1,15 +1,12 @@
 pub mod modules;
 
-use crate::application::repository::commands::create_repository::command::CreateRepositoryCommand;
-use crate::application::repository::commands::create_repository_task_tracker::command::CreateRepositoryTaskTrackerCommand;
 use crate::bootstrap::executors::ApplicationBoostrapExecutors;
-use crate::delivery::bot::telegram::dialogues::admin::modules::configure_task_tracker_for_repository::TelegramBotDialogueAdminConfigureTaskTrackerForRepositoryDispatcher;
-use crate::delivery::bot::telegram::dialogues::admin::modules::create_repository::TelegramBotDialogueAdminCreateRepositoryDispatcher;
-use crate::delivery::bot::telegram::dialogues::TelegramBotDialogueType;
+use crate::delivery::bot::telegram::dialogues::admin::modules::repository::TelegramBotDialogueAdminRepositoryDispatcher;
+use crate::delivery::bot::telegram::dialogues::admin::modules::task_tracker::TelegramBotDialogueAdminTaskTrackerDispatcher;
+use crate::delivery::bot::telegram::dialogues::{TelegramBotDialogueState, TelegramBotDialogueType};
 use crate::delivery::bot::telegram::keyboards::actions::admin::TelegramBotAdminAction;
 use crate::delivery::bot::telegram::keyboards::actions::TelegramBotKeyboardAction;
-use crate::domain::repository::value_objects::repository_id::RepositoryId;
-use crate::domain::shared::command::CommandExecutor;
+use crate::delivery::bot::telegram::keyboards::builder::KeyboardBuilder;
 use std::error::Error;
 use std::sync::Arc;
 use teloxide::dispatching::DpHandlerDescription;
@@ -19,40 +16,47 @@ use teloxide::types::InlineKeyboardButton;
 use teloxide::types::InlineKeyboardMarkup;
 use teloxide::{dptree, Bot};
 
+use crate::delivery::bot::telegram::keyboards::actions::admin_repository::TelegramBotAdminRepositoryAction;
+
+/// Состояния административного диалога.
+///
+/// Структура:
+///   Menu
+///   ├── ConfigureRepository → меню репозитория
+///   │     ├── Create: CreateRepository{Name,Owner,Url,ExternalId}
+///   │     └── Edit:   EditRepository{Select,Menu,Name,Owner,Url,ExternalId}
+///   └── ConfigureTaskTracker → TaskTracker{SelectRepository,...поля...}
 #[derive(Debug, Clone, Default)]
 pub enum TelegramBotDialogueAdminState {
     #[default]
     Menu,
 
-    // Создание репозитория
-    CreateRepositoryName,
-    CreateRepositoryOwner {
-        name: String,
-    },
-    CreateRepositoryUrl {
-        name: String,
-        owner: String,
-    },
-    CreateRepositoryExternalId {
-        name: String,
-        owner: String,
-        url: String,
-    },
+    // ── Репозиторий ─────────────────────────────────────────────────────────
+    ConfigureRepository,
 
-    // Настройка таск-трекера
+    // Создание
+    CreateRepositoryName,
+    CreateRepositoryOwner { name: String },
+    CreateRepositoryUrl { name: String, owner: String },
+    CreateRepositoryExternalId { name: String, owner: String, url: String },
+
+    // Редактирование
+    EditRepositorySelect,
+    EditRepositoryMenu { repository_id: i32 },
+    EditRepositoryName { repository_id: i32 },
+    EditRepositoryOwner { repository_id: i32 },
+    EditRepositoryUrl { repository_id: i32 },
+    EditRepositoryExternalId { repository_id: i32 },
+
+    // Удаление
+    DeleteRepositorySelect,
+    DeleteRepositoryConfirm { repository_id: i32 },
+
+    // ── Таск-трекер ─────────────────────────────────────────────────────────
     ConfigureTaskTrackerSelectRepository,
-    ConfigureTaskTrackerSpaceId {
-        repository_id: i32,
-    },
-    ConfigureTaskTrackerQaColumnId {
-        repository_id: i32,
-        space_id: i32,
-    },
-    ConfigureTaskTrackerExtractPattern {
-        repository_id: i32,
-        space_id: i32,
-        qa_column_id: i32,
-    },
+    ConfigureTaskTrackerSpaceId { repository_id: i32 },
+    ConfigureTaskTrackerQaColumnId { repository_id: i32, space_id: i32 },
+    ConfigureTaskTrackerExtractPattern { repository_id: i32, space_id: i32, qa_column_id: i32 },
     ConfigureTaskTrackerPathToCard {
         repository_id: i32,
         space_id: i32,
@@ -71,14 +75,12 @@ impl TelegramBotDialogueAdminDispatcher {
                 case![TelegramBotDialogueAdminState::Menu]
                     .endpoint(TelegramBotDialogueAdminDispatcher::handle_menu),
             )
-            .branch(
-                TelegramBotDialogueAdminConfigureTaskTrackerForRepositoryDispatcher::query_branches(
-                ),
-            );
+            .branch(TelegramBotDialogueAdminRepositoryDispatcher::query_branches())
+            .branch(TelegramBotDialogueAdminTaskTrackerDispatcher::query_branches());
 
         let messages = Update::filter_message()
-            .branch(TelegramBotDialogueAdminCreateRepositoryDispatcher::message_branches())
-            .branch(TelegramBotDialogueAdminConfigureTaskTrackerForRepositoryDispatcher::message_branches());
+            .branch(TelegramBotDialogueAdminRepositoryDispatcher::message_branches())
+            .branch(TelegramBotDialogueAdminTaskTrackerDispatcher::message_branches());
 
         dptree::entry().branch(callback_queries).branch(messages)
     }
@@ -107,18 +109,28 @@ impl TelegramBotDialogueAdminDispatcher {
         };
 
         let chat_id = msg.chat().id;
+        let message_id = msg.id();
 
         match action {
-            TelegramBotAdminAction::CreateRepository => {
+            TelegramBotAdminAction::ConfigureRepository => {
                 dialogue
-                    .update(
-                        crate::delivery::bot::telegram::dialogues::TelegramBotDialogueState::Admin(
-                            TelegramBotDialogueAdminState::CreateRepositoryName,
-                        ),
-                    )
+                    .update(TelegramBotDialogueState::Admin(
+                        TelegramBotDialogueAdminState::ConfigureRepository,
+                    ))
                     .await?;
 
-                bot.send_message(chat_id, "📝 Введите название репозитория:")
+                let keyboard = KeyboardBuilder::new()
+                    .row::<TelegramBotAdminRepositoryAction>(vec![
+                        TelegramBotAdminRepositoryAction::Create,
+                        TelegramBotAdminRepositoryAction::Edit,
+                    ])
+                    .row::<TelegramBotAdminRepositoryAction>(vec![
+                        TelegramBotAdminRepositoryAction::Delete,
+                    ])
+                    .build();
+
+                bot.edit_message_text(chat_id, message_id, "📦 Репозитории:")
+                    .reply_markup(keyboard)
                     .await?;
             }
             TelegramBotAdminAction::ConfigureTaskTracker => {
@@ -131,8 +143,9 @@ impl TelegramBotDialogueAdminDispatcher {
                     .unwrap_or_default();
 
                 if repositories.is_empty() {
-                    bot.send_message(
+                    bot.edit_message_text(
                         chat_id,
+                        message_id,
                         "❌ Нет доступных репозиториев. Сначала создайте репозиторий.",
                     )
                     .await?;
@@ -153,14 +166,12 @@ impl TelegramBotDialogueAdminDispatcher {
                 let keyboard = InlineKeyboardMarkup::new(buttons);
 
                 dialogue
-                    .update(
-                        crate::delivery::bot::telegram::dialogues::TelegramBotDialogueState::Admin(
-                            TelegramBotDialogueAdminState::ConfigureTaskTrackerSelectRepository,
-                        ),
-                    )
+                    .update(TelegramBotDialogueState::Admin(
+                        TelegramBotDialogueAdminState::ConfigureTaskTrackerSelectRepository,
+                    ))
                     .await?;
 
-                bot.send_message(chat_id, "📦 Выберите репозиторий:")
+                bot.edit_message_text(chat_id, message_id, "📦 Выберите репозиторий для таск-трекера:")
                     .reply_markup(keyboard)
                     .await?;
             }

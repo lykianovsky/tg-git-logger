@@ -66,7 +66,7 @@ impl TelegramBotAdminCommandHandler {
         }
 
         let keyboard = KeyboardBuilder::new()
-            .row::<TelegramBotAdminAction>(vec![TelegramBotAdminAction::CreateRepository])
+            .row::<TelegramBotAdminAction>(vec![TelegramBotAdminAction::ConfigureRepository])
             .row::<TelegramBotAdminAction>(vec![TelegramBotAdminAction::ConfigureTaskTracker])
             .build();
 

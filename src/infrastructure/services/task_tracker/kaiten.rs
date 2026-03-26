@@ -22,4 +22,14 @@ impl TaskTrackerService for KaitenTaskTrackerService {
             .and_then(|m| m.as_str().parse::<u64>().ok())
             .map(TaskId)
     }
+
+    fn extract_task_match(&self, text: &str) -> Option<(String, TaskId)> {
+        let regex = Regex::new(self.extract_pattern.as_str()).ok()?;
+
+        regex.captures(text).and_then(|caps| {
+            let full_match = caps.get(0)?.as_str().to_string();
+            let task_id = caps.get(1)?.as_str().parse::<u64>().ok().map(TaskId)?;
+            Some((full_match, task_id))
+        })
+    }
 }

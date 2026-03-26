@@ -26,33 +26,12 @@ impl DeliveryHttpServerAxum {
         config: Arc<ApplicationConfig>,
     ) -> Self {
         let middleware_config = config.clone();
-        // TODO разбить роуты на модули и вынести в отдельные функции для лучшей читаемости
-        let router = Router::new()
-            .route("/ping", get(|| async { "PONG" }))
-            .nest(
-                "/oauth",
-                Router::new().route(
-                    "/github",
-                    get(AxumOAuthGithubController::handle_post).layer(Extension(
-                        executors.commands.register_user_via_oauth.clone(),
-                    )),
-                ),
-            )
-            .nest(
-                "/webhook",
-                Router::new().route(
-                    "/github",
-                    post(AxumWebhookGithubController::handle_post)
-                        .layer(Extension(executors.commands.dispatch_webhook_event.clone()))
-                        .layer(axum::middleware::from_fn(move |req, next| {
-                            let middleware_clone = GithubWebhookAuthorizationMiddleware::new(
-                                middleware_config.github.webhook_secret.clone(),
-                            );
-                            async move { middleware_clone.handle(req, next).await }
-                        })),
-                ),
-            )
-            .layer(Extension(shared_dependency.clone()));
+        let router = Self::build_router(
+            &executors,
+            &shared_dependency,
+            &config,
+            middleware_config,
+        );
 
         Self {
             executors,
@@ -60,6 +39,38 @@ impl DeliveryHttpServerAxum {
             config,
             router,
         }
+    }
+
+    fn build_router(
+        executors: &Arc<ApplicationBoostrapExecutors>,
+        shared_dependency: &Arc<ApplicationSharedDependency>,
+        config: &Arc<ApplicationConfig>,
+        middleware_config: Arc<ApplicationConfig>,
+    ) -> Router {
+        let oauth_routes = Router::new().route(
+            "/github",
+            get(AxumOAuthGithubController::handle_post)
+                .layer(Extension(executors.commands.register_user_via_oauth.clone())),
+        );
+
+        let webhook_routes = Router::new().route(
+            "/github",
+            post(AxumWebhookGithubController::handle_post)
+                .layer(Extension(executors.commands.dispatch_webhook_event.clone()))
+                .layer(axum::middleware::from_fn(move |req, next| {
+                    let mw = GithubWebhookAuthorizationMiddleware::new(
+                        middleware_config.github.webhook_secret.clone(),
+                    );
+                    async move { mw.handle(req, next).await }
+                })),
+        );
+
+        Router::new()
+            .route("/ping", get(|| async { "PONG" }))
+            .nest("/oauth", oauth_routes)
+            .nest("/webhook", webhook_routes)
+            .layer(Extension(config.clone()))
+            .layer(Extension(shared_dependency.clone()))
     }
 }
 

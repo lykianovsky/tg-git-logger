@@ -2,8 +2,15 @@ use crate::application::auth::commands::create_oauth_link::executor::CreateOAuth
 use crate::application::notification::commands::send_social_notify::executor::SendSocialNotifyExecutor;
 use crate::application::repository::commands::create_repository::executor::CreateRepositoryExecutor;
 use crate::application::repository::commands::create_repository_task_tracker::executor::CreateRepositoryTaskTrackerExecutor;
+use crate::application::repository::commands::delete_repository::executor::DeleteRepositoryExecutor;
+use crate::application::repository::commands::update_repository::executor::UpdateRepositoryExecutor;
+use crate::application::repository::commands::update_repository_task_tracker::executor::UpdateRepositoryTaskTrackerExecutor;
+use crate::application::repository::queries::get_all_repositories::executor::GetAllRepositoriesExecutor;
 use crate::application::task::commands::move_task_to_test::executor::MoveTaskToTestExecutor;
+use crate::application::user::commands::bind_repository::executor::BindRepositoryExecutor;
 use crate::application::user::commands::register_via_oauth::executor::RegisterUserViaOAuthExecutor;
+use crate::application::user::commands::unbind_repository::executor::UnbindRepositoryExecutor;
+use crate::application::user::queries::get_user_bound_repositories::executor::GetUserBoundRepositoriesExecutor;
 use crate::application::user::queries::get_user_roles_by_telegram_id::executor::GetUserRolesByTelegramIdExecutor;
 use crate::application::version_control::queries::build_report::executor::BuildVersionControlDateRangeReportExecutor;
 use crate::application::webhook::commands::dispatch_event::executor::DispatchWebhookEventExecutor;
@@ -17,6 +24,8 @@ use std::sync::Arc;
 pub struct ApplicationBoostrapExecutorsQueries {
     pub build_report_by_range: Arc<BuildVersionControlDateRangeReportExecutor>,
     pub get_user_roles_by_telegram_id: Arc<GetUserRolesByTelegramIdExecutor>,
+    pub get_user_bound_repositories: Arc<GetUserBoundRepositoriesExecutor>,
+    pub get_all_repositories: Arc<GetAllRepositoriesExecutor>,
 }
 
 pub struct ApplicationBoostrapExecutorsCommands {
@@ -27,6 +36,11 @@ pub struct ApplicationBoostrapExecutorsCommands {
     pub move_task_to_test: Arc<MoveTaskToTestExecutor>,
     pub create_repository: Arc<CreateRepositoryExecutor>,
     pub create_repository_task_tracker: Arc<CreateRepositoryTaskTrackerExecutor>,
+    pub update_repository: Arc<UpdateRepositoryExecutor>,
+    pub update_repository_task_tracker: Arc<UpdateRepositoryTaskTrackerExecutor>,
+    pub bind_repository: Arc<BindRepositoryExecutor>,
+    pub unbind_repository: Arc<UnbindRepositoryExecutor>,
+    pub delete_repository: Arc<DeleteRepositoryExecutor>,
 }
 
 pub struct ApplicationBoostrapExecutors {
@@ -41,18 +55,28 @@ impl ApplicationBoostrapExecutors {
         shared_dependency: Arc<ApplicationSharedDependency>,
     ) -> Self {
         let queries = ApplicationBoostrapExecutorsQueries {
-            build_report_by_range: Arc::new(BuildVersionControlDateRangeReportExecutor {
-                reversible_cipher: shared_dependency.reversible_cipher.clone(),
-                user_socials_repo: shared_dependency.user_socials_repo.clone(),
-                user_version_control_service_repo: shared_dependency
-                    .user_version_controls_repo
-                    .clone(),
-                version_control_client: shared_dependency.version_control_client.clone(),
-                cache: shared_dependency.cache.clone(),
-            }),
+            build_report_by_range: Arc::new(BuildVersionControlDateRangeReportExecutor::new(
+                shared_dependency.reversible_cipher.clone(),
+                shared_dependency.user_socials_repo.clone(),
+                shared_dependency.user_version_controls_repo.clone(),
+                shared_dependency.version_control_client.clone(),
+                shared_dependency.repository_repo.clone(),
+                shared_dependency.repository_task_tracker_repo.clone(),
+                shared_dependency.task_tracker_service.clone(),
+                config.kaiten.base.clone(),
+                shared_dependency.cache.clone(),
+            )),
             get_user_roles_by_telegram_id: Arc::new(GetUserRolesByTelegramIdExecutor::new(
                 shared_dependency.user_socials_repo.clone(),
                 shared_dependency.user_has_roles_repo.clone(),
+            )),
+            get_user_bound_repositories: Arc::new(GetUserBoundRepositoriesExecutor::new(
+                shared_dependency.user_socials_repo.clone(),
+                shared_dependency.user_connection_repositories_repo.clone(),
+                shared_dependency.repository_repo.clone(),
+            )),
+            get_all_repositories: Arc::new(GetAllRepositoriesExecutor::new(
+                shared_dependency.repository_repo.clone(),
             )),
         };
 
@@ -95,6 +119,29 @@ impl ApplicationBoostrapExecutors {
             create_repository_task_tracker: Arc::new(CreateRepositoryTaskTrackerExecutor::new(
                 mysql_pool.clone(),
                 shared_dependency.repository_task_tracker_repo.clone(),
+            )),
+            update_repository: Arc::new(UpdateRepositoryExecutor::new(
+                mysql_pool.clone(),
+                shared_dependency.repository_repo.clone(),
+            )),
+            update_repository_task_tracker: Arc::new(UpdateRepositoryTaskTrackerExecutor::new(
+                mysql_pool.clone(),
+                shared_dependency.repository_task_tracker_repo.clone(),
+            )),
+            bind_repository: Arc::new(BindRepositoryExecutor::new(
+                mysql_pool.clone(),
+                shared_dependency.user_socials_repo.clone(),
+                shared_dependency.repository_repo.clone(),
+                shared_dependency.user_connection_repositories_repo.clone(),
+            )),
+            unbind_repository: Arc::new(UnbindRepositoryExecutor::new(
+                mysql_pool.clone(),
+                shared_dependency.user_socials_repo.clone(),
+                shared_dependency.user_connection_repositories_repo.clone(),
+            )),
+            delete_repository: Arc::new(DeleteRepositoryExecutor::new(
+                mysql_pool.clone(),
+                shared_dependency.repository_repo.clone(),
             )),
         };
 

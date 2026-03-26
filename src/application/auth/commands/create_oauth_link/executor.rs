@@ -8,10 +8,10 @@ use crate::domain::user::repositories::user_social_accounts_repository::UserSoci
 use crate::infrastructure::drivers::cache::contract::CacheService;
 use crate::utils::security::crypto::key_by_payload::create_key_by_payload;
 use std::sync::Arc;
+use std::time::Duration;
 use url::Url;
 
-// TODO: Вынести в конфиг
-const OAUTH_STATE_TTL_SECONDS: u64 = 600;
+const OAUTH_STATE_TTL_SECONDS: u64 = Duration::from_mins(10).as_secs();
 
 pub struct CreateOAuthLinkExecutor {
     user_repo: Arc<dyn UserRepository>,

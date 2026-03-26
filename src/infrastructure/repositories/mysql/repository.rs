@@ -1,14 +1,15 @@
 use crate::domain::repository::entities::repository::Repository;
 use crate::domain::repository::repositories::repository_repository::{
-    CreateRepositoryError, FindAllRepositoriesError, FindRepositoryByExternalIdError,
-    FindRepositoryByIdError, RepositoryRepository,
+    CreateRepositoryError, DeleteRepositoryError, FindAllRepositoriesError,
+    FindRepositoryByExternalIdError, FindRepositoryByIdError, RepositoryRepository,
+    UpdateRepositoryError,
 };
 use crate::domain::repository::value_objects::repository_id::RepositoryId;
 use crate::infrastructure::database::mysql::entities::repositories;
 use async_trait::async_trait;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseConnection, DatabaseTransaction, EntityTrait,
-    QueryFilter, Set,
+    ModelTrait, QueryFilter, Set,
 };
 use std::sync::Arc;
 
@@ -45,6 +46,28 @@ impl RepositoryRepository for MySQLRepositoryRepository {
         Ok(Repository::from_mysql(result))
     }
 
+    async fn update(
+        &self,
+        txn: &DatabaseTransaction,
+        repository: &Repository,
+    ) -> Result<Repository, UpdateRepositoryError> {
+        let model = repositories::ActiveModel {
+            id: Set(repository.id.0),
+            external_id: Set(repository.external_id),
+            name: Set(repository.name.clone()),
+            owner: Set(repository.owner.clone()),
+            url: Set(repository.url.clone()),
+            ..Default::default()
+        };
+
+        let result = model
+            .update(txn)
+            .await
+            .map_err(|e| UpdateRepositoryError::DbError(e.to_string()))?;
+
+        Ok(Repository::from_mysql(result))
+    }
+
     async fn find_by_id(&self, id: RepositoryId) -> Result<Repository, FindRepositoryByIdError> {
         let result = repositories::Entity::find()
             .filter(repositories::Column::Id.eq(id.0))
@@ -77,6 +100,26 @@ impl RepositoryRepository for MySQLRepositoryRepository {
             .map_err(|e| FindAllRepositoriesError::DbError(e.to_string()))?;
 
         Ok(results.into_iter().map(Repository::from_mysql).collect())
+    }
+
+    async fn delete(
+        &self,
+        txn: &DatabaseTransaction,
+        id: RepositoryId,
+    ) -> Result<(), DeleteRepositoryError> {
+        let model = repositories::Entity::find()
+            .filter(repositories::Column::Id.eq(id.0))
+            .one(txn)
+            .await
+            .map_err(|e| DeleteRepositoryError::DbError(e.to_string()))?
+            .ok_or(DeleteRepositoryError::NotFound)?;
+
+        model
+            .delete(txn)
+            .await
+            .map_err(|e| DeleteRepositoryError::DbError(e.to_string()))?;
+
+        Ok(())
     }
 }
 

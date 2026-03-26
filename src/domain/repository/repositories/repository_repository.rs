@@ -11,6 +11,14 @@ pub enum CreateRepositoryError {
 }
 
 #[derive(Debug, Error)]
+pub enum UpdateRepositoryError {
+    #[error("Database error: {0}")]
+    DbError(String),
+    #[error("Repository not found")]
+    NotFound,
+}
+
+#[derive(Debug, Error)]
 pub enum FindRepositoryByIdError {
     #[error("Database error: {0}")]
     DbError(String),
@@ -32,6 +40,14 @@ pub enum FindAllRepositoriesError {
     DbError(String),
 }
 
+#[derive(Debug, Error)]
+pub enum DeleteRepositoryError {
+    #[error("Database error: {0}")]
+    DbError(String),
+    #[error("Repository not found")]
+    NotFound,
+}
+
 #[async_trait]
 pub trait RepositoryRepository: Send + Sync {
     async fn create(
@@ -39,6 +55,12 @@ pub trait RepositoryRepository: Send + Sync {
         txn: &DatabaseTransaction,
         repository: &Repository,
     ) -> Result<Repository, CreateRepositoryError>;
+
+    async fn update(
+        &self,
+        txn: &DatabaseTransaction,
+        repository: &Repository,
+    ) -> Result<Repository, UpdateRepositoryError>;
 
     async fn find_by_id(&self, id: RepositoryId) -> Result<Repository, FindRepositoryByIdError>;
 
@@ -48,4 +70,10 @@ pub trait RepositoryRepository: Send + Sync {
     ) -> Result<Repository, FindRepositoryByExternalIdError>;
 
     async fn find_all(&self) -> Result<Vec<Repository>, FindAllRepositoriesError>;
+
+    async fn delete(
+        &self,
+        txn: &DatabaseTransaction,
+        id: RepositoryId,
+    ) -> Result<(), DeleteRepositoryError>;
 }

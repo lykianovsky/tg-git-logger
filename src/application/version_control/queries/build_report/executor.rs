@@ -4,11 +4,13 @@ use crate::application::version_control::queries::build_report::command::{
 };
 use crate::application::version_control::queries::build_report::error::BuildVersionControlDateRangeReportExecutorError;
 use crate::application::version_control::queries::build_report::response::BuildVersionControlDateRangeReportExecutorResponse;
+use crate::domain::repository::repositories::repository_repository::RepositoryRepository;
+use crate::domain::repository::repositories::repository_task_tracker_repository::RepositoryTaskTrackerRepository;
 use crate::domain::shared::command::CommandExecutor;
 use crate::domain::shared::date::range::DateRange;
+use crate::domain::task::services::task_tracker_service::TaskTrackerService;
 use crate::domain::user::repositories::user_social_accounts_repository::UserSocialAccountsRepository;
 use crate::domain::user::repositories::user_vc_accounts_repository::UserVersionControlAccountsRepository;
-use crate::domain::user::value_objects::social_user_id::SocialUserId;
 use crate::domain::version_control::ports::version_control_client::{
     VersionControlClient, VersionControlClientDateRangeReportError,
 };
@@ -19,17 +21,25 @@ use crate::domain::version_control::value_objects::report::{
 use crate::infrastructure::drivers::cache::contract::CacheService;
 use crate::utils::builder::message::MessageBuilder;
 use crate::utils::security::crypto::reversible::ReversibleCipher;
-use chrono::{TimeZone, Timelike, Utc};
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
-use std::time::Duration;
 
 const COMMITS_LIMIT: usize = 5;
 const PRS_LIMIT: usize = 5;
 const TOP_COMMITS: usize = 3;
 const TOP_CONTRIBUTORS: usize = 5;
 const DIVIDER: &str = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n";
+const REPORT_CACHE_TTL_SECONDS: u64 = 86_400; // 24 hours
+
+fn format_duration(seconds: f64) -> String {
+    match seconds {
+        s if s < 60.0 => format!("{:.0} сек", s),
+        s if s < 3600.0 => format!("{:.0} мин", s / 60.0),
+        s if s < 86400.0 => format!("{:.1} ч", s / 3600.0),
+        s => format!("{:.1} дн", s / 86400.0),
+    }
+}
 
 struct PrStats<'a> {
     merged: Vec<&'a VersionControlDateRangeReportPullRequest>,
@@ -37,8 +47,7 @@ struct PrStats<'a> {
     closed: Vec<&'a VersionControlDateRangeReportPullRequest>,
 }
 
-// TODO: ВАЙБ-КОД
-impl<'a> PrStats<'a> {
+impl<'a> From<&'a [VersionControlDateRangeReportPullRequest]> for PrStats<'a> {
     fn from(prs: &'a [VersionControlDateRangeReportPullRequest]) -> Self {
         Self {
             merged: prs.iter().filter(|p| p.merged_at.is_some()).collect(),
@@ -49,7 +58,9 @@ impl<'a> PrStats<'a> {
                 .collect(),
         }
     }
+}
 
+impl<'a> PrStats<'a> {
     fn merge_rate(&self) -> String {
         let total = self.merged.len() + self.open.len() + self.closed.len();
         if total == 0 {
@@ -59,29 +70,25 @@ impl<'a> PrStats<'a> {
     }
 
     fn avg_merge_time(&self) -> Option<String> {
-        let times: Vec<f64> = self
+        let total_secs: f64 = self
             .merged
             .iter()
             .filter_map(|p| {
                 p.merged_at
                     .map(|m| m.signed_duration_since(p.created_at).num_seconds() as f64)
             })
-            .collect();
+            .sum();
 
-        if times.is_empty() {
+        let count = self.merged.len();
+        if count == 0 {
             return None;
         }
 
-        let avg = times.iter().sum::<f64>() / times.len() as f64;
-        Some(match avg {
-            s if s < 60.0 => format!("{:.0} сек", s),
-            s if s < 3600.0 => format!("{:.0} мин", s / 60.0),
-            s if s < 86400.0 => format!("{:.1} ч", s / 3600.0),
-            s => format!("{:.1} дн", s / 86400.0),
-        })
+        Some(format_duration(total_secs / count as f64))
     }
 }
 
+#[derive(Default)]
 struct ContribStats {
     commits: usize,
     additions: i64,
@@ -89,14 +96,42 @@ struct ContribStats {
 }
 
 pub struct BuildVersionControlDateRangeReportExecutor {
-    pub reversible_cipher: Arc<ReversibleCipher>,
-    pub user_socials_repo: Arc<dyn UserSocialAccountsRepository>,
-    pub user_version_control_service_repo: Arc<dyn UserVersionControlAccountsRepository>,
-    pub version_control_client: Arc<dyn VersionControlClient>,
-    pub cache: Arc<dyn CacheService>,
+    reversible_cipher: Arc<ReversibleCipher>,
+    user_socials_repo: Arc<dyn UserSocialAccountsRepository>,
+    user_version_control_service_repo: Arc<dyn UserVersionControlAccountsRepository>,
+    version_control_client: Arc<dyn VersionControlClient>,
+    repository_repo: Arc<dyn RepositoryRepository>,
+    repository_task_tracker_repo: Arc<dyn RepositoryTaskTrackerRepository>,
+    task_tracker_service: Arc<dyn TaskTrackerService>,
+    kaiten_base: String,
+    cache: Arc<dyn CacheService>,
 }
 
 impl BuildVersionControlDateRangeReportExecutor {
+    pub fn new(
+        reversible_cipher: Arc<ReversibleCipher>,
+        user_socials_repo: Arc<dyn UserSocialAccountsRepository>,
+        user_version_control_service_repo: Arc<dyn UserVersionControlAccountsRepository>,
+        version_control_client: Arc<dyn VersionControlClient>,
+        repository_repo: Arc<dyn RepositoryRepository>,
+        repository_task_tracker_repo: Arc<dyn RepositoryTaskTrackerRepository>,
+        task_tracker_service: Arc<dyn TaskTrackerService>,
+        kaiten_base: String,
+        cache: Arc<dyn CacheService>,
+    ) -> Self {
+        Self {
+            reversible_cipher,
+            user_socials_repo,
+            user_version_control_service_repo,
+            version_control_client,
+            repository_repo,
+            repository_task_tracker_repo,
+            task_tracker_service,
+            kaiten_base,
+            cache,
+        }
+    }
+
     pub fn friendly_error_message(
         &self,
         error: &BuildVersionControlDateRangeReportExecutorError,
@@ -105,36 +140,85 @@ impl BuildVersionControlDateRangeReportExecutor {
 
         match error {
             BuildVersionControlDateRangeReportExecutorError::VersionControlClientDateRangeReportError(
-                VersionControlClientDateRangeReportError::Unauthorized(reason)
-            ) => {
-                format!("🔐 Нет доступа к репозиторию.\nПричина: {}", reason)
-            }
+                VersionControlClientDateRangeReportError::Unauthorized(reason),
+            ) => format!("🔐 Нет доступа к репозиторию.\nПричина: {}", reason),
+
             BuildVersionControlDateRangeReportExecutorError::VersionControlClientDateRangeReportError(
-                VersionControlClientDateRangeReportError::Transport(reason)
-            ) => {
-                format!("🌐 Ошибка соединения: {}", reason)
-            }
+                VersionControlClientDateRangeReportError::Transport(reason),
+            ) => format!("🌐 Ошибка соединения: {}", reason),
+
+            BuildVersionControlDateRangeReportExecutorError::VersionControlClientDateRangeReportError(
+                VersionControlClientDateRangeReportError::BranchNotFound(branch),
+            ) => format!(
+                "🌿 Ветка {} не найдена в репозитории.",
+                MessageBuilder::escape_html(branch)
+            ),
+
             BuildVersionControlDateRangeReportExecutorError::FindSocialServiceByIdError(..) => {
                 "🔐 Вы должны пройти регистрацию".to_string()
             }
-            _ => {
-                "❌ Неизвестная ошибка".to_string()
-            }
+
+            _ => "❌ Неизвестная ошибка".to_string(),
         }
     }
 
-    // TODO: ВАЙБ-КОД
+    fn build_task_link(&self, text: &str, url_template: &str) -> Option<String> {
+        self.task_tracker_service
+            .extract_task_id_by_pattern(text)
+            .map(|id| url_template.replace("{id}", &id.0.to_string()))
+    }
+
+    /// Возвращает HTML-строку, где только совпавший с паттерном фрагмент
+    /// оборачивается в `<a href="...">`, остальной текст остаётся как есть.
+    fn linkify_task_match(&self, text: &str, url_template: &str) -> String {
+        let Some((matched, task_id)) = self.task_tracker_service.extract_task_match(text) else {
+            return MessageBuilder::escape_html(text);
+        };
+        let url = url_template.replace("{id}", &task_id.0.to_string());
+        if let Some(pos) = text.find(&matched) {
+            let before = &text[..pos];
+            let after = &text[pos + matched.len()..];
+            format!(
+                "{}<a href=\"{}\">{}</a>{}",
+                MessageBuilder::escape_html(before),
+                url,
+                MessageBuilder::escape_html(&matched),
+                MessageBuilder::escape_html(after),
+            )
+        } else {
+            MessageBuilder::escape_html(text)
+        }
+    }
+
     fn render(
         &self,
         report: &VersionControlDateRangeReport,
         author: &Option<String>,
         date_range: &DateRange,
+        repo_owner: &str,
+        repo_name: &str,
+        branch: &str,
+        task_url_template: Option<&str>,
     ) -> String {
-        if let Some(author) = &author {
-            return self.render_for_author(report, author, date_range);
+        match author {
+            Some(author) => self.render_for_author(
+                report,
+                author,
+                date_range,
+                repo_owner,
+                repo_name,
+                branch,
+                task_url_template,
+            ),
+            None => self.render_for_repository(
+                report,
+                date_range,
+                repo_owner,
+                repo_name,
+                branch,
+                task_url_template,
+            ),
         }
-
-        self.render_for_repository(report, date_range)
     }
 
     fn render_for_author(
@@ -142,25 +226,25 @@ impl BuildVersionControlDateRangeReportExecutor {
         report: &VersionControlDateRangeReport,
         author: &str,
         date_range: &DateRange,
+        repo_owner: &str,
+        repo_name: &str,
+        branch: &str,
+        task_url_template: Option<&str>,
     ) -> String {
-        let mut b = MessageBuilder::new();
         let commits = &report.commits;
         let prs = &report.pull_requests;
 
-        b = self.render_header(
-            &mut b,
-            &format!(
-                "👤 <b>Персональный отчёт:</b> <b>{}</b>",
-                MessageBuilder::escape_html(author)
-            ),
-            date_range,
+        let title = format!(
+            "👤 <b>Персональный отчёт:</b> <b>{}</b>",
+            MessageBuilder::escape_html(author)
         );
+        let b = self.render_header(&title, date_range, repo_owner, repo_name, branch);
 
         if commits.is_empty() && prs.is_empty() {
             return Self::render_empty(b);
         }
 
-        let pr_stats = PrStats::from(prs);
+        let pr_stats = PrStats::from(prs.as_slice());
         let total_additions: i64 = commits.iter().map(|c| c.additions).sum();
         let total_deletions: i64 = commits.iter().map(|c| c.deletions).sum();
         let active_days: HashSet<String> = commits
@@ -168,7 +252,7 @@ impl BuildVersionControlDateRangeReportExecutor {
             .map(|c| c.authored_at.format("%Y-%m-%d").to_string())
             .collect();
 
-        b = self.render_summary(
+        let b = self.render_summary(
             b,
             commits.len(),
             prs.len(),
@@ -176,26 +260,18 @@ impl BuildVersionControlDateRangeReportExecutor {
             None,
             commits.iter().filter_map(|c| c.changed_files).sum(),
         );
-
-        b = self.render_code_stats(
+        let b = self.render_code_stats(
             b,
             total_additions,
             total_deletions,
             Some(total_additions / commits.len().max(1) as i64),
         );
-
-        b = self.render_activity(b, commits);
-
-        b = self.render_pr_block(b, &pr_stats, prs, true);
-
-        b = self.render_recent_commits(b, commits, false);
-
-        b = self.render_recent_prs(b, prs);
-
-        b = b.raw(DIVIDER);
-
-        b = self.render_top_commits(b, commits);
-
+        let b = self.render_activity(b, commits);
+        let b = self.render_pr_block(b, &pr_stats, prs, true);
+        let b = self.render_recent_commits(b, commits, false, task_url_template);
+        let b = self.render_recent_prs(b, prs, task_url_template);
+        let b = b.raw(DIVIDER);
+        let b = self.render_top_commits(b, commits);
         b.build()
     }
 
@@ -203,18 +279,22 @@ impl BuildVersionControlDateRangeReportExecutor {
         &self,
         report: &VersionControlDateRangeReport,
         date_range: &DateRange,
+        repo_owner: &str,
+        repo_name: &str,
+        branch: &str,
+        task_url_template: Option<&str>,
     ) -> String {
-        let mut b = MessageBuilder::new();
         let commits = &report.commits;
         let prs = &report.pull_requests;
 
-        b = self.render_header(&mut b, "🏢 <b>Отчёт по репозиторию</b>", date_range);
+        let title = "🏢 <b>Отчёт по репозиторию</b>".to_string();
+        let b = self.render_header(&title, date_range, repo_owner, repo_name, branch);
 
         if commits.is_empty() && prs.is_empty() {
             return Self::render_empty(b);
         }
 
-        let pr_stats = PrStats::from(prs);
+        let pr_stats = PrStats::from(prs.as_slice());
         let total_additions: i64 = commits.iter().map(|c| c.additions).sum();
         let total_deletions: i64 = commits.iter().map(|c| c.deletions).sum();
         let unique_authors: HashSet<String> = commits
@@ -226,7 +306,7 @@ impl BuildVersionControlDateRangeReportExecutor {
             })
             .collect();
 
-        b = self.render_summary(
+        let b = self.render_summary(
             b,
             commits.len(),
             prs.len(),
@@ -234,29 +314,23 @@ impl BuildVersionControlDateRangeReportExecutor {
             Some(unique_authors.len()),
             commits.iter().filter_map(|c| c.changed_files).sum(),
         );
-
-        b = self.render_code_stats(b, total_additions, total_deletions, None);
-
-        b = self.render_activity(b, commits);
-
-        b = self.render_pr_block(b, &pr_stats, prs, false);
-
-        b = b.raw(DIVIDER);
-
-        b = self.render_top_contributors(b, commits);
-
-        b = self.render_recent_prs(b, prs);
-
-        b = self.render_recent_commits(b, commits, true);
-
+        let b = self.render_code_stats(b, total_additions, total_deletions, None);
+        let b = self.render_activity(b, commits);
+        let b = self.render_pr_block(b, &pr_stats, prs, false);
+        let b = b.raw(DIVIDER);
+        let b = self.render_top_contributors(b, commits);
+        let b = self.render_recent_prs(b, prs, task_url_template);
+        let b = self.render_recent_commits(b, commits, true, task_url_template);
         b.build()
     }
 
     fn render_header(
         &self,
-        _b: &mut MessageBuilder,
         title: &str,
         date_range: &DateRange,
+        repo_owner: &str,
+        repo_name: &str,
+        branch: &str,
     ) -> MessageBuilder {
         let period = format!(
             "{} — {}",
@@ -265,6 +339,12 @@ impl BuildVersionControlDateRangeReportExecutor {
         );
         MessageBuilder::new()
             .raw(&format!("{}\n", title))
+            .raw(&format!(
+                "📦 <b>Репозиторий:</b> <code>{}/{}</code> \n 🌿 <b>Ветка:</b> <code>{}</code>\n",
+                MessageBuilder::escape_html(repo_owner),
+                MessageBuilder::escape_html(repo_name),
+                MessageBuilder::escape_html(branch),
+            ))
             .raw(&format!("📅 <b>Период:</b> {}\n", period))
             .raw(DIVIDER)
     }
@@ -397,6 +477,7 @@ impl BuildVersionControlDateRangeReportExecutor {
         b: MessageBuilder,
         commits: &[VersionControlDateRangeReportCommit],
         show_author: bool,
+        task_url_template: Option<&str>,
     ) -> MessageBuilder {
         if commits.is_empty() {
             return b;
@@ -413,6 +494,9 @@ impl BuildVersionControlDateRangeReportExecutor {
             let sha = &c.sha[..7.min(c.sha.len())];
             let msg = Self::truncate(c.message.lines().next().unwrap_or(&c.message), 45);
             let date = c.authored_at.format("%d %b, %H:%M");
+            let msg_html = task_url_template
+                .map(|t| self.linkify_task_match(&msg, t))
+                .unwrap_or_else(|| MessageBuilder::escape_html(&msg));
 
             b = if show_author {
                 let author = c
@@ -423,16 +507,14 @@ impl BuildVersionControlDateRangeReportExecutor {
                 b.raw(&format!(
                     "  • <code>{}</code> <i>{}</i>\n    {} — {}\n",
                     sha,
-                    MessageBuilder::escape_html(&msg),
+                    msg_html,
                     MessageBuilder::escape_html(author),
                     date
                 ))
             } else {
                 b.raw(&format!(
                     "  • <code>{}</code> <i>{}</i> — {}\n",
-                    sha,
-                    MessageBuilder::escape_html(&msg),
-                    date
+                    sha, msg_html, date
                 ))
             };
         }
@@ -448,6 +530,7 @@ impl BuildVersionControlDateRangeReportExecutor {
         &self,
         b: MessageBuilder,
         prs: &[VersionControlDateRangeReportPullRequest],
+        task_url_template: Option<&str>,
     ) -> MessageBuilder {
         if prs.is_empty() {
             return b;
@@ -472,12 +555,15 @@ impl BuildVersionControlDateRangeReportExecutor {
                 .as_deref()
                 .map(|a| format!(" · @{}", a))
                 .unwrap_or_default();
+            let title_html = task_url_template
+                .map(|t| self.linkify_task_match(&title, t))
+                .unwrap_or_else(|| MessageBuilder::escape_html(&title));
 
             b = b.raw(&format!(
                 "  {} #{} <i>{}</i>{}\n",
                 icon,
                 pr.number,
-                MessageBuilder::escape_html(&title),
+                title_html,
                 MessageBuilder::escape_html(&author)
             ));
         }
@@ -537,11 +623,7 @@ impl BuildVersionControlDateRangeReportExecutor {
                 .as_ref()
                 .and_then(|a| a.login.clone().or_else(|| a.name.clone()))
                 .unwrap_or_else(|| "unknown".into());
-            let e = map.entry(name).or_insert(ContribStats {
-                commits: 0,
-                additions: 0,
-                deletions: 0,
-            });
+            let e = map.entry(name).or_default();
             e.commits += 1;
             e.additions += c.additions;
             e.deletions += c.deletions;
@@ -590,11 +672,9 @@ impl BuildVersionControlDateRangeReportExecutor {
 
     fn create_stable_key_by_command(
         &self,
-        cmd: &<BuildVersionControlDateRangeReportExecutor as CommandExecutor>::Command,
-    ) -> Result<String, <BuildVersionControlDateRangeReportExecutor as CommandExecutor>::Error>
-    {
+        cmd: &BuildVersionControlDateRangeReportExecutorCommand,
+    ) -> Result<String, BuildVersionControlDateRangeReportExecutorError> {
         let mut cmd = cmd.clone();
-
         cmd.date_range = cmd.date_range.normalize_to_day();
 
         let json = serde_json::to_string(&mut cmd)?;
@@ -640,6 +720,8 @@ impl CommandExecutor for BuildVersionControlDateRangeReportExecutor {
             .reversible_cipher
             .decrypt(version_control_user.access_token.value())?;
 
+        let repository = self.repository_repo.find_by_id(cmd.repository_id).await?;
+
         let author = match cmd.for_who {
             BuildVersionControlDateRangeReportExecutorCommandForWho::Me => {
                 Some(version_control_user.version_control_login)
@@ -651,8 +733,9 @@ impl CommandExecutor for BuildVersionControlDateRangeReportExecutor {
             .version_control_client
             .get_details_by_range(
                 &decrypted_token,
-                // TODO: Сделать передачу для выбранной ветки
-                String::from("refs/heads/dev"),
+                &repository.owner,
+                &repository.name,
+                &cmd.branch,
                 &cmd.date_range,
                 author.as_deref(),
             )
@@ -660,15 +743,27 @@ impl CommandExecutor for BuildVersionControlDateRangeReportExecutor {
 
         tracing::debug!("Version control report built: {:?}", report);
 
-        let render_text = self.render(&report, &author, &cmd.date_range);
+        let task_url_template: Option<String> = match self
+            .repository_task_tracker_repo
+            .find_by_repository_id(repository.id)
+            .await
+        {
+            Ok(tracker) => Some(format!("{}{}", self.kaiten_base, tracker.path_to_card)),
+            Err(_) => None,
+        };
+
+        let render_text = self.render(
+            &report,
+            &author,
+            &cmd.date_range,
+            &repository.owner,
+            &repository.name,
+            &cmd.branch,
+            task_url_template.as_deref(),
+        );
 
         self.cache
-            .set(
-                &cache_key,
-                render_text.as_str(),
-                // TODO: Вынести в ENV
-                Duration::from_hours(24).as_secs(),
-            )
+            .set(&cache_key, render_text.as_str(), REPORT_CACHE_TTL_SECONDS)
             .await
             .map_err(|e| BuildVersionControlDateRangeReportExecutorError::Cache(e.to_string()))?;
 

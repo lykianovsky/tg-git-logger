@@ -41,7 +41,7 @@ impl CommandExecutor for CreateRepositoryTaskTrackerExecutor {
             .map_err(|e| CreateRepositoryTaskTrackerExecutorError::DbError(e.to_string()))?;
 
         let placeholder = RepositoryTaskTracker {
-            id: 0,
+            id: Default::default(),
             repository_id: cmd.repository_id.clone(),
             space_id: cmd.space_id,
             qa_column_id: cmd.qa_column_id,
