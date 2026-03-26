@@ -1,9 +1,8 @@
 use crate::application::user::commands::register_via_oauth::command::RegisterUserViaOAuthExecutorCommand;
 use crate::application::user::commands::register_via_oauth::error::RegisterUserViaOAuthExecutorError;
 use crate::application::user::commands::register_via_oauth::response::RegisterUserViaOAuthExecutorResponse;
-use crate::domain::auth::entities::oauth_state::OpenAuthorizationState;
 use crate::domain::auth::ports::oauth_client::OAuthClient;
-use crate::domain::notification::services::notification_service::NotificationService;
+use crate::domain::role::value_objects::role_name::RoleName;
 use crate::domain::shared::command::CommandExecutor;
 use crate::domain::user::entities::user::User;
 use crate::domain::user::entities::user_social_account::UserSocialAccount;
@@ -12,6 +11,7 @@ use crate::domain::user::repositories::user_has_roles_repository::UserHasRolesRe
 use crate::domain::user::repositories::user_repository::UserRepository;
 use crate::domain::user::repositories::user_social_accounts_repository::UserSocialAccountsRepository;
 use crate::domain::user::repositories::user_vc_accounts_repository::UserVersionControlAccountsRepository;
+use crate::domain::user::value_objects::social_user_id::SocialUserId;
 use crate::domain::user::value_objects::version_control_user_id::VersionControlUserId;
 use crate::domain::version_control::ports::version_control_client::VersionControlClient;
 use crate::infrastructure::drivers::cache::contract::CacheService;
@@ -32,6 +32,7 @@ pub struct RegisterUserViaOAuthExecutor {
     pub reversible_cipher: Arc<ReversibleCipher>,
     pub cache: Arc<dyn CacheService>,
     pub mutex: Arc<KeyLocker<String>>,
+    pub telegram_admin_user_id: SocialUserId,
 }
 
 impl CommandExecutor for RegisterUserViaOAuthExecutor {
@@ -82,46 +83,58 @@ impl CommandExecutor for RegisterUserViaOAuthExecutor {
             .assign(&txn, user.id, cmd.state.role.clone())
             .await?;
 
-        let new_social_user = UserSocialAccount {
-            id: Default::default(),
-            user_id: user.id,
-            social_type: cmd.state.social_type.clone(),
-            social_user_id: cmd.state.social_user_id,
-            social_chat_id: cmd.state.social_chat_id,
-            social_user_login: cmd.state.social_user_login.clone(),
-            social_user_email: cmd.state.social_user_email.clone(),
-            social_user_avatar_url: cmd.state.social_user_avatar_url.clone(),
-            created_at: Default::default(),
-            updated_at: Default::default(),
-        };
+        if cmd.state.social_user_id == self.telegram_admin_user_id {
+            self.user_has_role
+                .assign(&txn, user.id, RoleName::Admin)
+                .await?;
+        }
 
-        self.user_socials_repo
-            .create(&txn, &new_social_user)
+        let new_social_user = self
+            .user_socials_repo
+            .create(
+                &txn,
+                &UserSocialAccount {
+                    id: Default::default(),
+                    user_id: user.id,
+                    social_type: cmd.state.social_type.clone(),
+                    social_user_id: cmd.state.social_user_id,
+                    social_chat_id: cmd.state.social_chat_id,
+                    social_user_login: cmd.state.social_user_login.clone(),
+                    social_user_email: cmd.state.social_user_email.clone(),
+                    social_user_avatar_url: cmd.state.social_user_avatar_url.clone(),
+                    created_at: Default::default(),
+                    updated_at: Default::default(),
+                },
+            )
             .await?;
 
         let encrypted_access_token = self
             .reversible_cipher
             .encrypt(&exchange_code_response.access_token)?;
 
-        let new_user_version_control_service = UserVersionControlAccount {
-            id: Default::default(),
-            user_id: user.id,
-            version_control_type: cmd.state.version_control_type.clone(),
-            version_control_user_id: VersionControlUserId(version_control_client_user.id as i32),
-            version_control_login: version_control_client_user.login.clone(),
-            version_control_email: version_control_client_user.email.clone(),
-            version_control_avatar_url: None,
-            access_token: encrypted_access_token,
-            refresh_token: None,
-            token_type: Some(exchange_code_response.token_type),
-            scope: Some(exchange_code_response.scope),
-            expires_at: None,
-            created_at: Default::default(),
-            updated_at: Default::default(),
-        };
-
-        self.user_version_control_service_repo
-            .create(&txn, &new_user_version_control_service)
+        let new_user_version_control_service = self
+            .user_version_control_service_repo
+            .create(
+                &txn,
+                &UserVersionControlAccount {
+                    id: Default::default(),
+                    user_id: user.id,
+                    version_control_type: cmd.state.version_control_type.clone(),
+                    version_control_user_id: VersionControlUserId(
+                        version_control_client_user.id as i32,
+                    ),
+                    version_control_login: version_control_client_user.login.clone(),
+                    version_control_email: version_control_client_user.email.clone(),
+                    version_control_avatar_url: None,
+                    access_token: encrypted_access_token,
+                    refresh_token: None,
+                    token_type: Some(exchange_code_response.token_type),
+                    scope: Some(exchange_code_response.scope),
+                    expires_at: None,
+                    created_at: Default::default(),
+                    updated_at: Default::default(),
+                },
+            )
             .await?;
 
         txn.commit().await?;

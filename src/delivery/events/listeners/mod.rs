@@ -12,6 +12,7 @@ use crate::delivery::events::listeners::github::webhook::workflow::WebhookWorkfl
 use crate::delivery::events::listeners::user::registration::failed::UserRegistrationFailedListener;
 use crate::delivery::events::listeners::user::registration::success::UserRegistrationSuccessListener;
 use crate::domain::user::value_objects::social_chat_id::SocialChatId;
+use crate::domain::user::value_objects::social_user_id::SocialUserId;
 use async_trait::async_trait;
 use std::error::Error;
 use std::sync::Arc;
@@ -75,6 +76,7 @@ impl ApplicationDelivery for DeliveryEventListeners {
             .event_bus
             .on(UserRegistrationSuccessListener {
                 publisher: self.shared_dependency.publisher.clone(),
+                telegram_admin_user_id: SocialUserId(self.config.telegram.admin_user_id as i32),
             })
             .await;
         self.shared_dependency

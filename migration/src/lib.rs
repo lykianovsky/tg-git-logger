@@ -5,6 +5,11 @@ mod m002_create_roles;
 mod m003_create_user_has_role;
 mod m004_create_user_social_accounts;
 mod m005_create_user_version_control_accounts;
+mod m006_create_repositories;
+mod m007_create_repository_pull_request;
+mod m008_create_user_connection_repositories;
+mod m009_create_user_notifications;
+mod m20260326_144331_create_repository_task_trackers;
 
 pub struct Migrator;
 
@@ -17,6 +22,11 @@ impl MigratorTrait for Migrator {
             Box::new(m003_create_user_has_role::Migration),
             Box::new(m004_create_user_social_accounts::Migration),
             Box::new(m005_create_user_version_control_accounts::Migration),
+            Box::new(m006_create_repositories::Migration),
+            Box::new(m007_create_repository_pull_request::Migration),
+            Box::new(m008_create_user_connection_repositories::Migration),
+            Box::new(m009_create_user_notifications::Migration),
+            Box::new(m20260326_144331_create_repository_task_trackers::Migration),
         ]
     }
 }

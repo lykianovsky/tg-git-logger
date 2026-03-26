@@ -6,6 +6,7 @@ use crate::application::version_control::queries::build_report::executor::BuildV
 use crate::application::webhook::commands::dispatch_event::executor::DispatchWebhookEventExecutor;
 use crate::bootstrap::shared_dependency::ApplicationSharedDependency;
 use crate::config::application::ApplicationConfig;
+use crate::domain::user::value_objects::social_user_id::SocialUserId;
 use crate::utils::mutex::key_locker::KeyLocker;
 use sea_orm::DatabaseConnection;
 use std::sync::Arc;
@@ -64,6 +65,7 @@ impl ApplicationBoostrapExecutors {
                 reversible_cipher: shared_dependency.reversible_cipher.clone(),
                 cache: shared_dependency.cache.clone(),
                 mutex: Arc::new(KeyLocker::new()),
+                telegram_admin_user_id: SocialUserId(config.telegram.admin_user_id as i32),
             }),
             dispatch_webhook_event: Arc::new(DispatchWebhookEventExecutor {
                 publisher: shared_dependency.publisher.clone(),
