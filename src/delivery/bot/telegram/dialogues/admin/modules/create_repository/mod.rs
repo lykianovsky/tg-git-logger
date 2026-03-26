@@ -165,10 +165,15 @@ impl TelegramBotDialogueAdminCreateRepositoryDispatcher {
             url,
         };
 
+        let loading_message = bot
+            .send_message(msg.chat.id, "Создаем репозиторий...")
+            .await?;
+
         match executors.commands.create_repository.execute(&cmd).await {
             Ok(response) => {
-                bot.send_message(
+                bot.edit_message_text(
                     msg.chat.id,
+                    loading_message.id,
                     format!(
                         "✅ Репозиторий <b>{}/{}</b> успешно создан (ID: {}).",
                         response.repository.owner,
@@ -181,8 +186,12 @@ impl TelegramBotDialogueAdminCreateRepositoryDispatcher {
             }
             Err(e) => {
                 tracing::error!(error = %e, "Failed to create repository");
-                bot.send_message(msg.chat.id, format!("❌ Ошибка создания репозитория: {e}"))
-                    .await?;
+                bot.edit_message_text(
+                    msg.chat.id,
+                    loading_message.id,
+                    format!("❌ Ошибка создания репозитория: {e}"),
+                )
+                .await?;
             }
         }
 

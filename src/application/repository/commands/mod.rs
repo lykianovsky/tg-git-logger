@@ -1,2 +1,5 @@
 pub mod create_repository;
 pub mod create_repository_task_tracker;
+pub mod delete_repository;
+pub mod update_repository;
+pub mod update_repository_task_tracker;

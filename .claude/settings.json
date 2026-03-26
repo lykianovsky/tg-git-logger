@@ -1,0 +1,47 @@
+{
+  "temperature": 0.1,
+  "maxTokens": 2048,
+  "permissions": {
+    "fileSystem": "write",
+    "shell": true,
+    "git": false
+  },
+  "tools": {
+    "terminal": true,
+    "editor": true,
+    "git": false
+  },
+  "context": {
+    "include": [
+      "src",
+      "crates"
+    ],
+    "exclude": [
+      "target",
+      "node_modules",
+      ".git",
+      "dist",
+      "build",
+      "coverage",
+      "*.lock"
+    ],
+    "maxFiles": 80
+  },
+  "systemPrompt": "You are a senior Rust developer. Write efficient, safe, idiomatic Rust. Avoid unnecessary explanations.",
+  "rules": [
+    "Prefer idiomatic Rust",
+    "Avoid unwrap in production code",
+    "Use Result and proper error handling",
+    "Minimize allocations",
+    "Prefer references over cloning",
+    "Use cargo fmt and clippy standards",
+    "Keep code minimal and readable",
+    "Do not generate unnecessary comments"
+  ],
+  "autoRun": {
+    "onFileChange": [
+      "cargo fmt",
+      "cargo clippy --fix --allow-dirty"
+    ]
+  }
+}

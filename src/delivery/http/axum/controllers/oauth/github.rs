@@ -1,6 +1,7 @@
 use crate::application::user::commands::register_via_oauth::command::RegisterUserViaOAuthExecutorCommand;
 use crate::application::user::commands::register_via_oauth::executor::RegisterUserViaOAuthExecutor;
 use crate::bootstrap::shared_dependency::ApplicationSharedDependency;
+use crate::config::application::ApplicationConfig;
 use crate::domain::auth::entities::oauth_state::OpenAuthorizationState;
 use crate::domain::shared::command::CommandExecutor;
 use crate::domain::user::events::registration_failed::UserRegistrationFailedEvent;
@@ -69,13 +70,15 @@ impl AxumOAuthGithubController {
     pub async fn handle_post(
         Extension(executor): Extension<Arc<RegisterUserViaOAuthExecutor>>,
         Extension(shared): Extension<Arc<ApplicationSharedDependency>>,
+        Extension(config): Extension<Arc<ApplicationConfig>>,
         Query(query): Query<AxumOAuthGithubControllerPostQuery>,
     ) -> impl IntoResponse {
+        let bot_url = config.telegram.bot_url.as_str();
         let key = query.state.clone();
 
         let state = match Self::retrieve_oauth_state(&key, shared.cache.clone()).await {
             Ok(s) => s,
-            Err(..) => return Redirect::to("https://t.me/zb_git_log_bot"),
+            Err(..) => return Redirect::to(bot_url),
         };
 
         let cmd = RegisterUserViaOAuthExecutorCommand {
@@ -111,7 +114,6 @@ impl AxumOAuthGithubController {
             }
         }
 
-        // TODO: Вынести к конфиг
-        Redirect::to("https://t.me/zb_git_log_bot")
+        Redirect::to(bot_url)
     }
 }

@@ -2,6 +2,7 @@ use crate::domain::repository::entities::repository_task_tracker::RepositoryTask
 use crate::domain::repository::repositories::repository_task_tracker_repository::{
     CreateRepositoryTaskTrackerError, FindRepositoryTaskTrackerByIdError,
     FindRepositoryTaskTrackerByRepositoryIdError, RepositoryTaskTrackerRepository,
+    UpdateRepositoryTaskTrackerError,
 };
 use crate::domain::repository::value_objects::repository_id::RepositoryId;
 use crate::infrastructure::database::mysql::entities::repository_task_tracker;
@@ -42,6 +43,29 @@ impl RepositoryTaskTrackerRepository for MySQLRepositoryTaskTrackerRepository {
             .insert(txn)
             .await
             .map_err(|e| CreateRepositoryTaskTrackerError::DbError(e.to_string()))?;
+
+        Ok(RepositoryTaskTracker::from_mysql(result))
+    }
+
+    async fn update(
+        &self,
+        txn: &DatabaseTransaction,
+        tracker: &RepositoryTaskTracker,
+    ) -> Result<RepositoryTaskTracker, UpdateRepositoryTaskTrackerError> {
+        let model = repository_task_tracker::ActiveModel {
+            id: Set(tracker.id),
+            repository_id: Set(tracker.repository_id.0),
+            space_id: Set(tracker.space_id),
+            qa_column_id: Set(tracker.qa_column_id),
+            extract_pattern_regexp: Set(tracker.extract_pattern_regexp.clone()),
+            path_to_card: Set(tracker.path_to_card.clone()),
+            ..Default::default()
+        };
+
+        let result = model
+            .update(txn)
+            .await
+            .map_err(|e| UpdateRepositoryTaskTrackerError::DbError(e.to_string()))?;
 
         Ok(RepositoryTaskTracker::from_mysql(result))
     }

@@ -26,6 +26,9 @@ pub enum VersionControlClientDateRangeReportError {
 
     #[error("Unauthorized: {0}")]
     Unauthorized(String),
+
+    #[error("Branch not found: {0}")]
+    BranchNotFound(String),
 }
 
 #[async_trait]
@@ -38,7 +41,9 @@ pub trait VersionControlClient: Send + Sync {
     async fn get_details_by_range(
         &self,
         access_token: &str,
-        branch: String,
+        owner: &str,
+        repo: &str,
+        branch: &str,
         range: &DateRange,
         author: Option<&str>,
     ) -> Result<VersionControlDateRangeReport, VersionControlClientDateRangeReportError>;

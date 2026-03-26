@@ -11,6 +11,14 @@ pub enum CreateRepositoryTaskTrackerError {
 }
 
 #[derive(Debug, Error)]
+pub enum UpdateRepositoryTaskTrackerError {
+    #[error("Database error: {0}")]
+    DbError(String),
+    #[error("Task tracker not found")]
+    NotFound,
+}
+
+#[derive(Debug, Error)]
 pub enum FindRepositoryTaskTrackerByIdError {
     #[error("Database error: {0}")]
     DbError(String),
@@ -33,6 +41,12 @@ pub trait RepositoryTaskTrackerRepository: Send + Sync {
         txn: &DatabaseTransaction,
         tracker: &RepositoryTaskTracker,
     ) -> Result<RepositoryTaskTracker, CreateRepositoryTaskTrackerError>;
+
+    async fn update(
+        &self,
+        txn: &DatabaseTransaction,
+        tracker: &RepositoryTaskTracker,
+    ) -> Result<RepositoryTaskTracker, UpdateRepositoryTaskTrackerError>;
 
     async fn find_by_id(
         &self,

@@ -1,3 +1,4 @@
+use crate::domain::repository::value_objects::repository_id::RepositoryId;
 use crate::domain::shared::date::range::DateRange;
 use crate::domain::user::value_objects::social_user_id::SocialUserId;
 use serde::{Deserialize, Serialize};
@@ -16,4 +17,6 @@ pub struct BuildVersionControlDateRangeReportExecutorCommand {
     pub social_user_id: SocialUserId,
     pub date_range: DateRange,
     pub for_who: BuildVersionControlDateRangeReportExecutorCommandForWho,
+    pub repository_id: RepositoryId,
+    pub branch: String,
 }

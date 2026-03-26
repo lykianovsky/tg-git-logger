@@ -115,14 +115,20 @@ impl ApplicationBootstrap {
                 .expect("Delivery scheduler error");
         });
 
-        // TODO: Handle shutdown signals and gracefully stop the servers
-        tokio::try_join!(
-            http_server_handle,
-            bot_handle,
-            event_listeners_handle,
-            workers_handle,
-            scheduler_handle
-        )?;
+        tokio::select! {
+            result = async {
+                tokio::try_join!(
+                    http_server_handle,
+                    bot_handle,
+                    event_listeners_handle,
+                    workers_handle,
+                    scheduler_handle
+                )
+            } => { result?; }
+            _ = tokio::signal::ctrl_c() => {
+                tracing::info!("Shutdown signal received, stopping application...");
+            }
+        }
 
         Ok(())
     }

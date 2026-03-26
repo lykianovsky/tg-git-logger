@@ -1,6 +1,7 @@
 use crate::bootstrap::executors::ApplicationBoostrapExecutors;
 use crate::config::application::ApplicationConfig;
 use crate::delivery::bot::telegram::commands::admin::TelegramBotAdminCommandHandler;
+use crate::delivery::bot::telegram::commands::bind_repository::TelegramBotBindRepositoryCommandHandler;
 use crate::delivery::bot::telegram::commands::register::TelegramBotRegisterCommandHandler;
 use crate::delivery::bot::telegram::commands::report::TelegramBotVersionControlReportCommandHandler;
 use crate::delivery::bot::telegram::commands::start::TelegramBotStartCommandHandler;
@@ -21,6 +22,11 @@ pub enum TelegramBotCommand {
     Register,
     #[command(description = "Получить отчет")]
     Report,
+    #[command(
+        rename = "bind_repository",
+        description = "Привязать/отвязать репозиторий"
+    )]
+    BindRepository,
     #[command(description = "Панель администратора")]
     Admin,
 }
@@ -73,6 +79,15 @@ pub async fn handle(
             TelegramBotVersionControlReportCommandHandler::new(context, Arc::new(dialogue))
                 .execute()
                 .await?;
+        }
+        TelegramBotCommand::BindRepository => {
+            TelegramBotBindRepositoryCommandHandler::new(
+                context,
+                executors.clone(),
+                Arc::new(dialogue),
+            )
+            .execute()
+            .await?;
         }
         TelegramBotCommand::Admin => {
             TelegramBotAdminCommandHandler::new(
