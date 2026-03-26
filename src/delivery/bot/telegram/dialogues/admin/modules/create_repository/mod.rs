@@ -1,0 +1,193 @@
+use crate::application::repository::commands::create_repository::command::CreateRepositoryCommand;
+use crate::bootstrap::executors::ApplicationBoostrapExecutors;
+use crate::delivery::bot::telegram::dialogues::admin::TelegramBotDialogueAdminState;
+use crate::delivery::bot::telegram::dialogues::TelegramBotDialogueType;
+use crate::domain::shared::command::CommandExecutor;
+use std::error::Error;
+use std::sync::Arc;
+use teloxide::dispatching::DpHandlerDescription;
+use teloxide::dptree::case;
+use teloxide::prelude::Message;
+use teloxide::prelude::*;
+use teloxide::{dptree, Bot};
+
+pub struct TelegramBotDialogueAdminCreateRepositoryDispatcher {}
+
+impl TelegramBotDialogueAdminCreateRepositoryDispatcher {
+    pub fn message_branches()
+    -> Handler<'static, Result<(), Box<dyn Error + Send + Sync>>, DpHandlerDescription> {
+        dptree::entry()
+            .branch(
+                case![TelegramBotDialogueAdminState::CreateRepositoryName]
+                    .endpoint(Self::handle_create_repository_name),
+            )
+            .branch(
+                case![TelegramBotDialogueAdminState::CreateRepositoryOwner { name }]
+                    .endpoint(Self::handle_create_repository_owner),
+            )
+            .branch(
+                case![TelegramBotDialogueAdminState::CreateRepositoryUrl { name, owner }]
+                    .endpoint(Self::handle_create_repository_url),
+            )
+            .branch(
+                case![TelegramBotDialogueAdminState::CreateRepositoryExternalId {
+                    name,
+                    owner,
+                    url
+                }]
+                .endpoint(Self::handle_create_repository_external_id),
+            )
+    }
+}
+
+impl TelegramBotDialogueAdminCreateRepositoryDispatcher {
+    async fn handle_create_repository_name(
+        bot: Bot,
+        dialogue: TelegramBotDialogueType,
+        msg: Message,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        let name = match msg.text() {
+            Some(t) => t.trim().to_string(),
+            None => {
+                bot.send_message(msg.chat.id, "❌ Введите текстовое название.")
+                    .await?;
+                return Ok(());
+            }
+        };
+
+        dialogue
+            .update(
+                crate::delivery::bot::telegram::dialogues::TelegramBotDialogueState::Admin(
+                    TelegramBotDialogueAdminState::CreateRepositoryOwner { name },
+                ),
+            )
+            .await?;
+
+        bot.send_message(msg.chat.id, "👤 Введите владельца репозитория (owner):")
+            .await?;
+
+        Ok(())
+    }
+
+    async fn handle_create_repository_owner(
+        bot: Bot,
+        dialogue: TelegramBotDialogueType,
+        msg: Message,
+        name: String,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        let owner = match msg.text() {
+            Some(t) => t.trim().to_string(),
+            None => {
+                bot.send_message(msg.chat.id, "❌ Введите текстовое значение.")
+                    .await?;
+                return Ok(());
+            }
+        };
+
+        dialogue
+            .update(
+                crate::delivery::bot::telegram::dialogues::TelegramBotDialogueState::Admin(
+                    TelegramBotDialogueAdminState::CreateRepositoryUrl { name, owner },
+                ),
+            )
+            .await?;
+
+        bot.send_message(msg.chat.id, "🔗 Введите URL репозитория:")
+            .await?;
+
+        Ok(())
+    }
+
+    async fn handle_create_repository_url(
+        bot: Bot,
+        dialogue: TelegramBotDialogueType,
+        msg: Message,
+        (name, owner): (String, String),
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        let url = match msg.text() {
+            Some(t) => t.trim().to_string(),
+            None => {
+                bot.send_message(msg.chat.id, "❌ Введите текстовое значение.")
+                    .await?;
+                return Ok(());
+            }
+        };
+
+        dialogue
+            .update(
+                crate::delivery::bot::telegram::dialogues::TelegramBotDialogueState::Admin(
+                    TelegramBotDialogueAdminState::CreateRepositoryExternalId { name, owner, url },
+                ),
+            )
+            .await?;
+
+        bot.send_message(
+            msg.chat.id,
+            "🔢 Введите внешний ID репозитория (GitHub repo ID):",
+        )
+        .await?;
+
+        Ok(())
+    }
+
+    async fn handle_create_repository_external_id(
+        bot: Bot,
+        dialogue: TelegramBotDialogueType,
+        executors: Arc<ApplicationBoostrapExecutors>,
+        msg: Message,
+        (name, owner, url): (String, String, String),
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        let text = match msg.text() {
+            Some(t) => t.trim().to_string(),
+            None => {
+                bot.send_message(msg.chat.id, "❌ Введите числовое значение.")
+                    .await?;
+                return Ok(());
+            }
+        };
+
+        let external_id: i64 = match text.parse() {
+            Ok(v) => v,
+            Err(_) => {
+                bot.send_message(
+                    msg.chat.id,
+                    "❌ Некорректное значение. Введите целое число.",
+                )
+                .await?;
+                return Ok(());
+            }
+        };
+
+        let cmd = CreateRepositoryCommand {
+            external_id,
+            name,
+            owner,
+            url,
+        };
+
+        match executors.commands.create_repository.execute(&cmd).await {
+            Ok(response) => {
+                bot.send_message(
+                    msg.chat.id,
+                    format!(
+                        "✅ Репозиторий <b>{}/{}</b> успешно создан (ID: {}).",
+                        response.repository.owner,
+                        response.repository.name,
+                        response.repository.id.0
+                    ),
+                )
+                .parse_mode(teloxide::types::ParseMode::Html)
+                .await?;
+            }
+            Err(e) => {
+                tracing::error!(error = %e, "Failed to create repository");
+                bot.send_message(msg.chat.id, format!("❌ Ошибка создания репозитория: {e}"))
+                    .await?;
+            }
+        }
+
+        dialogue.exit().await.ok();
+
+        Ok(())
+    }
+}
