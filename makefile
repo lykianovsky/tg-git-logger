@@ -46,14 +46,13 @@ docker-prod-up:
 	docker-compose -f docker-compose.prod.yml --env-file .env.local up -d
 
 docker-prod-down:
-	docker-compose -f docker-compose.prod.yml --env-file .env.local down -v --remove-orphans
+	docker-compose -f docker-compose.prod.yml --env-file .env.local down -d
 
 docker-prod-logs:
 	docker-compose -f docker-compose.prod.yml --env-file .env.local logs -f rust-app
 
 docker-prod-restart:
-	docker-compose -f docker-compose.prod.yml --env-file .env.local down -v --remove-orphans
-	docker-compose -f docker-compose.prod.yml --env-file .env.local up -d
+	docker-compose -f docker-compose.prod.yml --env-file .env.local up -d --build
 
 # ========================
 # Utilities
