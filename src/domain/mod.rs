@@ -1,5 +1,6 @@
 pub mod auth;
 pub mod notification;
+pub mod repository;
 pub mod role;
 pub mod shared;
 pub mod task;

@@ -1,3 +1,4 @@
+pub mod admin;
 pub mod choose_role;
 pub mod date_range;
 pub mod for_who;

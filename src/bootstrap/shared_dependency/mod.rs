@@ -1,5 +1,7 @@
 use crate::config::application::ApplicationConfig;
 use crate::domain::auth::ports::oauth_client::OAuthClient;
+use crate::domain::repository::repositories::repository_repository::RepositoryRepository;
+use crate::domain::repository::repositories::repository_task_tracker_repository::RepositoryTaskTrackerRepository;
 use crate::domain::role::repositories::role_repository::RoleRepository;
 use crate::domain::task::ports::task_tracker_client::TaskTrackerClient;
 use crate::domain::task::services::task_tracker_service::TaskTrackerService;
@@ -20,6 +22,8 @@ use crate::infrastructure::integrations::task_tracker::kaiten::{
 };
 use crate::infrastructure::integrations::version_control::github::client::GithubVersionControlClient;
 use crate::infrastructure::processing::event_bus::EventBus;
+use crate::infrastructure::repositories::mysql::repository::MySQLRepositoryRepository;
+use crate::infrastructure::repositories::mysql::repository_task_tracker::MySQLRepositoryTaskTrackerRepository;
 use crate::infrastructure::repositories::mysql::role::MySQLRoleRepository;
 use crate::infrastructure::repositories::mysql::user::MySQLUserRepository;
 use crate::infrastructure::repositories::mysql::user_has_roles::MySQLUserHasRolesRepository;
@@ -42,6 +46,8 @@ pub struct ApplicationSharedDependency {
     pub user_has_roles_repo: Arc<dyn UserHasRolesRepository>,
     pub user_socials_repo: Arc<dyn UserSocialAccountsRepository>,
     pub user_version_controls_repo: Arc<dyn UserVersionControlAccountsRepository>,
+    pub repository_repo: Arc<dyn RepositoryRepository>,
+    pub repository_task_tracker_repo: Arc<dyn RepositoryTaskTrackerRepository>,
     pub notification_service: Arc<CompositionNotificationService>,
     pub oauth_client: Arc<dyn OAuthClient>,
     pub task_tracker_client: Arc<dyn TaskTrackerClient>,
@@ -83,6 +89,12 @@ impl ApplicationSharedDependency {
             mysql_pool.clone(),
         ));
 
+        let repository_repo: Arc<dyn RepositoryRepository> =
+            Arc::new(MySQLRepositoryRepository::new(mysql_pool.clone()));
+
+        let repository_task_tracker_repo: Arc<dyn RepositoryTaskTrackerRepository> =
+            Arc::new(MySQLRepositoryTaskTrackerRepository::new(mysql_pool.clone()));
+
         let notification_service = Arc::new(CompositionNotificationService::new(
             config.telegram.bot_token.clone(),
         ));
@@ -120,6 +132,8 @@ impl ApplicationSharedDependency {
             user_has_roles_repo,
             user_socials_repo,
             user_version_controls_repo,
+            repository_repo,
+            repository_task_tracker_repo,
             notification_service,
             oauth_client,
             task_tracker_client,

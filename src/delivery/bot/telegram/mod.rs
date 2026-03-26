@@ -5,6 +5,7 @@ mod keyboards;
 
 use crate::bootstrap::executors::ApplicationBoostrapExecutors;
 use crate::config::application::ApplicationConfig;
+use crate::delivery::bot::telegram::dialogues::admin::TelegramBotDialogueAdminDispatcher;
 use crate::delivery::bot::telegram::dialogues::registration::TelegramBotDialogueRegistrationDispatcher;
 use crate::delivery::bot::telegram::dialogues::report::TelegramBotDialogueReportByDateRangeDispatcher;
 use crate::delivery::bot::telegram::dialogues::TelegramBotDialogueState;
@@ -53,6 +54,10 @@ impl ApplicationDelivery for DeliveryBotMessengerTelegram {
             .branch(
                 case![TelegramBotDialogueState::ReportByDateRange(state)]
                     .branch(TelegramBotDialogueReportByDateRangeDispatcher::new())
+            )
+            .branch(
+                case![TelegramBotDialogueState::Admin(state)]
+                    .branch(TelegramBotDialogueAdminDispatcher::new())
             );
 
         Dispatcher::builder(bot, handler)

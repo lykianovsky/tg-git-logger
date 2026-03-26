@@ -1,5 +1,6 @@
 use crate::bootstrap::executors::ApplicationBoostrapExecutors;
 use crate::config::application::ApplicationConfig;
+use crate::delivery::bot::telegram::commands::admin::TelegramBotAdminCommandHandler;
 use crate::delivery::bot::telegram::commands::register::TelegramBotRegisterCommandHandler;
 use crate::delivery::bot::telegram::commands::report::TelegramBotVersionControlReportCommandHandler;
 use crate::delivery::bot::telegram::commands::start::TelegramBotStartCommandHandler;
@@ -20,6 +21,8 @@ pub enum TelegramBotCommand {
     Register,
     #[command(description = "Получить отчет")]
     Report,
+    #[command(description = "Панель администратора")]
+    Admin,
 }
 
 pub async fn handle(
@@ -70,6 +73,15 @@ pub async fn handle(
             TelegramBotVersionControlReportCommandHandler::new(context, Arc::new(dialogue))
                 .execute()
                 .await?;
+        }
+        TelegramBotCommand::Admin => {
+            TelegramBotAdminCommandHandler::new(
+                context,
+                executors.queries.get_user_roles_by_telegram_id.clone(),
+                Arc::new(dialogue),
+            )
+            .execute()
+            .await?;
         }
     }
 

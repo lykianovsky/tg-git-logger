@@ -1,5 +1,10 @@
+pub mod repository;
+pub mod repository_pull_request;
+pub mod repository_task_tracker;
 pub mod role;
 pub mod user;
+pub mod user_connection_repositories;
 pub mod user_has_roles;
+pub mod user_notifications;
 pub mod user_social_accounts;
 pub mod user_vc_accounts;

@@ -1,3 +1,4 @@
+pub mod notification_type;
 pub mod social_chat_id;
 pub mod social_message_id;
 pub mod social_type;

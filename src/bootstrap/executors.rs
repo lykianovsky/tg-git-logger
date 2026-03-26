@@ -1,7 +1,10 @@
 use crate::application::auth::commands::create_oauth_link::executor::CreateOAuthLinkExecutor;
 use crate::application::notification::commands::send_social_notify::executor::SendSocialNotifyExecutor;
+use crate::application::repository::commands::create_repository::executor::CreateRepositoryExecutor;
+use crate::application::repository::commands::create_repository_task_tracker::executor::CreateRepositoryTaskTrackerExecutor;
 use crate::application::task::commands::move_task_to_test::executor::MoveTaskToTestExecutor;
 use crate::application::user::commands::register_via_oauth::executor::RegisterUserViaOAuthExecutor;
+use crate::application::user::queries::get_user_roles_by_telegram_id::executor::GetUserRolesByTelegramIdExecutor;
 use crate::application::version_control::queries::build_report::executor::BuildVersionControlDateRangeReportExecutor;
 use crate::application::webhook::commands::dispatch_event::executor::DispatchWebhookEventExecutor;
 use crate::bootstrap::shared_dependency::ApplicationSharedDependency;
@@ -13,6 +16,7 @@ use std::sync::Arc;
 
 pub struct ApplicationBoostrapExecutorsQueries {
     pub build_report_by_range: Arc<BuildVersionControlDateRangeReportExecutor>,
+    pub get_user_roles_by_telegram_id: Arc<GetUserRolesByTelegramIdExecutor>,
 }
 
 pub struct ApplicationBoostrapExecutorsCommands {
@@ -21,6 +25,8 @@ pub struct ApplicationBoostrapExecutorsCommands {
     pub dispatch_webhook_event: Arc<DispatchWebhookEventExecutor>,
     pub send_social_notify: Arc<SendSocialNotifyExecutor>,
     pub move_task_to_test: Arc<MoveTaskToTestExecutor>,
+    pub create_repository: Arc<CreateRepositoryExecutor>,
+    pub create_repository_task_tracker: Arc<CreateRepositoryTaskTrackerExecutor>,
 }
 
 pub struct ApplicationBoostrapExecutors {
@@ -44,6 +50,10 @@ impl ApplicationBoostrapExecutors {
                 version_control_client: shared_dependency.version_control_client.clone(),
                 cache: shared_dependency.cache.clone(),
             }),
+            get_user_roles_by_telegram_id: Arc::new(GetUserRolesByTelegramIdExecutor::new(
+                shared_dependency.user_socials_repo.clone(),
+                shared_dependency.user_has_roles_repo.clone(),
+            )),
         };
 
         let commands = ApplicationBoostrapExecutorsCommands {
@@ -77,6 +87,14 @@ impl ApplicationBoostrapExecutors {
                 shared_dependency.task_tracker_client.clone(),
                 shared_dependency.task_tracker_service.clone(),
                 config.task_tracker.test_column_id,
+            )),
+            create_repository: Arc::new(CreateRepositoryExecutor::new(
+                mysql_pool.clone(),
+                shared_dependency.repository_repo.clone(),
+            )),
+            create_repository_task_tracker: Arc::new(CreateRepositoryTaskTrackerExecutor::new(
+                mysql_pool.clone(),
+                shared_dependency.repository_task_tracker_repo.clone(),
             )),
         };
 
