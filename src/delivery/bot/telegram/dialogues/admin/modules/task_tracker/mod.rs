@@ -1,19 +1,21 @@
 use crate::application::repository::commands::update_repository_task_tracker::command::UpdateRepositoryTaskTrackerCommand;
 use crate::bootstrap::executors::ApplicationBoostrapExecutors;
+use crate::delivery::bot::telegram::dialogues::admin::TelegramBotDialogueAdminState;
 use crate::delivery::bot::telegram::dialogues::admin::helpers::{
     db_error_message, extract_text, parse_integer,
 };
-use crate::delivery::bot::telegram::dialogues::admin::TelegramBotDialogueAdminState;
-use crate::delivery::bot::telegram::dialogues::{TelegramBotDialogueState, TelegramBotDialogueType};
+use crate::delivery::bot::telegram::dialogues::{
+    TelegramBotDialogueState, TelegramBotDialogueType,
+};
 use crate::domain::repository::value_objects::repository_id::RepositoryId;
 use crate::domain::shared::command::CommandExecutor;
 use std::error::Error;
 use std::sync::Arc;
+use teloxide::Bot;
 use teloxide::dispatching::DpHandlerDescription;
 use teloxide::dptree::case;
 use teloxide::prelude::*;
 use teloxide::types::InlineKeyboardMarkup;
-use teloxide::Bot;
 
 pub struct TelegramBotDialogueAdminTaskTrackerDispatcher {}
 
@@ -34,27 +36,33 @@ impl TelegramBotDialogueAdminTaskTrackerDispatcher {
                     .endpoint(Self::handle_space_id),
             )
             .branch(
-                case![TelegramBotDialogueAdminState::ConfigureTaskTrackerQaColumnId {
-                    repository_id,
-                    space_id
-                }]
+                case![
+                    TelegramBotDialogueAdminState::ConfigureTaskTrackerQaColumnId {
+                        repository_id,
+                        space_id
+                    }
+                ]
                 .endpoint(Self::handle_qa_column_id),
             )
             .branch(
-                case![TelegramBotDialogueAdminState::ConfigureTaskTrackerExtractPattern {
-                    repository_id,
-                    space_id,
-                    qa_column_id
-                }]
+                case![
+                    TelegramBotDialogueAdminState::ConfigureTaskTrackerExtractPattern {
+                        repository_id,
+                        space_id,
+                        qa_column_id
+                    }
+                ]
                 .endpoint(Self::handle_extract_pattern),
             )
             .branch(
-                case![TelegramBotDialogueAdminState::ConfigureTaskTrackerPathToCard {
-                    repository_id,
-                    space_id,
-                    qa_column_id,
-                    extract_pattern
-                }]
+                case![
+                    TelegramBotDialogueAdminState::ConfigureTaskTrackerPathToCard {
+                        repository_id,
+                        space_id,
+                        qa_column_id,
+                        extract_pattern
+                    }
+                ]
                 .endpoint(Self::handle_path_to_card),
             )
     }
@@ -181,7 +189,8 @@ impl TelegramBotDialogueAdminTaskTrackerDispatcher {
         let extract_pattern = match extract_text(&msg) {
             Some(v) => v,
             None => {
-                bot.send_message(msg.chat.id, "❌ Введите regex-паттерн текстом.").await?;
+                bot.send_message(msg.chat.id, "❌ Введите regex-паттерн текстом.")
+                    .await?;
                 return Ok(());
             }
         };
@@ -216,7 +225,8 @@ impl TelegramBotDialogueAdminTaskTrackerDispatcher {
         let path_to_card = match extract_text(&msg) {
             Some(v) => v,
             None => {
-                bot.send_message(msg.chat.id, "❌ Введите путь к карточке текстом.").await?;
+                bot.send_message(msg.chat.id, "❌ Введите путь к карточке текстом.")
+                    .await?;
                 return Ok(());
             }
         };
@@ -229,9 +239,16 @@ impl TelegramBotDialogueAdminTaskTrackerDispatcher {
             path_to_card,
         };
 
-        let loading = bot.send_message(msg.chat.id, "⏳ Сохраняем настройки...").await?;
+        let loading = bot
+            .send_message(msg.chat.id, "⏳ Сохраняем настройки...")
+            .await?;
 
-        match executors.commands.update_repository_task_tracker.execute(&cmd).await {
+        match executors
+            .commands
+            .update_repository_task_tracker
+            .execute(&cmd)
+            .await
+        {
             Ok(r) => {
                 bot.edit_message_text(
                     msg.chat.id,

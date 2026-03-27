@@ -48,6 +48,14 @@ pub enum DeleteRepositoryError {
     NotFound,
 }
 
+#[derive(Debug, Error)]
+pub enum FindRepositoryByOwnerAndNameError {
+    #[error("Database error: {0}")]
+    DbError(String),
+    #[error("Repository not found")]
+    NotFound,
+}
+
 #[async_trait]
 pub trait RepositoryRepository: Send + Sync {
     async fn create(
@@ -65,6 +73,12 @@ pub trait RepositoryRepository: Send + Sync {
     async fn find_by_id(&self, id: RepositoryId) -> Result<Repository, FindRepositoryByIdError>;
 
     async fn find_all(&self) -> Result<Vec<Repository>, FindAllRepositoriesError>;
+
+    async fn find_by_owner_and_name(
+        &self,
+        owner: &str,
+        name: &str,
+    ) -> Result<Repository, FindRepositoryByOwnerAndNameError>;
 
     async fn delete(
         &self,

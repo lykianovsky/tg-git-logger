@@ -32,10 +32,7 @@ pub trait RepositoryPullRequestRepository: Send + Sync {
         pull_request: &RepositoryPullRequest,
     ) -> Result<RepositoryPullRequest, CreatePullRequestError>;
 
-    async fn find_by_id(
-        &self,
-        id: i32,
-    ) -> Result<RepositoryPullRequest, FindPullRequestByIdError>;
+    async fn find_by_id(&self, id: i32) -> Result<RepositoryPullRequest, FindPullRequestByIdError>;
 
     async fn find_by_repository_id(
         &self,

@@ -7,8 +7,8 @@ use crate::delivery::bot::telegram::dialogues::admin::modules::task_tracker::Tel
 use crate::delivery::bot::telegram::dialogues::{
     TelegramBotDialogueState, TelegramBotDialogueType,
 };
-use crate::delivery::bot::telegram::keyboards::actions::admin::TelegramBotAdminAction;
 use crate::delivery::bot::telegram::keyboards::actions::TelegramBotKeyboardAction;
+use crate::delivery::bot::telegram::keyboards::actions::admin::TelegramBotAdminAction;
 use crate::delivery::bot::telegram::keyboards::builder::KeyboardBuilder;
 use std::error::Error;
 use std::sync::Arc;
@@ -17,7 +17,7 @@ use teloxide::dptree::case;
 use teloxide::prelude::*;
 use teloxide::types::InlineKeyboardButton;
 use teloxide::types::InlineKeyboardMarkup;
-use teloxide::{dptree, Bot};
+use teloxide::{Bot, dptree};
 
 use crate::delivery::bot::telegram::keyboards::actions::admin_repository::TelegramBotAdminRepositoryAction;
 

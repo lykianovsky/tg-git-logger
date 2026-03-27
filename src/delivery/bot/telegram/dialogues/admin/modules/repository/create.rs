@@ -1,7 +1,7 @@
 use crate::application::repository::commands::create_repository::command::CreateRepositoryCommand;
 use crate::bootstrap::executors::ApplicationBoostrapExecutors;
-use crate::delivery::bot::telegram::dialogues::admin::helpers::{db_error_message, extract_text};
 use crate::delivery::bot::telegram::dialogues::admin::TelegramBotDialogueAdminState;
+use crate::delivery::bot::telegram::dialogues::admin::helpers::{db_error_message, extract_text};
 use crate::delivery::bot::telegram::dialogues::{
     TelegramBotDialogueState, TelegramBotDialogueType,
 };
@@ -11,7 +11,7 @@ use std::sync::Arc;
 use teloxide::dispatching::DpHandlerDescription;
 use teloxide::dptree::case;
 use teloxide::prelude::*;
-use teloxide::{dptree, Bot};
+use teloxide::{Bot, dptree};
 
 pub struct TelegramBotDialogueAdminRepositoryCreateDispatcher {}
 

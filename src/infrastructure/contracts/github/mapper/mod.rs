@@ -1,6 +1,10 @@
 use crate::domain::webhook::events::WebhookEvent;
 use crate::infrastructure::contracts::github::event_type::{GithubEvent, GithubEventType};
+use crate::infrastructure::contracts::github::payloads::pr_comment::{
+    GithubIssueCommentEvent, GithubPrReviewCommentEvent,
+};
 use crate::infrastructure::contracts::github::payloads::pull_request::GithubPullRequestEvent;
+use crate::infrastructure::contracts::github::payloads::pull_request_review::GithubPullRequestReviewEvent;
 use crate::infrastructure::contracts::github::payloads::push::GithubPushEvent;
 use crate::infrastructure::contracts::github::payloads::release::GithubReleaseEvent;
 use crate::infrastructure::contracts::github::payloads::workflow::GithubWorkflowEvent;
@@ -26,8 +30,17 @@ impl GithubWebhookEventMapper {
             GithubEventType::PullRequest => {
                 Self::parse_to_domain::<GithubPullRequestEvent>(payload)
             }
+            GithubEventType::PullRequestReview => {
+                Self::parse_to_domain::<GithubPullRequestReviewEvent>(payload)
+            }
             GithubEventType::Release => Self::parse_to_domain::<GithubReleaseEvent>(payload),
             GithubEventType::Workflow => Self::parse_to_domain::<GithubWorkflowEvent>(payload),
+            GithubEventType::PullRequestReviewComment => {
+                Self::parse_to_domain::<GithubPrReviewCommentEvent>(payload)
+            }
+            GithubEventType::IssueComment => {
+                Self::parse_to_domain::<GithubIssueCommentEvent>(payload)
+            }
 
             _ => {
                 tracing::warn!(

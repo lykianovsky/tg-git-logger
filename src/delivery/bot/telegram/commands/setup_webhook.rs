@@ -1,0 +1,120 @@
+use crate::application::user::queries::get_user_roles_by_telegram_id::query::GetUserRolesByTelegramIdQuery;
+use crate::bootstrap::executors::ApplicationBoostrapExecutors;
+use crate::delivery::bot::telegram::context::TelegramBotCommandContext;
+use crate::delivery::bot::telegram::dialogues::setup_webhook::TelegramBotSetupWebhookState;
+use crate::delivery::bot::telegram::dialogues::{
+    TelegramBotDialogueState, TelegramBotDialogueType,
+};
+use crate::domain::role::value_objects::role_name::RoleName;
+use crate::domain::shared::command::CommandExecutor;
+use crate::domain::user::value_objects::social_user_id::SocialUserId;
+use std::sync::Arc;
+use teloxide::payloads::SendMessageSetters;
+use teloxide::prelude::Requester;
+use teloxide::types::{InlineKeyboardButton, InlineKeyboardMarkup, ParseMode};
+
+pub struct TelegramBotSetupWebhookCommandHandler {
+    context: TelegramBotCommandContext,
+    executors: Arc<ApplicationBoostrapExecutors>,
+    dialogue: Arc<TelegramBotDialogueType>,
+}
+
+impl TelegramBotSetupWebhookCommandHandler {
+    pub fn new(
+        context: TelegramBotCommandContext,
+        executors: Arc<ApplicationBoostrapExecutors>,
+        dialogue: Arc<TelegramBotDialogueType>,
+    ) -> Self {
+        Self {
+            context,
+            executors,
+            dialogue,
+        }
+    }
+
+    pub async fn execute(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        let social_user_id = SocialUserId(self.context.user.id.0 as i32);
+
+        let roles = match self
+            .executors
+            .queries
+            .get_user_roles_by_telegram_id
+            .execute(&GetUserRolesByTelegramIdQuery { social_user_id })
+            .await
+        {
+            Ok(r) => r.roles,
+            Err(_) => {
+                self.context
+                    .bot
+                    .send_message(
+                        self.context.msg.chat.id,
+                        "⛔ У вас нет доступа к этой команде.",
+                    )
+                    .await?;
+                return Ok(());
+            }
+        };
+
+        if !roles.contains(&RoleName::Admin) {
+            self.context
+                .bot
+                .send_message(
+                    self.context.msg.chat.id,
+                    "⛔ У вас нет доступа к этой команде.",
+                )
+                .await?;
+            return Ok(());
+        }
+
+        let repositories = self
+            .executors
+            .commands
+            .create_repository
+            .repository_repo
+            .find_all()
+            .await
+            .unwrap_or_default();
+
+        if repositories.is_empty() {
+            self.context
+                .bot
+                .send_message(
+                    self.context.msg.chat.id,
+                    "❌ Нет доступных репозиториев. Сначала создайте репозиторий в /admin.",
+                )
+                .await?;
+            return Ok(());
+        }
+
+        let buttons: Vec<Vec<InlineKeyboardButton>> = repositories
+            .into_iter()
+            .map(|r| {
+                vec![InlineKeyboardButton::callback(
+                    format!("{}/{}", r.owner, r.name),
+                    r.id.0.to_string(),
+                )]
+            })
+            .collect();
+
+        let keyboard = InlineKeyboardMarkup::new(buttons);
+
+        self.dialogue
+            .update(TelegramBotDialogueState::SetupWebhook(
+                TelegramBotSetupWebhookState::SelectRepository,
+            ))
+            .await?;
+
+        self.context
+            .bot
+            .send_message(
+                self.context.msg.chat.id,
+                "📣 Выберите репозиторий для привязки этого чата к уведомлениям:\n\
+                 После выбора все вебхук-события будут приходить сюда.",
+            )
+            .reply_markup(keyboard)
+            .parse_mode(ParseMode::Html)
+            .await?;
+
+        Ok(())
+    }
+}

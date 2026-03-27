@@ -32,10 +32,7 @@ pub trait UserNotificationsRepository: Send + Sync {
         notification: &UserNotification,
     ) -> Result<UserNotification, CreateUserNotificationError>;
 
-    async fn find_by_id(
-        &self,
-        id: i32,
-    ) -> Result<UserNotification, FindUserNotificationByIdError>;
+    async fn find_by_id(&self, id: i32) -> Result<UserNotification, FindUserNotificationByIdError>;
 
     async fn find_by_user_id(
         &self,

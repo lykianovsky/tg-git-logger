@@ -1,12 +1,12 @@
 use crate::application::repository::commands::update_repository::command::UpdateRepositoryCommand;
 use crate::bootstrap::executors::ApplicationBoostrapExecutors;
-use crate::delivery::bot::telegram::dialogues::admin::helpers::{db_error_message, extract_text};
 use crate::delivery::bot::telegram::dialogues::admin::TelegramBotDialogueAdminState;
+use crate::delivery::bot::telegram::dialogues::admin::helpers::{db_error_message, extract_text};
 use crate::delivery::bot::telegram::dialogues::{
     TelegramBotDialogueState, TelegramBotDialogueType,
 };
-use crate::delivery::bot::telegram::keyboards::actions::admin_repository_edit_field::TelegramBotAdminRepositoryEditField;
 use crate::delivery::bot::telegram::keyboards::actions::TelegramBotKeyboardAction;
+use crate::delivery::bot::telegram::keyboards::actions::admin_repository_edit_field::TelegramBotAdminRepositoryEditField;
 use crate::delivery::bot::telegram::keyboards::builder::KeyboardBuilder;
 use crate::domain::repository::value_objects::repository_id::RepositoryId;
 use crate::domain::shared::command::CommandExecutor;
@@ -15,7 +15,7 @@ use std::sync::Arc;
 use teloxide::dispatching::DpHandlerDescription;
 use teloxide::dptree::case;
 use teloxide::prelude::*;
-use teloxide::{dptree, Bot};
+use teloxide::{Bot, dptree};
 
 enum EditField {
     Name,
@@ -182,7 +182,16 @@ impl TelegramBotDialogueAdminRepositoryEditDispatcher {
                 return Ok(());
             }
         };
-        Self::apply_field_edit(bot, dialogue, executors, msg, repository_id, EditField::Name, new_value).await
+        Self::apply_field_edit(
+            bot,
+            dialogue,
+            executors,
+            msg,
+            repository_id,
+            EditField::Name,
+            new_value,
+        )
+        .await
     }
 
     async fn handle_edit_owner(
@@ -200,7 +209,16 @@ impl TelegramBotDialogueAdminRepositoryEditDispatcher {
                 return Ok(());
             }
         };
-        Self::apply_field_edit(bot, dialogue, executors, msg, repository_id, EditField::Owner, new_value).await
+        Self::apply_field_edit(
+            bot,
+            dialogue,
+            executors,
+            msg,
+            repository_id,
+            EditField::Owner,
+            new_value,
+        )
+        .await
     }
 
     async fn handle_edit_url(
@@ -213,11 +231,21 @@ impl TelegramBotDialogueAdminRepositoryEditDispatcher {
         let new_value = match extract_text(&msg) {
             Some(v) => v,
             None => {
-                bot.send_message(msg.chat.id, "❌ Введите новый URL текстом.").await?;
+                bot.send_message(msg.chat.id, "❌ Введите новый URL текстом.")
+                    .await?;
                 return Ok(());
             }
         };
-        Self::apply_field_edit(bot, dialogue, executors, msg, repository_id, EditField::Url, new_value).await
+        Self::apply_field_edit(
+            bot,
+            dialogue,
+            executors,
+            msg,
+            repository_id,
+            EditField::Url,
+            new_value,
+        )
+        .await
     }
 
     async fn apply_field_edit(
@@ -239,8 +267,11 @@ impl TelegramBotDialogueAdminRepositoryEditDispatcher {
             Ok(r) => r,
             Err(e) => {
                 tracing::error!(error = %e, repository_id = repository_id, "Repository not found for edit");
-                bot.send_message(msg.chat.id, "❌ Репозиторий не найден. Возможно, он был удалён.")
-                    .await?;
+                bot.send_message(
+                    msg.chat.id,
+                    "❌ Репозиторий не найден. Возможно, он был удалён.",
+                )
+                .await?;
                 dialogue.exit().await.ok();
                 return Ok(());
             }

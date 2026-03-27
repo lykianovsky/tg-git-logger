@@ -7,9 +7,9 @@ use crate::bootstrap::executors::ApplicationBoostrapExecutors;
 use crate::delivery::bot::telegram::dialogues::{
     TelegramBotDialogueState, TelegramBotDialogueType,
 };
+use crate::delivery::bot::telegram::keyboards::actions::TelegramBotKeyboardAction;
 use crate::delivery::bot::telegram::keyboards::actions::date_range::TelegramBotDateRangeAction;
 use crate::delivery::bot::telegram::keyboards::actions::for_who::TelegramBotForWhoAction;
-use crate::delivery::bot::telegram::keyboards::actions::TelegramBotKeyboardAction;
 use crate::delivery::bot::telegram::keyboards::builder::KeyboardBuilder;
 use crate::domain::repository::value_objects::repository_id::RepositoryId;
 use crate::domain::shared::command::CommandExecutor;
@@ -19,13 +19,13 @@ use crate::utils::builder::message::MessageBuilder;
 use std::error::Error;
 use std::sync::Arc;
 use teloxide::dispatching::{DpHandlerDescription, UpdateFilterExt};
-use teloxide::dptree::{case, Handler};
+use teloxide::dptree::{Handler, case};
 use teloxide::payloads::{EditMessageTextSetters, SendMessageSetters};
 use teloxide::prelude::{Requester, Update};
 use teloxide::types::{
     CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message, ParseMode,
 };
-use teloxide::{dptree, Bot};
+use teloxide::{Bot, dptree};
 
 #[derive(Debug, Clone, Default)]
 pub enum TelegramBotDialogueReportByDateRangeState {

@@ -4,14 +4,16 @@ use crate::delivery::bot::telegram::commands::admin::TelegramBotAdminCommandHand
 use crate::delivery::bot::telegram::commands::bind_repository::TelegramBotBindRepositoryCommandHandler;
 use crate::delivery::bot::telegram::commands::register::TelegramBotRegisterCommandHandler;
 use crate::delivery::bot::telegram::commands::report::TelegramBotVersionControlReportCommandHandler;
+use crate::delivery::bot::telegram::commands::setup_webhook::TelegramBotSetupWebhookCommandHandler;
 use crate::delivery::bot::telegram::commands::start::TelegramBotStartCommandHandler;
+use crate::delivery::bot::telegram::commands::task::TelegramBotTaskCommandHandler;
 use crate::delivery::bot::telegram::context::TelegramBotCommandContext;
 use crate::delivery::bot::telegram::dialogues::TelegramBotDialogueType;
 use std::sync::Arc;
+use teloxide::Bot;
 use teloxide::macros::BotCommands;
 use teloxide::prelude::Requester;
-use teloxide::types::{Message, User};
-use teloxide::Bot;
+use teloxide::types::{ChatKind, Message, User};
 
 #[derive(BotCommands, Clone, Debug)]
 #[command(rename_rule = "lowercase", description = "Доступные команды:")]
@@ -29,6 +31,13 @@ pub enum TelegramBotCommand {
     BindRepository,
     #[command(description = "Панель администратора")]
     Admin,
+    #[command(description = "Получить карточку по ID: /task 12345")]
+    Task(String),
+    #[command(
+        rename = "setup_webhook",
+        description = "Привязать чат к уведомлениям репозитория"
+    )]
+    SetupWebhook,
 }
 
 pub async fn handle(
@@ -40,6 +49,36 @@ pub async fn handle(
     executors: Arc<ApplicationBoostrapExecutors>,
     config: Arc<ApplicationConfig>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    if let TelegramBotCommand::SetupWebhook = &cmd {
+        if !matches!(msg.chat.kind, ChatKind::Public(_)) {
+            bot.send_message(msg.chat.id, "Эта команда доступна только в чате группы.")
+                .await?;
+            return Ok(());
+        }
+
+        let context = TelegramBotCommandContext {
+            bot,
+            user,
+            msg,
+            cmd,
+            config,
+        };
+        return TelegramBotSetupWebhookCommandHandler::new(
+            context,
+            executors.clone(),
+            Arc::new(dialogue),
+        )
+        .execute()
+        .await;
+    }
+
+    // All other commands are private-chat only
+    if !matches!(msg.chat.kind, ChatKind::Private(_)) {
+        bot.send_message(msg.chat.id, "Эта команда доступна только в приватном чате.")
+            .await?;
+        return Ok(());
+    }
+
     let context = TelegramBotCommandContext {
         bot,
         user,
@@ -47,18 +86,6 @@ pub async fn handle(
         cmd,
         config,
     };
-
-    if !matches!(context.msg.chat.kind, teloxide::types::ChatKind::Private(_)) {
-        context
-            .bot
-            .send_message(
-                context.msg.chat.id,
-                "Эта команда доступна только в приватном чате.",
-            )
-            .await?;
-
-        return Ok(());
-    }
 
     match context.cmd {
         TelegramBotCommand::Start => {
@@ -98,6 +125,18 @@ pub async fn handle(
             .execute()
             .await?;
         }
+        TelegramBotCommand::Task(raw_id) => {
+            TelegramBotTaskCommandHandler::new(
+                context.bot,
+                context.msg,
+                executors.queries.get_task_card.clone(),
+                raw_id,
+            )
+            .execute()
+            .await?;
+        }
+        // Handled above before private-chat guard
+        TelegramBotCommand::SetupWebhook => {}
     }
 
     Ok(())

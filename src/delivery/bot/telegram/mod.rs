@@ -5,18 +5,19 @@ mod keyboards;
 
 use crate::bootstrap::executors::ApplicationBoostrapExecutors;
 use crate::config::application::ApplicationConfig;
+use crate::delivery::bot::telegram::dialogues::TelegramBotDialogueState;
 use crate::delivery::bot::telegram::dialogues::admin::TelegramBotDialogueAdminDispatcher;
 use crate::delivery::bot::telegram::dialogues::bind_repository::TelegramBotBindRepositoryDispatcher;
 use crate::delivery::bot::telegram::dialogues::registration::TelegramBotDialogueRegistrationDispatcher;
 use crate::delivery::bot::telegram::dialogues::report::TelegramBotDialogueReportByDateRangeDispatcher;
-use crate::delivery::bot::telegram::dialogues::TelegramBotDialogueState;
+use crate::delivery::bot::telegram::dialogues::setup_webhook::TelegramBotSetupWebhookDispatcher;
 use crate::delivery::contract::ApplicationDelivery;
 use std::sync::Arc;
+use teloxide::Bot;
 use teloxide::dispatching::dialogue::InMemStorage;
 use teloxide::dptree::case;
 use teloxide::prelude::*;
 use teloxide::utils::command::BotCommands;
-use teloxide::Bot;
 
 pub struct DeliveryBotMessengerTelegram {
     executors: Arc<ApplicationBoostrapExecutors>,
@@ -50,19 +51,23 @@ impl ApplicationDelivery for DeliveryBotMessengerTelegram {
             .branch(commands_handler)
             .branch(
                 case![TelegramBotDialogueState::Registration(state)]
-                    .branch(TelegramBotDialogueRegistrationDispatcher::new())
+                    .branch(TelegramBotDialogueRegistrationDispatcher::new()),
             )
             .branch(
                 case![TelegramBotDialogueState::ReportByDateRange(state)]
-                    .branch(TelegramBotDialogueReportByDateRangeDispatcher::new())
+                    .branch(TelegramBotDialogueReportByDateRangeDispatcher::new()),
             )
             .branch(
                 case![TelegramBotDialogueState::Admin(state)]
-                    .branch(TelegramBotDialogueAdminDispatcher::new())
+                    .branch(TelegramBotDialogueAdminDispatcher::new()),
             )
             .branch(
                 case![TelegramBotDialogueState::BindRepository(state)]
-                    .branch(TelegramBotBindRepositoryDispatcher::new())
+                    .branch(TelegramBotBindRepositoryDispatcher::new()),
+            )
+            .branch(
+                case![TelegramBotDialogueState::SetupWebhook(state)]
+                    .branch(TelegramBotSetupWebhookDispatcher::new()),
             );
 
         Dispatcher::builder(bot, handler)

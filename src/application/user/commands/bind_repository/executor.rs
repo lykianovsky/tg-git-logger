@@ -4,7 +4,9 @@ use crate::application::user::commands::bind_repository::response::BindRepositor
 use crate::domain::repository::repositories::repository_repository::RepositoryRepository;
 use crate::domain::shared::command::CommandExecutor;
 use crate::domain::user::entities::user_connection_repository::UserConnectionRepository;
-use crate::domain::user::repositories::user_connection_repositories_repository::UserConnectionRepositoriesRepository;
+use crate::domain::user::repositories::user_connection_repositories_repository::{
+    CreateUserConnectionRepositoryError, UserConnectionRepositoriesRepository,
+};
 use crate::domain::user::repositories::user_social_accounts_repository::UserSocialAccountsRepository;
 use chrono::Utc;
 use sea_orm::{DatabaseConnection, TransactionTrait};
@@ -70,9 +72,17 @@ impl CommandExecutor for BindRepositoryExecutor {
             updated_at: Utc::now(),
         };
 
-        self.user_connection_repositories_repo
+        match self
+            .user_connection_repositories_repo
             .create(&txn, &connection)
-            .await?;
+            .await
+        {
+            Ok(_) => {}
+            Err(CreateUserConnectionRepositoryError::DuplicateEntry) => {
+                return Err(BindRepositoryExecutorError::AlreadyBound);
+            }
+            Err(e) => return Err(BindRepositoryExecutorError::CreateError(e)),
+        }
 
         txn.commit()
             .await

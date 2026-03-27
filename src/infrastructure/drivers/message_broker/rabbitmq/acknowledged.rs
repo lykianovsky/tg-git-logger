@@ -2,13 +2,13 @@ use crate::infrastructure::drivers::message_broker::contracts::acknowledger::Bro
 use crate::infrastructure::drivers::message_broker::contracts::queue::MessageBrokerQueueRetryPolicy;
 use crate::infrastructure::drivers::message_broker::rabbitmq::additional_headers::RabbitMQMessageBrokerAdditionalHeader;
 use crate::infrastructure::drivers::message_broker::rabbitmq::broker::{
-    MessageBrokerRabbitMQ, RoutingKeys, EXCHANGE_NAME,
+    EXCHANGE_NAME, MessageBrokerRabbitMQ, RoutingKeys,
 };
 use crate::infrastructure::drivers::message_broker::rabbitmq::retry_error::RabbitMQMessageBrokerRetryError;
 use async_trait::async_trait;
+use lapin::Channel;
 use lapin::options::{BasicAckOptions, BasicNackOptions, BasicPublishOptions};
 use lapin::types::AMQPValue;
-use lapin::Channel;
 use std::sync::Arc;
 
 pub struct RabbitMQAcknowledger {
