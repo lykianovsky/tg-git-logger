@@ -19,25 +19,20 @@ impl MigrationTrait for Migration {
                             .primary_key(),
                     )
                     .col(
-                        ColumnDef::new(Repositories::ExternalId)
-                            .big_integer()
-                            .not_null()
-                            .unique_key(), // уникальный внешний ID
-                    )
-                    .col(
                         ColumnDef::new(Repositories::Name)
-                            .string_len(255)
+                            .string_len(100)
                             .not_null(),
                     )
                     .col(
                         ColumnDef::new(Repositories::Owner)
-                            .string_len(255)
+                            .string_len(100)
                             .not_null(),
                     )
                     .col(
                         ColumnDef::new(Repositories::Url)
-                            .string_len(1024)
-                            .not_null(),
+                            .string_len(512)
+                            .not_null()
+                            .unique_key(),
                     )
                     .col(
                         ColumnDef::new(Repositories::CreatedAt)
@@ -51,6 +46,13 @@ impl MigrationTrait for Migration {
                             .default(SimpleExpr::Keyword(Keyword::CurrentTimestamp))
                             .extra("ON UPDATE CURRENT_TIMESTAMP")
                             .not_null(),
+                    )
+                    .index(
+                        Index::create()
+                            .name("idx-repositories-owner-name-unique")
+                            .col(Repositories::Owner)
+                            .col(Repositories::Name)
+                            .unique(),
                     )
                     .to_owned(),
             )

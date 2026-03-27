@@ -11,7 +11,9 @@
       "Bash(\"D:/code/tg-git-logger/src/application/repository/commands/mod.rs\")",
       "Bash(echo \"pub mod register_via_oauth;:*)",
       "Bash(\"D:/code/tg-git-logger/src/application/user/commands/mod.rs\")",
-      "Bash(grep -rn \"PullRequestState\\\\|pr\\\\.state\\\\|state.*pull\" D:/code/tg-git-logger/src --include=*.rs)"
+      "Bash(grep -rn \"PullRequestState\\\\|pr\\\\.state\\\\|state.*pull\" D:/code/tg-git-logger/src --include=*.rs)",
+      "Bash(find /d/code/tg-git-logger/src/delivery/bot/telegram -type d -o -type f -name *.rs)",
+      "Bash(grep -c \"edit_message_text\\\\|send_message\" /d/code/tg-git-logger/src/delivery/bot/telegram/dialogues/*.rs)"
     ]
   }
 }

@@ -10,8 +10,6 @@ pub enum TelegramBotAdminRepositoryEditField {
     Owner,
     #[strum(serialize = "repo_edit_url")]
     Url,
-    #[strum(serialize = "repo_edit_external_id")]
-    ExternalId,
 }
 
 impl TelegramBotKeyboardAction for TelegramBotAdminRepositoryEditField {
@@ -28,7 +26,6 @@ impl TelegramBotKeyboardAction for TelegramBotAdminRepositoryEditField {
             TelegramBotAdminRepositoryEditField::Name => "✏️ Название",
             TelegramBotAdminRepositoryEditField::Owner => "👤 Владелец",
             TelegramBotAdminRepositoryEditField::Url => "🔗 URL",
-            TelegramBotAdminRepositoryEditField::ExternalId => "🔢 External ID",
         }
     }
 }

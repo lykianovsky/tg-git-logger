@@ -56,6 +56,7 @@ pub struct ApplicationTelegramConfig {
 
 pub struct ApplicationConfig {
     pub port: u16,
+    pub base_url: String,
     pub debug: bool,
     pub telegram: ApplicationTelegramConfig,
     pub mysql: ApplicationMysqlConfig,
@@ -70,6 +71,7 @@ pub struct ApplicationConfig {
 impl ApplicationConfig {
     pub fn new() -> Self {
         let port: u16 = ENV.get("APPLICATION_PORT").parse().unwrap();
+        let base_url = ENV.get("APPLICATION_BASE_URL");
         let debug: bool = ENV.get("DEBUG").parse().unwrap();
         let telegram = Self::build_telegram_config();
         let mysql = Self::build_mysql_config();
@@ -82,6 +84,7 @@ impl ApplicationConfig {
 
         Self {
             port,
+            base_url,
             debug,
             telegram,
             mysql,

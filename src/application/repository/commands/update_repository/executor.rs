@@ -13,8 +13,14 @@ pub struct UpdateRepositoryExecutor {
 }
 
 impl UpdateRepositoryExecutor {
-    pub fn new(db: Arc<DatabaseConnection>, repository_repo: Arc<dyn RepositoryRepository>) -> Self {
-        Self { db, repository_repo }
+    pub fn new(
+        db: Arc<DatabaseConnection>,
+        repository_repo: Arc<dyn RepositoryRepository>,
+    ) -> Self {
+        Self {
+            db,
+            repository_repo,
+        }
     }
 }
 
@@ -26,7 +32,6 @@ impl CommandExecutor for UpdateRepositoryExecutor {
     async fn execute(&self, cmd: &Self::Command) -> Result<Self::Response, Self::Error> {
         let mut repository = self.repository_repo.find_by_id(cmd.id).await?;
 
-        repository.external_id = cmd.external_id;
         repository.name = cmd.name.clone();
         repository.owner = cmd.owner.clone();
         repository.url = cmd.url.clone();

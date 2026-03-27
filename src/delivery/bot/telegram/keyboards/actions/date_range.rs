@@ -2,7 +2,7 @@ use crate::delivery::bot::telegram::keyboards::actions::TelegramBotKeyboardActio
 use std::str::FromStr;
 use strum_macros::{AsRefStr, EnumString};
 
-#[derive(EnumString, AsRefStr)]
+#[derive(Clone, Debug, EnumString, AsRefStr)]
 pub enum TelegramBotDateRangeAction {
     #[strum(serialize = "last_week")]
     LastWeek,

@@ -43,7 +43,6 @@ impl CommandExecutor for CreateRepositoryExecutor {
 
         let placeholder = Repository {
             id: RepositoryId(0),
-            external_id: cmd.external_id,
             name: cmd.name.clone(),
             owner: cmd.owner.clone(),
             url: cmd.url.clone(),
@@ -56,9 +55,7 @@ impl CommandExecutor for CreateRepositoryExecutor {
             .create(&txn, &placeholder)
             .await
             .map_err(|e| match e {
-                CreateRepositoryError::DbError(msg) => {
-                    CreateRepositoryExecutorError::DbError(msg)
-                }
+                CreateRepositoryError::DbError(msg) => CreateRepositoryExecutorError::DbError(msg),
             })?;
 
         txn.commit()

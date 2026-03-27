@@ -26,16 +26,8 @@ impl TelegramBotDialogueAdminCreateRepositoryDispatcher {
                     .endpoint(Self::handle_create_repository_owner),
             )
             .branch(
-                case![TelegramBotDialogueAdminState::CreateRepositoryUrl { name, owner }]
-                    .endpoint(Self::handle_create_repository_url),
-            )
-            .branch(
-                case![TelegramBotDialogueAdminState::CreateRepositoryExternalId {
-                    name,
-                    owner,
-                    url
-                }]
-                .endpoint(Self::handle_create_repository_external_id),
+                case![TelegramBotDialogueAdminState::CreateRepositoryFinish { name, owner }]
+                    .endpoint(Self::handle_create_repository_finish),
             )
     }
 }
@@ -87,7 +79,7 @@ impl TelegramBotDialogueAdminCreateRepositoryDispatcher {
         dialogue
             .update(
                 crate::delivery::bot::telegram::dialogues::TelegramBotDialogueState::Admin(
-                    TelegramBotDialogueAdminState::CreateRepositoryUrl { name, owner },
+                    TelegramBotDialogueAdminState::CreateRepositoryFinish { name, owner },
                 ),
             )
             .await?;
@@ -98,10 +90,11 @@ impl TelegramBotDialogueAdminCreateRepositoryDispatcher {
         Ok(())
     }
 
-    async fn handle_create_repository_url(
+    async fn handle_create_repository_finish(
         bot: Bot,
         dialogue: TelegramBotDialogueType,
         msg: Message,
+        executors: Arc<ApplicationBoostrapExecutors>,
         (name, owner): (String, String),
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let url = match msg.text() {
@@ -113,57 +106,7 @@ impl TelegramBotDialogueAdminCreateRepositoryDispatcher {
             }
         };
 
-        dialogue
-            .update(
-                crate::delivery::bot::telegram::dialogues::TelegramBotDialogueState::Admin(
-                    TelegramBotDialogueAdminState::CreateRepositoryExternalId { name, owner, url },
-                ),
-            )
-            .await?;
-
-        bot.send_message(
-            msg.chat.id,
-            "🔢 Введите внешний ID репозитория (GitHub repo ID):",
-        )
-        .await?;
-
-        Ok(())
-    }
-
-    async fn handle_create_repository_external_id(
-        bot: Bot,
-        dialogue: TelegramBotDialogueType,
-        executors: Arc<ApplicationBoostrapExecutors>,
-        msg: Message,
-        (name, owner, url): (String, String, String),
-    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        let text = match msg.text() {
-            Some(t) => t.trim().to_string(),
-            None => {
-                bot.send_message(msg.chat.id, "❌ Введите числовое значение.")
-                    .await?;
-                return Ok(());
-            }
-        };
-
-        let external_id: i64 = match text.parse() {
-            Ok(v) => v,
-            Err(_) => {
-                bot.send_message(
-                    msg.chat.id,
-                    "❌ Некорректное значение. Введите целое число.",
-                )
-                .await?;
-                return Ok(());
-            }
-        };
-
-        let cmd = CreateRepositoryCommand {
-            external_id,
-            name,
-            owner,
-            url,
-        };
+        let cmd = CreateRepositoryCommand { name, owner, url };
 
         let loading_message = bot
             .send_message(msg.chat.id, "Создаем репозиторий...")
