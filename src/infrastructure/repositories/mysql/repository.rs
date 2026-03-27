@@ -1,7 +1,7 @@
 use crate::domain::repository::entities::repository::Repository;
 use crate::domain::repository::repositories::repository_repository::{
-    CreateRepositoryError, DeleteRepositoryError, FindAllRepositoriesError,
-    FindRepositoryByExternalIdError, FindRepositoryByIdError, RepositoryRepository,
+    CreateRepositoryError, DeleteRepositoryError, FindAllRepositoriesError
+    , FindRepositoryByIdError, RepositoryRepository,
     UpdateRepositoryError,
 };
 use crate::domain::repository::value_objects::repository_id::RepositoryId;
@@ -31,7 +31,6 @@ impl RepositoryRepository for MySQLRepositoryRepository {
         repository: &Repository,
     ) -> Result<Repository, CreateRepositoryError> {
         let model = repositories::ActiveModel {
-            external_id: Set(repository.external_id),
             name: Set(repository.name.clone()),
             owner: Set(repository.owner.clone()),
             url: Set(repository.url.clone()),
@@ -53,7 +52,6 @@ impl RepositoryRepository for MySQLRepositoryRepository {
     ) -> Result<Repository, UpdateRepositoryError> {
         let model = repositories::ActiveModel {
             id: Set(repository.id.0),
-            external_id: Set(repository.external_id),
             name: Set(repository.name.clone()),
             owner: Set(repository.owner.clone()),
             url: Set(repository.url.clone()),
@@ -75,20 +73,6 @@ impl RepositoryRepository for MySQLRepositoryRepository {
             .await
             .map_err(|e| FindRepositoryByIdError::DbError(e.to_string()))?
             .ok_or(FindRepositoryByIdError::NotFound)?;
-
-        Ok(Repository::from_mysql(result))
-    }
-
-    async fn find_by_external_id(
-        &self,
-        external_id: i64,
-    ) -> Result<Repository, FindRepositoryByExternalIdError> {
-        let result = repositories::Entity::find()
-            .filter(repositories::Column::ExternalId.eq(external_id))
-            .one(self.db.as_ref())
-            .await
-            .map_err(|e| FindRepositoryByExternalIdError::DbError(e.to_string()))?
-            .ok_or(FindRepositoryByExternalIdError::NotFound)?;
 
         Ok(Repository::from_mysql(result))
     }
@@ -127,7 +111,6 @@ impl Repository {
     pub fn from_mysql(model: repositories::Model) -> Self {
         Self {
             id: RepositoryId(model.id),
-            external_id: model.external_id,
             name: model.name,
             owner: model.owner,
             url: model.url,

@@ -3,6 +3,9 @@ mod edit;
 
 use crate::application::repository::commands::delete_repository::command::DeleteRepositoryCommand;
 use crate::bootstrap::executors::ApplicationBoostrapExecutors;
+use crate::delivery::bot::telegram::dialogues::admin::helpers::db_error_message;
+use crate::delivery::bot::telegram::dialogues::admin::modules::repository::create::TelegramBotDialogueAdminRepositoryCreateDispatcher;
+use crate::delivery::bot::telegram::dialogues::admin::modules::repository::edit::TelegramBotDialogueAdminRepositoryEditDispatcher;
 use crate::delivery::bot::telegram::dialogues::admin::TelegramBotDialogueAdminState;
 use crate::delivery::bot::telegram::dialogues::{TelegramBotDialogueState, TelegramBotDialogueType};
 use crate::delivery::bot::telegram::keyboards::actions::admin_repository::TelegramBotAdminRepositoryAction;
@@ -28,7 +31,7 @@ impl TelegramBotDialogueAdminRepositoryDispatcher {
                 case![TelegramBotDialogueAdminState::ConfigureRepository]
                     .endpoint(Self::handle_menu),
             )
-            .branch(edit::query_branches())
+            .branch(TelegramBotDialogueAdminRepositoryEditDispatcher::query_branches())
             .branch(
                 case![TelegramBotDialogueAdminState::DeleteRepositorySelect]
                     .endpoint(Self::handle_delete_select),
@@ -42,8 +45,8 @@ impl TelegramBotDialogueAdminRepositoryDispatcher {
     pub fn message_branches()
     -> Handler<'static, Result<(), Box<dyn Error + Send + Sync>>, DpHandlerDescription> {
         dptree::entry()
-            .branch(create::message_branches())
-            .branch(edit::message_branches())
+            .branch(TelegramBotDialogueAdminRepositoryCreateDispatcher::message_branches())
+            .branch(TelegramBotDialogueAdminRepositoryEditDispatcher::message_branches())
     }
 }
 
@@ -82,6 +85,7 @@ impl TelegramBotDialogueAdminRepositoryDispatcher {
                     ))
                     .await?;
                 bot.edit_message_text(chat_id, message_id, "📝 Введите название репозитория:")
+                    .reply_markup(InlineKeyboardMarkup::default())
                     .await?;
             }
             TelegramBotAdminRepositoryAction::Edit => {
@@ -94,8 +98,12 @@ impl TelegramBotDialogueAdminRepositoryDispatcher {
                     .unwrap_or_default();
 
                 if repositories.is_empty() {
-                    bot.edit_message_text(chat_id, message_id, "❌ Нет репозиториев для редактирования.")
-                        .await?;
+                    bot.edit_message_text(
+                        chat_id,
+                        message_id,
+                        "ℹ️ Нет репозиториев для редактирования. Сначала создайте репозиторий.",
+                    )
+                    .await?;
                     dialogue.exit().await.ok();
                     return Ok(());
                 }
@@ -110,17 +118,19 @@ impl TelegramBotDialogueAdminRepositoryDispatcher {
                     })
                     .collect();
 
-                let keyboard = InlineKeyboardMarkup::new(buttons);
-
                 dialogue
                     .update(TelegramBotDialogueState::Admin(
                         TelegramBotDialogueAdminState::EditRepositorySelect,
                     ))
                     .await?;
 
-                bot.edit_message_text(chat_id, message_id, "✏️ Выберите репозиторий для редактирования:")
-                    .reply_markup(keyboard)
-                    .await?;
+                bot.edit_message_text(
+                    chat_id,
+                    message_id,
+                    "✏️ Выберите репозиторий для редактирования:",
+                )
+                .reply_markup(InlineKeyboardMarkup::new(buttons))
+                .await?;
             }
             TelegramBotAdminRepositoryAction::Delete => {
                 let repositories: Vec<Repository> = executors
@@ -132,8 +142,12 @@ impl TelegramBotDialogueAdminRepositoryDispatcher {
                     .unwrap_or_default();
 
                 if repositories.is_empty() {
-                    bot.edit_message_text(chat_id, message_id, "❌ Нет репозиториев для удаления.")
-                        .await?;
+                    bot.edit_message_text(
+                        chat_id,
+                        message_id,
+                        "ℹ️ Нет репозиториев для удаления.",
+                    )
+                    .await?;
                     dialogue.exit().await.ok();
                     return Ok(());
                 }
@@ -148,8 +162,6 @@ impl TelegramBotDialogueAdminRepositoryDispatcher {
                     })
                     .collect();
 
-                let keyboard = InlineKeyboardMarkup::new(buttons);
-
                 dialogue
                     .update(TelegramBotDialogueState::Admin(
                         TelegramBotDialogueAdminState::DeleteRepositorySelect,
@@ -157,7 +169,7 @@ impl TelegramBotDialogueAdminRepositoryDispatcher {
                     .await?;
 
                 bot.edit_message_text(chat_id, message_id, "🗑 Выберите репозиторий для удаления:")
-                    .reply_markup(keyboard)
+                    .reply_markup(InlineKeyboardMarkup::new(buttons))
                     .await?;
             }
         }
@@ -195,7 +207,7 @@ impl TelegramBotDialogueAdminRepositoryDispatcher {
             .find_by_id(RepositoryId(repository_id))
             .await
             .map(|r| format!("{}/{}", r.owner, r.name))
-            .unwrap_or_else(|_| repository_id.to_string());
+            .unwrap_or_else(|_| format!("ID {}", repository_id));
 
         let keyboard = InlineKeyboardMarkup::new(vec![vec![
             InlineKeyboardButton::callback("✅ Да, удалить", "repo_delete_yes"),
@@ -208,9 +220,13 @@ impl TelegramBotDialogueAdminRepositoryDispatcher {
             ))
             .await?;
 
-        bot.send_message(
+        bot.edit_message_text(
             msg.chat().id,
-            format!("🗑 Удалить репозиторий <b>{}</b>? Это действие необратимо.", repo_label),
+            msg.id(),
+            format!(
+                "🗑 Удалить репозиторий <b>{}</b>?\n\nЭто действие необратимо.",
+                repo_label
+            ),
         )
         .parse_mode(teloxide::types::ParseMode::Html)
         .reply_markup(keyboard)
@@ -236,7 +252,9 @@ impl TelegramBotDialogueAdminRepositoryDispatcher {
         };
 
         if data == "repo_delete_cancel" {
-            bot.send_message(msg.chat().id, "❌ Удаление отменено.").await?;
+            bot.edit_message_text(msg.chat().id, msg.id(), "❌ Удаление отменено.")
+                .reply_markup(InlineKeyboardMarkup::default())
+                .await?;
             dialogue.exit().await.ok();
             return Ok(());
         }
@@ -248,11 +266,19 @@ impl TelegramBotDialogueAdminRepositoryDispatcher {
         let cmd = DeleteRepositoryCommand { id: RepositoryId(repository_id) };
         match executors.commands.delete_repository.execute(&cmd).await {
             Ok(_) => {
-                bot.send_message(msg.chat().id, "✅ Репозиторий удалён.").await?;
+                bot.edit_message_text(msg.chat().id, msg.id(), "✅ Репозиторий успешно удалён.")
+                    .reply_markup(InlineKeyboardMarkup::default())
+                    .await?;
             }
             Err(e) => {
                 tracing::error!(error = %e, "Failed to delete repository");
-                bot.send_message(msg.chat().id, format!("❌ Ошибка удаления: {e}")).await?;
+                bot.edit_message_text(
+                    msg.chat().id,
+                    msg.id(),
+                    db_error_message("удалить репозиторий"),
+                )
+                .reply_markup(InlineKeyboardMarkup::default())
+                .await?;
             }
         }
 

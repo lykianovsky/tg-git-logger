@@ -27,4 +27,10 @@ pub enum BuildVersionControlDateRangeReportExecutorError {
 
     #[error("{0}")]
     Serialization(#[from] serde_json::Error),
+
+    #[error("Template render error: {0}")]
+    TemplateRender(String),
+
+    #[error("APPLICATION_BASE_URL is not configured — report URL cannot be generated")]
+    BaseUrlNotConfigured,
 }

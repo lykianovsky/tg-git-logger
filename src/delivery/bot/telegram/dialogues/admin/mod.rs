@@ -1,9 +1,12 @@
+pub mod helpers;
 pub mod modules;
 
 use crate::bootstrap::executors::ApplicationBoostrapExecutors;
 use crate::delivery::bot::telegram::dialogues::admin::modules::repository::TelegramBotDialogueAdminRepositoryDispatcher;
 use crate::delivery::bot::telegram::dialogues::admin::modules::task_tracker::TelegramBotDialogueAdminTaskTrackerDispatcher;
-use crate::delivery::bot::telegram::dialogues::{TelegramBotDialogueState, TelegramBotDialogueType};
+use crate::delivery::bot::telegram::dialogues::{
+    TelegramBotDialogueState, TelegramBotDialogueType,
+};
 use crate::delivery::bot::telegram::keyboards::actions::admin::TelegramBotAdminAction;
 use crate::delivery::bot::telegram::keyboards::actions::TelegramBotKeyboardAction;
 use crate::delivery::bot::telegram::keyboards::builder::KeyboardBuilder;
@@ -36,27 +39,49 @@ pub enum TelegramBotDialogueAdminState {
 
     // Создание
     CreateRepositoryName,
-    CreateRepositoryOwner { name: String },
-    CreateRepositoryUrl { name: String, owner: String },
-    CreateRepositoryExternalId { name: String, owner: String, url: String },
+    CreateRepositoryOwner {
+        name: String,
+    },
+    CreateRepositoryFinish {
+        name: String,
+        owner: String,
+    },
 
     // Редактирование
     EditRepositorySelect,
-    EditRepositoryMenu { repository_id: i32 },
-    EditRepositoryName { repository_id: i32 },
-    EditRepositoryOwner { repository_id: i32 },
-    EditRepositoryUrl { repository_id: i32 },
-    EditRepositoryExternalId { repository_id: i32 },
+    EditRepositoryMenu {
+        repository_id: i32,
+    },
+    EditRepositoryName {
+        repository_id: i32,
+    },
+    EditRepositoryOwner {
+        repository_id: i32,
+    },
+    EditRepositoryUrl {
+        repository_id: i32,
+    },
 
     // Удаление
     DeleteRepositorySelect,
-    DeleteRepositoryConfirm { repository_id: i32 },
+    DeleteRepositoryConfirm {
+        repository_id: i32,
+    },
 
     // ── Таск-трекер ─────────────────────────────────────────────────────────
     ConfigureTaskTrackerSelectRepository,
-    ConfigureTaskTrackerSpaceId { repository_id: i32 },
-    ConfigureTaskTrackerQaColumnId { repository_id: i32, space_id: i32 },
-    ConfigureTaskTrackerExtractPattern { repository_id: i32, space_id: i32, qa_column_id: i32 },
+    ConfigureTaskTrackerSpaceId {
+        repository_id: i32,
+    },
+    ConfigureTaskTrackerQaColumnId {
+        repository_id: i32,
+        space_id: i32,
+    },
+    ConfigureTaskTrackerExtractPattern {
+        repository_id: i32,
+        space_id: i32,
+        qa_column_id: i32,
+    },
     ConfigureTaskTrackerPathToCard {
         repository_id: i32,
         space_id: i32,
@@ -171,9 +196,13 @@ impl TelegramBotDialogueAdminDispatcher {
                     ))
                     .await?;
 
-                bot.edit_message_text(chat_id, message_id, "📦 Выберите репозиторий для таск-трекера:")
-                    .reply_markup(keyboard)
-                    .await?;
+                bot.edit_message_text(
+                    chat_id,
+                    message_id,
+                    "📦 Выберите репозиторий для таск-трекера:",
+                )
+                .reply_markup(keyboard)
+                .await?;
             }
         }
 

@@ -15,13 +15,16 @@ use crate::domain::repository::value_objects::repository_id::RepositoryId;
 use crate::domain::shared::command::CommandExecutor;
 use crate::domain::shared::date::range::DateRange;
 use crate::domain::user::value_objects::social_user_id::SocialUserId;
+use crate::utils::builder::message::MessageBuilder;
 use std::error::Error;
 use std::sync::Arc;
 use teloxide::dispatching::{DpHandlerDescription, UpdateFilterExt};
 use teloxide::dptree::{case, Handler};
 use teloxide::payloads::{EditMessageTextSetters, SendMessageSetters};
 use teloxide::prelude::{Requester, Update};
-use teloxide::types::{CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message, ParseMode};
+use teloxide::types::{
+    CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message, ParseMode,
+};
 use teloxide::{dptree, Bot};
 
 #[derive(Debug, Clone, Default)]
@@ -53,8 +56,10 @@ impl TelegramBotDialogueReportByDateRangeDispatcher {
         let callbacks = Update::filter_callback_query()
             .branch(case![TelegramBotDialogueReportByDateRangeState::For].endpoint(choose_for_who))
             .branch(
-                case![TelegramBotDialogueReportByDateRangeState::SelectRepository { for_who_action }]
-                    .endpoint(choose_repository),
+                case![
+                    TelegramBotDialogueReportByDateRangeState::SelectRepository { for_who_action }
+                ]
+                .endpoint(choose_repository),
             )
             .branch(
                 case![TelegramBotDialogueReportByDateRangeState::DateRange {
@@ -108,9 +113,13 @@ async fn choose_for_who(
     match bound_repos_response {
         Err(e) => {
             tracing::error!(error = %e, "Failed to get user bound repositories");
-            bot.edit_message_text(chat_id, message_id, format!("❌ Ошибка: {e}"))
-                .reply_markup(InlineKeyboardMarkup::default())
-                .await?;
+            bot.edit_message_text(
+                chat_id,
+                message_id,
+                "❌ Не удалось загрузить список репозиториев. Попробуйте позже.",
+            )
+            .reply_markup(InlineKeyboardMarkup::default())
+            .await?;
             dialogue.exit().await.ok();
         }
         Ok(response) if response.repositories.is_empty() => {
@@ -199,18 +208,18 @@ async fn enter_branch(
     msg: Message,
     (for_who_action, repository_id): (TelegramBotForWhoAction, i32),
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let branch = match msg.text() {
-        Some(t) => t.trim().to_string(),
+    let branch = match msg
+        .text()
+        .map(|t| t.trim().to_string())
+        .filter(|s| !s.is_empty())
+    {
+        Some(b) => b,
         None => {
-            bot.send_message(msg.chat.id, "❌ Введите название ветки текстом.").await?;
+            bot.send_message(msg.chat.id, "❌ Введите название ветки текстом.")
+                .await?;
             return Ok(());
         }
     };
-
-    if branch.is_empty() {
-        bot.send_message(msg.chat.id, "❌ Название ветки не может быть пустым.").await?;
-        return Ok(());
-    }
 
     let keyboard = KeyboardBuilder::new()
         .row::<TelegramBotDateRangeAction>(vec![
@@ -267,9 +276,7 @@ async fn create_report_by_date_range(
     };
 
     let for_who = match for_who_action {
-        TelegramBotForWhoAction::Me => {
-            BuildVersionControlDateRangeReportExecutorCommandForWho::Me
-        }
+        TelegramBotForWhoAction::Me => BuildVersionControlDateRangeReportExecutorCommandForWho::Me,
         TelegramBotForWhoAction::Repository => {
             BuildVersionControlDateRangeReportExecutorCommandForWho::Repository
         }
@@ -295,20 +302,42 @@ async fn create_report_by_date_range(
 
     match executor.execute(&cmd).await {
         Ok(response) => {
-            bot.edit_message_text(chat_id, message_id, response.text)
+            let msg = MessageBuilder::new()
+                .line("✅ Отчёт готов!")
+                .empty_line()
+                .link("📊 Открыть полный отчёт", &response.report_url)
+                .build();
+
+            tracing::debug!("REPORT URL: {}", response.report_url);
+
+            bot.edit_message_text(chat_id, message_id, msg)
                 .parse_mode(ParseMode::Html)
                 .await?;
+
+            dialogue.exit().await?;
         }
         Err(error) => {
+            let error_text = executor.friendly_error_message(&error);
+
+            // Не завершаем диалог — оставляем состояние DateRange для повтора
+            let retry_keyboard =
+                InlineKeyboardMarkup::new(vec![vec![InlineKeyboardButton::callback(
+                    "🔄 Попробовать снова",
+                    date_range_action.to_callback_data(),
+                )]]);
+
             bot.edit_message_text(
                 chat_id,
                 message_id,
-                executor.friendly_error_message(&error).to_string(),
+                format!(
+                    "{}\n\nМожете попробовать снова с теми же параметрами.",
+                    error_text
+                ),
             )
+            .reply_markup(retry_keyboard)
             .await?;
         }
     };
 
-    dialogue.exit().await?;
     Ok(())
 }

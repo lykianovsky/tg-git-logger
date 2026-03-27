@@ -6,6 +6,7 @@ use crate::bootstrap::shared_dependency::ApplicationSharedDependency;
 use crate::config::application::ApplicationConfig;
 use crate::delivery::contract::ApplicationDelivery;
 use crate::delivery::http::axum::controllers::oauth::github::AxumOAuthGithubController;
+use crate::delivery::http::axum::controllers::report::AxumReportController;
 use crate::delivery::http::axum::controllers::webhook::github::AxumWebhookGithubController;
 use crate::delivery::http::axum::middlewares::GithubWebhookAuthorizationMiddleware;
 use axum::routing::post;
@@ -67,6 +68,7 @@ impl DeliveryHttpServerAxum {
 
         Router::new()
             .route("/ping", get(|| async { "PONG" }))
+            .route("/report/{token}", get(AxumReportController::handle_get))
             .nest("/oauth", oauth_routes)
             .nest("/webhook", webhook_routes)
             .layer(Extension(config.clone()))

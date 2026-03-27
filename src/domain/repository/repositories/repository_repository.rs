@@ -64,11 +64,6 @@ pub trait RepositoryRepository: Send + Sync {
 
     async fn find_by_id(&self, id: RepositoryId) -> Result<Repository, FindRepositoryByIdError>;
 
-    async fn find_by_external_id(
-        &self,
-        external_id: i64,
-    ) -> Result<Repository, FindRepositoryByExternalIdError>;
-
     async fn find_all(&self) -> Result<Vec<Repository>, FindAllRepositoriesError>;
 
     async fn delete(

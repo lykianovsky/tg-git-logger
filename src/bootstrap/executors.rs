@@ -64,6 +64,7 @@ impl ApplicationBoostrapExecutors {
                 shared_dependency.repository_task_tracker_repo.clone(),
                 shared_dependency.task_tracker_service.clone(),
                 config.kaiten.base.clone(),
+                config.base_url.clone(),
                 shared_dependency.cache.clone(),
             )),
             get_user_roles_by_telegram_id: Arc::new(GetUserRolesByTelegramIdExecutor::new(

@@ -5,7 +5,6 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Repository {
     pub id: RepositoryId,
-    pub external_id: i64,
     pub name: String,
     pub owner: String,
     pub url: String,

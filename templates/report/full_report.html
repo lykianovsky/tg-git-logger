@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GitEye — {{ title }}</title>
+<style>
+:root {
+  --bg: #0d1117;
+  --surface: #161b22;
+  --surface2: #21262d;
+  --border: #30363d;
+  --text: #c9d1d9;
+  --muted: #8b949e;
+  --accent: #58a6ff;
+  --green: #3fb950;
+  --red: #f85149;
+  --orange: #e3b341;
+  --purple: #bc8cff;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.6;
+}
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+code {
+  font-family: 'SFMono-Regular', Consolas, monospace;
+  font-size: 12px;
+  background: var(--surface2);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.page-wrap { max-width: 1200px; margin: 0 auto; padding: 32px 24px; }
+
+/* ── Header ─────────────────────────────────────────── */
+.report-header {
+  background: linear-gradient(135deg, #1a1f2e, #161b22);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 28px 32px;
+  margin-bottom: 24px;
+}
+.report-header h1 { font-size: 22px; font-weight: 700; color: #fff; margin-bottom: 12px; }
+.report-meta { display: flex; flex-wrap: wrap; gap: 16px; color: var(--muted); font-size: 13px; }
+.report-meta span { display: flex; align-items: center; gap: 6px; }
+
+/* ── Stats grid ─────────────────────────────────────── */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(155px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.stat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 18px 20px;
+  text-align: center;
+}
+.stat-card .val { font-size: 28px; font-weight: 700; color: var(--accent); }
+.stat-card .lbl { font-size: 12px; color: var(--muted); margin-top: 4px; }
+.stat-card.green .val  { color: var(--green); }
+.stat-card.red .val    { color: var(--red); }
+.stat-card.orange .val { color: var(--orange); }
+.stat-card.purple .val { color: var(--purple); }
+.stat-card.muted .val  { color: var(--muted); }
+
+/* ── Section ────────────────────────────────────────── */
+.section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 20px 24px;
+  margin-bottom: 20px;
+}
+.section h2 { font-size: 15px; font-weight: 600; margin-bottom: 16px; color: #fff; }
+.badge {
+  background: var(--surface2);
+  color: var(--muted);
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* ── PR lifecycle ───────────────────────────────────── */
+.pr-summary { display: flex; flex-wrap: wrap; gap: 32px; }
+.pr-stat { text-align: center; min-width: 80px; }
+.pr-stat .val { font-size: 26px; font-weight: 700; display: block; color: var(--accent); }
+.pr-stat .lbl { font-size: 12px; color: var(--muted); }
+
+/* ── Activity chart ─────────────────────────────────── */
+.activity-wrap { overflow-x: auto; padding-bottom: 4px; }
+.activity-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  height: 80px;
+  min-width: min-content;
+  padding-bottom: 28px;
+}
+.activity-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+  width: 30px;
+  height: 100%;
+  justify-content: flex-end;
+  cursor: default;
+}
+.activity-bar {
+  width: 22px;
+  background: var(--accent);
+  border-radius: 3px 3px 0 0;
+  min-height: 4px;
+  transition: background 0.15s;
+}
+.activity-col:hover .activity-bar { background: var(--purple); }
+.activity-label {
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 4px;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  white-space: nowrap;
+  height: 26px;
+}
+
+/* ── Tasks ──────────────────────────────────────────── */
+.task-badges { display: flex; flex-wrap: wrap; gap: 8px; }
+.task-badge {
+  background: rgba(88, 166, 255, 0.12);
+  border: 1px solid rgba(88, 166, 255, 0.3);
+  color: var(--accent);
+  padding: 4px 14px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 500;
+  transition: background 0.15s;
+}
+.task-badge:hover { background: rgba(88, 166, 255, 0.22); text-decoration: none; }
+
+/* ── Contributors ───────────────────────────────────── */
+.contributor { margin-bottom: 16px; }
+.contributor:last-child { margin-bottom: 0; }
+.contributor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 6px;
+  font-size: 13px;
+  gap: 12px;
+}
+.contributor-name { font-weight: 600; flex-shrink: 0; }
+.contributor-stats { color: var(--muted); font-size: 12px; }
+.bar-wrap { background: var(--surface2); border-radius: 4px; height: 6px; }
+.bar { background: var(--accent); border-radius: 4px; height: 6px; }
+
+/* ── Tables ─────────────────────────────────────────── */
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+thead th {
+  text-align: left;
+  padding: 8px 12px;
+  color: var(--muted);
+  font-weight: 500;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+tbody tr { border-bottom: 1px solid rgba(48, 54, 61, 0.5); }
+tbody tr:last-child { border-bottom: none; }
+tbody tr:hover { background: var(--surface2); }
+tbody td { padding: 9px 12px; vertical-align: top; }
+.sha { color: var(--purple); }
+.commit-msg, .pr-title { max-width: 420px; word-break: break-word; }
+.stat-add  { color: var(--green); font-weight: 600; white-space: nowrap; }
+.stat-del  { color: var(--red);   font-weight: 600; white-space: nowrap; }
+.date      { color: var(--muted); white-space: nowrap; font-size: 12px; }
+.state-badge { padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: 500; white-space: nowrap; }
+.state-badge.merged { background: rgba(63, 185, 80, 0.15);  color: var(--green); }
+.state-badge.open   { background: rgba(88, 166, 255, 0.15); color: var(--accent); }
+.state-badge.closed { background: rgba(248, 81, 73, 0.15);  color: var(--red); }
+.green { color: var(--green); }
+.red   { color: var(--red); }
+
+/* ── Footer ─────────────────────────────────────────── */
+footer {
+  text-align: center;
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 32px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+@media (max-width: 640px) {
+  .page-wrap { padding: 16px; }
+  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  thead { display: none; }
+  tbody tr { display: block; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  tbody td { display: inline-block; padding: 2px 6px; }
+  .commit-msg, .pr-title { max-width: 100%; }
+}
+</style>
+</head>
+<body>
+<div class="page-wrap">
+
+<!-- ── Header ──────────────────────────────────────── -->
+<header class="report-header">
+  <h1>🔭 {{ title }}</h1>
+  <div class="report-meta">
+    <span>📦 {{ repo_owner }}/{{ repo_name }}</span>
+    <span>🌿 {{ branch }}</span>
+    <span>📅 {{ period }}</span>
+  </div>
+</header>
+
+<!-- ── Summary stats grid ───────────────────────────── -->
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="val">{{ commits_count }}</div>
+    <div class="lbl">Коммитов</div>
+  </div>
+  <div class="stat-card purple">
+    <div class="val">{{ prs_count }}</div>
+    <div class="lbl">Pull Requests</div>
+  </div>
+  <div class="stat-card green">
+    <div class="val">+{{ total_additions }}</div>
+    <div class="lbl">Добавлено строк</div>
+  </div>
+  <div class="stat-card red">
+    <div class="val">-{{ total_deletions }}</div>
+    <div class="lbl">Удалено строк</div>
+  </div>
+  <div class="stat-card orange">
+    <div class="val">{{ net_changes_str }}</div>
+    <div class="lbl">Чистое изменение</div>
+  </div>
+  <div class="stat-card orange">
+    <div class="val">{{ pr_summary_merge_rate }}</div>
+    <div class="lbl">Merge Rate</div>
+  </div>
+  {% if is_personal %}
+  <div class="stat-card">
+    <div class="val">{{ active_days }}</div>
+    <div class="lbl">Активных дней</div>
+  </div>
+  {% else %}
+  <div class="stat-card">
+    <div class="val">{{ authors_count }}</div>
+    <div class="lbl">Авторов</div>
+  </div>
+  {% endif %}
+  <div class="stat-card">
+    <div class="val">{{ total_changed_files }}</div>
+    <div class="lbl">Файлов изменено</div>
+  </div>
+  <div class="stat-card muted">
+    <div class="val">+{{ avg_commit_size }}</div>
+    <div class="lbl">Средний коммит</div>
+  </div>
+</div>
+
+<!-- ── PR lifecycle ─────────────────────────────────── -->
+{% if prs_count > 0 %}
+<section class="section">
+  <h2>🔀 Pull Request статистика</h2>
+  <div class="pr-summary">
+    <div class="pr-stat">
+      <span class="val" style="color:var(--green)">{{ pr_summary_merged }}</span>
+      <span class="lbl">Merged ✅</span>
+    </div>
+    <div class="pr-stat">
+      <span class="val" style="color:var(--accent)">{{ pr_summary_open }}</span>
+      <span class="lbl">Open 🟢</span>
+    </div>
+    <div class="pr-stat">
+      <span class="val" style="color:var(--red)">{{ pr_summary_closed }}</span>
+      <span class="lbl">Closed 🔴</span>
+    </div>
+    <div class="pr-stat">
+      <span class="val">{{ pr_summary_merge_rate }}</span>
+      <span class="lbl">Merge Rate</span>
+    </div>
+    <div class="pr-stat">
+      <span class="val">{{ pr_summary_avg_merge_time }}</span>
+      <span class="lbl">Среднее до Merge</span>
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<!-- ── Activity chart ───────────────────────────────── -->
+{% if !activity.is_empty() %}
+<section class="section">
+  <h2>📈 Активность по дням</h2>
+  <div class="activity-wrap">
+    <div class="activity-chart">
+      {% for day in activity %}
+      <div class="activity-col" title="{{ day.day }}: {{ day.commits }} коммитов">
+        <div class="activity-bar" style="height:{{ day.bar_px }}px"></div>
+        <div class="activity-label">{{ day.day }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<!-- ── Tasks ────────────────────────────────────────── -->
+{% if !tasks.is_empty() %}
+<section class="section">
+  <h2>📌 Задачи <span class="badge">{{ tasks_count }}</span></h2>
+  <div class="task-badges">
+    {% for task in tasks %}
+    <a href="{{ task.url }}" class="task-badge" target="_blank" rel="noopener">{{ task.label }}</a>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+<!-- ── Contributors ─────────────────────────────────── -->
+{% if !contributors.is_empty() %}
+<section class="section">
+  <h2>👥 Контрибьютеры</h2>
+  {% for c in contributors %}
+  <div class="contributor">
+    <div class="contributor-header">
+      <span class="contributor-name">{{ c.name }}</span>
+      <span class="contributor-stats">
+        {{ c.commits }} коммитов ·
+        <span class="green">+{{ c.additions }}</span>
+        <span class="red">-{{ c.deletions }}</span>
+      </span>
+    </div>
+    <div class="bar-wrap"><div class="bar" style="width:{{ c.pct }}%"></div></div>
+  </div>
+  {% endfor %}
+</section>
+{% endif %}
+
+<!-- ── PRs table ────────────────────────────────────── -->
+{% if prs_count > 0 %}
+<section class="section">
+  <h2>📋 Pull Requests <span class="badge">{{ prs_count }}</span></h2>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Название</th>
+          <th>Статус</th>
+          <th>Автор</th>
+          <th>+</th>
+          <th>-</th>
+          <th>Файлов</th>
+          <th>Создан</th>
+          <th>Merged</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for pr in pull_requests %}
+        <tr>
+          <td><b>#{{ pr.number }}</b></td>
+          <td class="pr-title">{{ pr.title_html }}</td>
+          <td><span class="state-badge {{ pr.state_class }}">{{ pr.state_icon }} {{ pr.state_label }}</span></td>
+          <td>{{ pr.author }}</td>
+          <td class="stat-add">+{{ pr.additions }}</td>
+          <td class="stat-del">-{{ pr.deletions }}</td>
+          <td>{{ pr.changed_files }}</td>
+          <td class="date">{{ pr.created_at }}</td>
+          <td class="date">{{ pr.merged_at }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+
+<!-- ── Commits table ────────────────────────────────── -->
+{% if commits_count > 0 %}
+<section class="section">
+  <h2>🕐 Коммиты <span class="badge">{{ commits_count }}</span></h2>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>SHA</th>
+          <th>Сообщение</th>
+          <th>Автор</th>
+          <th>+</th>
+          <th>-</th>
+          <th>Файлов</th>
+          <th>Дата</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in commits %}
+        <tr>
+          <td><code class="sha">{{ c.sha }}</code></td>
+          <td class="commit-msg">{{ c.message_html }}</td>
+          <td>{{ c.author }}</td>
+          <td class="stat-add">+{{ c.additions }}</td>
+          <td class="stat-del">-{{ c.deletions }}</td>
+          <td>{{ c.changed_files }}</td>
+          <td class="date">{{ c.date }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+
+<footer>Сгенерировано GitEye Bot &middot; {{ generated_at }}</footer>
+
+</div>
+</body>
+</html>
