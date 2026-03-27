@@ -5,8 +5,8 @@ use crate::application::auth::commands::create_oauth_link::command::{
 use crate::bootstrap::executors::ApplicationBoostrapExecutors;
 use crate::config::application::ApplicationConfig;
 use crate::delivery::bot::telegram::dialogues::TelegramBotDialogueType;
-use crate::delivery::bot::telegram::keyboards::actions::choose_role::TelegramBotChooseRoleAction;
 use crate::delivery::bot::telegram::keyboards::actions::TelegramBotKeyboardAction;
+use crate::delivery::bot::telegram::keyboards::actions::choose_role::TelegramBotChooseRoleAction;
 use crate::domain::shared::command::CommandExecutor;
 use crate::domain::user::value_objects::social_chat_id::SocialChatId;
 use crate::domain::user::value_objects::social_message_id::SocialMessageId;
@@ -20,7 +20,7 @@ use teloxide::dispatching::DpHandlerDescription;
 use teloxide::dptree::case;
 use teloxide::prelude::*;
 use teloxide::types::ParseMode;
-use teloxide::{dptree, Bot};
+use teloxide::{Bot, dptree};
 
 #[derive(Debug, Clone, Default)]
 pub enum TelegramBotDialogueRegistrationState {

@@ -84,23 +84,26 @@ pub struct GithubUser;
 #[derive(GraphQLQuery)]
 #[graphql(
     schema_path = "src/infrastructure/integrations/version_control/github/graphql/schema.docs.graphql",
-    query_path = "src/infrastructure/integrations/version_control/github/graphql/queries/get_date_range_report.graphql"
+    query_path = "src/infrastructure/integrations/version_control/github/graphql/queries/get_commit_history.graphql"
 )]
-pub struct GithubDateRangeReport;
+pub struct GithubCommitHistory;
+
+#[derive(GraphQLQuery)]
+#[graphql(
+    schema_path = "src/infrastructure/integrations/version_control/github/graphql/schema.docs.graphql",
+    query_path = "src/infrastructure/integrations/version_control/github/graphql/queries/get_pull_requests.graphql"
+)]
+pub struct GithubPullRequests;
 
 pub struct GithubVersionControlClient {
     base: String,
-    owner: String,
-    repository: String,
     client: Client,
 }
 
 impl GithubVersionControlClient {
-    pub fn new(base: String, owner: String, repository: String) -> Self {
+    pub fn new(base: String) -> Self {
         Self {
             base,
-            owner,
-            repository,
             client: Client::new(),
         }
     }
@@ -168,6 +171,7 @@ impl VersionControlClient for GithubVersionControlClient {
             email: Some(data.viewer.email),
         })
     }
+
     async fn get_details_by_range(
         &self,
         access_token: &str,
@@ -177,8 +181,91 @@ impl VersionControlClient for GithubVersionControlClient {
         date_range: &DateRange,
         author: Option<&str>,
     ) -> Result<VersionControlDateRangeReport, VersionControlClientDateRangeReportError> {
-        let author_filter = author.map(|a| format!(" author:{}", a)).unwrap_or_default();
+        // ── Fetch all commits with cursor pagination ───────────────────────────
+        let mut commits = Vec::new();
+        let mut commit_cursor: Option<String> = None;
+        let mut branch_exists = true;
 
+        loop {
+            let data = self
+                .graphql::<GithubCommitHistory>(
+                    access_token,
+                    github_commit_history::Variables {
+                        owner: owner.to_string(),
+                        repo: repo.to_string(),
+                        branch: branch.to_string(),
+                        since: date_range.since,
+                        until: date_range.until,
+                        after: commit_cursor.clone(),
+                    },
+                )
+                .await
+                .map_err(|e| {
+                    if let Some(err) = e.get_error_by_type(GithubGraphQLErrorType::Forbidden) {
+                        return VersionControlClientDateRangeReportError::Unauthorized(
+                            err.message.to_string(),
+                        );
+                    }
+                    VersionControlClientDateRangeReportError::Transport(e.to_string())
+                })?;
+
+            let Some(repository) = data.repository else {
+                break;
+            };
+
+            let Some(ref_) = repository.ref_ else {
+                branch_exists = false;
+                break;
+            };
+
+            let Some(target) = ref_.target else {
+                break;
+            };
+
+            let github_commit_history::GithubCommitHistoryRepositoryRefTarget::Commit(
+                commit_target,
+            ) = target
+            else {
+                break;
+            };
+
+            let history = commit_target.history;
+            let has_next = history.page_info.has_next_page;
+            let end_cursor = history.page_info.end_cursor;
+
+            if let Some(nodes) = history.nodes {
+                for commit in nodes.into_iter().flatten() {
+                    commits.push(VersionControlDateRangeReportCommit {
+                        sha: commit.oid,
+                        message: commit.message,
+                        authored_at: commit.committed_date,
+                        additions: commit.additions,
+                        deletions: commit.deletions,
+                        changed_files: commit.changed_files_if_available,
+                        author: commit.author.map(|a| VersionControlDateRangeReportAuthor {
+                            login: a.user.and_then(|u| u.login.into()),
+                            name: a.name,
+                            email: a.email,
+                        }),
+                    });
+                }
+            }
+
+            if !has_next {
+                break;
+            }
+            commit_cursor = end_cursor;
+        }
+
+        // If the branch doesn't exist, report it early
+        if !branch_exists {
+            return Err(VersionControlClientDateRangeReportError::BranchNotFound(
+                branch.to_string(),
+            ));
+        }
+
+        // ── Fetch all PRs with cursor pagination ───────────────────────────────
+        let author_filter = author.map(|a| format!(" author:{}", a)).unwrap_or_default();
         let pr_search = format!(
             "repo:{}/{} is:pr created:{}..{}{}",
             owner,
@@ -187,118 +274,84 @@ impl VersionControlClient for GithubVersionControlClient {
             date_range.until.format("%Y-%m-%d"),
             author_filter,
         );
-        let issue_search = format!(
-            "repo:{}/{} is:issue created:{}..{}{}",
-            owner,
-            repo,
-            date_range.since.format("%Y-%m-%d"),
-            date_range.until.format("%Y-%m-%d"),
-            author_filter,
+
+        let mut pull_requests = Vec::new();
+        let mut pr_cursor: Option<String> = None;
+
+        loop {
+            let data = self
+                .graphql::<GithubPullRequests>(
+                    access_token,
+                    github_pull_requests::Variables {
+                        pr_search: pr_search.clone(),
+                        after: pr_cursor.clone(),
+                    },
+                )
+                .await
+                .map_err(|e| {
+                    if let Some(err) = e.get_error_by_type(GithubGraphQLErrorType::Forbidden) {
+                        return VersionControlClientDateRangeReportError::Unauthorized(
+                            err.message.to_string(),
+                        );
+                    }
+                    VersionControlClientDateRangeReportError::Transport(e.to_string())
+                })?;
+
+            let has_next = data.pull_requests.page_info.has_next_page;
+            let end_cursor = data.pull_requests.page_info.end_cursor;
+
+            if let Some(nodes) = data.pull_requests.nodes {
+                for node in nodes.into_iter().flatten() {
+                    if let github_pull_requests::GithubPullRequestsPullRequestsNodes::PullRequest(
+                        pr,
+                    ) = node
+                    {
+                        pull_requests.push(VersionControlDateRangeReportPullRequest {
+                            number: pr.number,
+                            title: pr.title,
+                            state: serde_json::to_value(&pr.state)
+                                .ok()
+                                .and_then(|v| v.as_str().map(|s| s.to_lowercase()))
+                                .unwrap_or_else(|| "unknown".to_string()),
+                            created_at: pr.created_at,
+                            merged_at: pr.merged_at,
+                            closed_at: pr.closed_at,
+                            additions: pr.additions,
+                            deletions: pr.deletions,
+                            changed_files: pr.changed_files,
+                            author: pr.author.map(|a| a.login),
+                        });
+                    }
+                }
+            }
+
+            if !has_next {
+                break;
+            }
+            pr_cursor = end_cursor;
+        }
+
+        // When a specific author is requested, filter commits to that login.
+        if let Some(login) = author {
+            commits.retain(|c| {
+                c.author
+                    .as_ref()
+                    .and_then(|a| a.login.as_deref())
+                    .map(|l| l.eq_ignore_ascii_case(login))
+                    .unwrap_or(false)
+            });
+        }
+
+        tracing::debug!(
+            repo = %repo,
+            commits = commits.len(),
+            prs = pull_requests.len(),
+            "GitHub report fetched (paginated)"
         );
 
-        let response = self
-            .graphql::<GithubDateRangeReport>(
-                access_token,
-                github_date_range_report::Variables {
-                    owner: owner.to_string(),
-                    repo: repo.to_string(),
-                    branch: branch.to_string(),
-                    since: date_range.since,
-                    until: date_range.until,
-                    pr_search,
-                    issue_search: issue_search.to_string(),
-                    after: None,
-                },
-            )
-            .await
-            .map_err(|e| {
-                if let Some(graphql_error) = e.get_error_by_type(GithubGraphQLErrorType::Forbidden)
-                {
-                    return VersionControlClientDateRangeReportError::Unauthorized(
-                        graphql_error.message.to_string(),
-                    );
-                }
-
-                VersionControlClientDateRangeReportError::Transport(e.to_string())
-            })?;
-
-        // If the repository exists but the ref is None, the branch does not exist
-        if response.repository.is_some()
-            && response
-                .repository
-                .as_ref()
-                .and_then(|r| r.ref_.as_ref())
-                .is_none()
-        {
-            return Err(VersionControlClientDateRangeReportError::BranchNotFound(
-                branch.to_string(),
-            ));
-        }
-
-        Ok(VersionControlDateRangeReport::from_github_response(
-            response,
-        ))
-    }
-}
-
-impl VersionControlDateRangeReport {
-    pub fn from_github_response(response: github_date_range_report::ResponseData) -> Self {
-        let mut pull_requests = Vec::new();
-        let mut commits = Vec::new();
-
-        if let Some(pr_nodes) = response.pull_requests.nodes {
-            for node in pr_nodes.into_iter().flatten() {
-                if let github_date_range_report::GithubDateRangeReportPullRequestsNodes::PullRequest(pr) =
-                    node
-                {
-                    pull_requests.push(VersionControlDateRangeReportPullRequest {
-                        number: pr.number,
-                        title: pr.title,
-                        state: serde_json::to_value(&pr.state)
-                            .ok()
-                            .and_then(|v| v.as_str().map(|s| s.to_lowercase()))
-                            .unwrap_or_else(|| "unknown".to_string()),
-                        created_at: pr.created_at,
-                        merged_at: pr.merged_at,
-                        closed_at: pr.closed_at,
-                        additions: pr.additions,
-                        deletions: pr.deletions,
-                        changed_files: pr.changed_files,
-                        author: pr.author.map(|a| a.login),
-                    });
-                }
-            }
-        }
-
-        if let Some(target) = response
-            .repository
-            .and_then(|r| r.ref_)
-            .and_then(|b| b.target)
-            && let github_date_range_report::GithubDateRangeReportRepositoryRefTarget::Commit(
-                commit_target,
-            ) = target
-            && let Some(nodes) = commit_target.history.nodes
-        {
-            for commit in nodes.into_iter().flatten() {
-                commits.push(VersionControlDateRangeReportCommit {
-                    sha: commit.oid,
-                    message: commit.message,
-                    authored_at: commit.committed_date,
-                    additions: commit.additions,
-                    deletions: commit.deletions,
-                    changed_files: commit.changed_files_if_available,
-                    author: commit.author.map(|a| VersionControlDateRangeReportAuthor {
-                        login: a.user.and_then(|u| u.login.into()),
-                        name: a.name,
-                        email: a.email,
-                    }),
-                });
-            }
-        }
-
-        VersionControlDateRangeReport {
-            pull_requests,
+        Ok(VersionControlDateRangeReport {
             commits,
-        }
+            pull_requests,
+        })
     }
 }

@@ -1,10 +1,11 @@
 use crate::domain::repository::entities::repository::Repository;
 use crate::domain::repository::repositories::repository_repository::{
-    CreateRepositoryError, DeleteRepositoryError, FindAllRepositoriesError
-    , FindRepositoryByIdError, RepositoryRepository,
+    CreateRepositoryError, DeleteRepositoryError, FindAllRepositoriesError,
+    FindRepositoryByIdError, FindRepositoryByOwnerAndNameError, RepositoryRepository,
     UpdateRepositoryError,
 };
 use crate::domain::repository::value_objects::repository_id::RepositoryId;
+use crate::domain::user::value_objects::social_chat_id::SocialChatId;
 use crate::infrastructure::database::mysql::entities::repositories;
 use async_trait::async_trait;
 use sea_orm::{
@@ -34,6 +35,7 @@ impl RepositoryRepository for MySQLRepositoryRepository {
             name: Set(repository.name.clone()),
             owner: Set(repository.owner.clone()),
             url: Set(repository.url.clone()),
+            social_chat_id: Set(repository.social_chat_id.map(|id| id.0)),
             ..Default::default()
         };
 
@@ -55,6 +57,7 @@ impl RepositoryRepository for MySQLRepositoryRepository {
             name: Set(repository.name.clone()),
             owner: Set(repository.owner.clone()),
             url: Set(repository.url.clone()),
+            social_chat_id: Set(repository.social_chat_id.map(|id| id.0)),
             ..Default::default()
         };
 
@@ -86,6 +89,22 @@ impl RepositoryRepository for MySQLRepositoryRepository {
         Ok(results.into_iter().map(Repository::from_mysql).collect())
     }
 
+    async fn find_by_owner_and_name(
+        &self,
+        owner: &str,
+        name: &str,
+    ) -> Result<Repository, FindRepositoryByOwnerAndNameError> {
+        let result = repositories::Entity::find()
+            .filter(repositories::Column::Owner.eq(owner))
+            .filter(repositories::Column::Name.eq(name))
+            .one(self.db.as_ref())
+            .await
+            .map_err(|e| FindRepositoryByOwnerAndNameError::DbError(e.to_string()))?
+            .ok_or(FindRepositoryByOwnerAndNameError::NotFound)?;
+
+        Ok(Repository::from_mysql(result))
+    }
+
     async fn delete(
         &self,
         txn: &DatabaseTransaction,
@@ -114,6 +133,7 @@ impl Repository {
             name: model.name,
             owner: model.owner,
             url: model.url,
+            social_chat_id: model.social_chat_id.map(SocialChatId),
             created_at: model.created_at,
             updated_at: model.updated_at,
         }

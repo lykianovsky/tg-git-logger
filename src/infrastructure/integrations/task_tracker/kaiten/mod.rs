@@ -2,7 +2,8 @@ use async_trait::async_trait;
 use serde::Deserialize;
 
 use crate::domain::task::ports::task_tracker_client::{
-    TaskTrackerClient, TaskTrackerClientMoveToColumnError,
+    TaskTrackerCard, TaskTrackerClient, TaskTrackerClientGetCardError,
+    TaskTrackerClientMoveToColumnError,
 };
 use crate::domain::task::value_objects::task_id::TaskId;
 use reqwest::{Client, Method};
@@ -11,6 +12,8 @@ use serde_json::json;
 
 #[derive(Deserialize, Debug)]
 pub struct KaitenCard {
+    pub id: u64,
+    pub title: String,
     pub column_id: u64,
 }
 
@@ -69,6 +72,10 @@ impl KaitenClient {
         tracing::debug!("Response status: {}", status);
         tracing::debug!("Response body: {}", text);
 
+        if status == reqwest::StatusCode::NOT_FOUND {
+            return Err(format!("Not found: {}", path).into());
+        }
+
         let parsed = serde_json::from_str::<Response>(&text)?;
 
         Ok(parsed)
@@ -107,5 +114,30 @@ impl TaskTrackerClient for KaitenClient {
         }
 
         Ok(())
+    }
+
+    async fn get_card(
+        &self,
+        task_id: TaskId,
+    ) -> Result<TaskTrackerCard, TaskTrackerClientGetCardError> {
+        let card: KaitenCard = self
+            .request::<(), KaitenCard>(Method::GET, &format!("/cards/{}", task_id.0), None)
+            .await
+            .map_err(|e| {
+                let msg = e.to_string();
+                if msg.contains("Not found") {
+                    TaskTrackerClientGetCardError::NotFound
+                } else {
+                    TaskTrackerClientGetCardError::ClientError(msg)
+                }
+            })?;
+
+        let url = format!("{}/space/0/boards/card/{}", self.base.0, card.id);
+
+        Ok(TaskTrackerCard {
+            id: TaskId(card.id),
+            title: card.title,
+            url,
+        })
     }
 }

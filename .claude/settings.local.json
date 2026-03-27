@@ -15,7 +15,10 @@
       "Bash(find /d/code/tg-git-logger/src/delivery/bot/telegram -type d -o -type f -name *.rs)",
       "Bash(grep -c \"edit_message_text\\\\|send_message\" /d/code/tg-git-logger/src/delivery/bot/telegram/dialogues/*.rs)",
       "Bash(xargs grep:*)",
-      "Bash(grep -A 5 \"no method named \\\\`weekday\\\\`\")"
+      "Bash(grep -A 5 \"no method named \\\\`weekday\\\\`\")",
+      "Bash(xargs wc:*)",
+      "Bash(xargs head:*)",
+      "Bash(grep -E \"\\\\.rs$\")"
     ]
   }
 }

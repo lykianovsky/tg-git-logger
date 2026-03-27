@@ -9,6 +9,8 @@ use thiserror::Error;
 pub enum CreateUserConnectionRepositoryError {
     #[error("Database error: {0}")]
     DbError(String),
+    #[error("Already bound to this repository")]
+    DuplicateEntry,
 }
 
 #[derive(Debug, Error)]

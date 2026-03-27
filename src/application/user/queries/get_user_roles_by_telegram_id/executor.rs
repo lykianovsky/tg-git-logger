@@ -32,18 +32,13 @@ impl CommandExecutor for GetUserRolesByTelegramIdExecutor {
     type Response = GetUserRolesByTelegramIdResponse;
     type Error = GetUserRolesByTelegramIdError;
 
-    async fn execute(
-        &self,
-        cmd: &Self::Command,
-    ) -> Result<Self::Response, Self::Error> {
+    async fn execute(&self, cmd: &Self::Command) -> Result<Self::Response, Self::Error> {
         let social = self
             .user_socials_repo
             .find_by_social_user_id(&cmd.social_user_id)
             .await
             .map_err(|e| match e {
-                FindSocialServiceByIdError::NotFound => {
-                    GetUserRolesByTelegramIdError::UserNotFound
-                }
+                FindSocialServiceByIdError::NotFound => GetUserRolesByTelegramIdError::UserNotFound,
                 FindSocialServiceByIdError::DbError(msg) => {
                     GetUserRolesByTelegramIdError::DbError(msg)
                 }

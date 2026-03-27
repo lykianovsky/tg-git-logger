@@ -1,7 +1,7 @@
 use crate::domain::user::entities::user_notification::UserNotification;
 use crate::domain::user::repositories::user_notifications_repository::{
-    CreateUserNotificationError, FindUserNotificationByIdError,
-    FindUserNotificationsByUserIdError, UserNotificationsRepository,
+    CreateUserNotificationError, FindUserNotificationByIdError, FindUserNotificationsByUserIdError,
+    UserNotificationsRepository,
 };
 use crate::domain::user::value_objects::notification_type::NotificationType;
 use crate::domain::user::value_objects::user_id::UserId;
@@ -48,10 +48,7 @@ impl UserNotificationsRepository for MySQLUserNotificationsRepository {
         UserNotification::from_mysql(result).map_err(CreateUserNotificationError::DbError)
     }
 
-    async fn find_by_id(
-        &self,
-        id: i32,
-    ) -> Result<UserNotification, FindUserNotificationByIdError> {
+    async fn find_by_id(&self, id: i32) -> Result<UserNotification, FindUserNotificationByIdError> {
         let result = user_notifications::Entity::find()
             .filter(user_notifications::Column::Id.eq(id))
             .one(self.db.as_ref())
@@ -75,8 +72,7 @@ impl UserNotificationsRepository for MySQLUserNotificationsRepository {
         results
             .into_iter()
             .map(|m| {
-                UserNotification::from_mysql(m)
-                    .map_err(FindUserNotificationsByUserIdError::DbError)
+                UserNotification::from_mysql(m).map_err(FindUserNotificationsByUserIdError::DbError)
             })
             .collect()
     }

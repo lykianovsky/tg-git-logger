@@ -1,0 +1,33 @@
+query GithubPullRequests(
+    $prSearch: String!,
+    $after: String
+) {
+    pullRequests: search(query: $prSearch, first: 100, after: $after, type: ISSUE) {
+        pageInfo {
+            hasNextPage
+            endCursor
+        }
+        nodes {
+            __typename
+            ... on PullRequest {
+                number
+                title
+                state
+                createdAt
+                updatedAt
+                mergedAt
+                closedAt
+                additions
+                deletions
+                changedFiles
+                author { __typename login }
+                assignees(first: 10) {
+                    nodes { login }
+                }
+                labels(first: 10) {
+                    nodes { name }
+                }
+            }
+        }
+    }
+}

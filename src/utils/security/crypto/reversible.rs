@@ -1,8 +1,8 @@
 use aes_gcm::{
-    aead::{Aead, KeyInit}, Aes256Gcm,
-    Nonce,
+    Aes256Gcm, Nonce,
+    aead::{Aead, KeyInit},
 };
-use base64::{engine::general_purpose, Engine as _};
+use base64::{Engine as _, engine::general_purpose};
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;

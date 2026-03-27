@@ -2,7 +2,9 @@ use crate::application::user::commands::bind_repository::command::BindRepository
 use crate::application::user::commands::bind_repository::error::BindRepositoryExecutorError;
 use crate::application::user::commands::unbind_repository::command::UnbindRepositoryCommand;
 use crate::bootstrap::executors::ApplicationBoostrapExecutors;
-use crate::delivery::bot::telegram::dialogues::{TelegramBotDialogueState, TelegramBotDialogueType};
+use crate::delivery::bot::telegram::dialogues::{
+    TelegramBotDialogueState, TelegramBotDialogueType,
+};
 use crate::domain::repository::value_objects::repository_id::RepositoryId;
 use crate::domain::shared::command::CommandExecutor;
 use crate::domain::user::value_objects::social_user_id::SocialUserId;
@@ -12,13 +14,15 @@ use teloxide::dispatching::DpHandlerDescription;
 use teloxide::dptree::case;
 use teloxide::prelude::*;
 use teloxide::types::{InlineKeyboardButton, InlineKeyboardMarkup};
-use teloxide::{dptree, Bot};
+use teloxide::{Bot, dptree};
 
 #[derive(Debug, Clone, Default)]
 pub enum TelegramBotBindRepositoryState {
     #[default]
     SelectRepository,
-    ConfirmUnbind { repository_id: i32 },
+    ConfirmUnbind {
+        repository_id: i32,
+    },
 }
 
 pub struct TelegramBotBindRepositoryDispatcher {}
@@ -27,10 +31,7 @@ impl TelegramBotBindRepositoryDispatcher {
     pub fn new() -> Handler<'static, Result<(), Box<dyn Error + Send + Sync>>, DpHandlerDescription>
     {
         let queries = Update::filter_callback_query()
-            .branch(
-                case![TelegramBotBindRepositoryState::SelectRepository]
-                    .endpoint(handle_select),
-            )
+            .branch(case![TelegramBotBindRepositoryState::SelectRepository].endpoint(handle_select))
             .branch(
                 case![TelegramBotBindRepositoryState::ConfirmUnbind { repository_id }]
                     .endpoint(handle_confirm_unbind),
@@ -97,7 +98,8 @@ async fn handle_select(
         }
         Err(e) => {
             tracing::error!(error = %e, "Failed to bind repository");
-            bot.send_message(msg.chat().id, format!("❌ Ошибка: {e}")).await?;
+            bot.send_message(msg.chat().id, format!("❌ Ошибка: {e}"))
+                .await?;
             dialogue.exit().await.ok();
         }
     }
@@ -133,11 +135,13 @@ async fn handle_confirm_unbind(
 
     match executors.commands.unbind_repository.execute(&cmd).await {
         Ok(_) => {
-            bot.send_message(msg.chat().id, "✅ Вы успешно отвязались от репозитория.").await?;
+            bot.send_message(msg.chat().id, "✅ Вы успешно отвязались от репозитория.")
+                .await?;
         }
         Err(e) => {
             tracing::error!(error = %e, "Failed to unbind repository");
-            bot.send_message(msg.chat().id, format!("❌ Ошибка: {e}")).await?;
+            bot.send_message(msg.chat().id, format!("❌ Ошибка: {e}"))
+                .await?;
         }
     }
 

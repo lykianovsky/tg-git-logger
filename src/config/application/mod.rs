@@ -17,8 +17,6 @@ pub struct ApplicationSecretConfig {
 pub struct ApplicationGithubConfig {
     pub base: String,
     pub api_base: String,
-    pub repository: String,
-    pub repository_owner: String,
     pub webhook_secret: String,
     pub oauth_pathname: String,
     pub oauth_client_scope: String,
@@ -154,9 +152,6 @@ impl ApplicationConfig {
         let base = ENV.get("GITHUB_BASE");
         let api_base = ENV.get("GITHUB_API_BASE");
 
-        let repository = ENV.get("GITHUB_REPOSITORY");
-        let repository_owner = ENV.get("GITHUB_REPOSITORY_OWNER");
-
         let oauth_pathname = ENV.get("GITHUB_OAUTH_PATHNAME");
         let oauth_client_scope = ENV.get("GITHUB_OAUTH_CLIENT_SCOPE");
         let oauth_client_id = ENV.get("GITHUB_OAUTH_CLIENT_ID");
@@ -164,17 +159,16 @@ impl ApplicationConfig {
 
         let webhook_secret = ENV.get_or("GITHUB_WEBHOOK_SECRET", "");
 
-        if webhook_secret == "" {
+        if webhook_secret.is_empty() {
             tracing::warn!(
-                "GITHUB_WEBHOOK_SECRET is not set or empty. Please provide it in your .env.local file for better security."
+                "GITHUB_WEBHOOK_SECRET is not set or empty. \
+                 Provide it in .env for better security."
             )
         }
 
         ApplicationGithubConfig {
             base,
             api_base,
-            repository,
-            repository_owner,
             oauth_pathname,
             oauth_client_scope,
             oauth_client_id,

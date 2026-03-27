@@ -1,0 +1,42 @@
+query GithubCommitHistory(
+    $owner: String!,
+    $repo: String!,
+    $branch: String!,
+    $since: GitTimestamp!,
+    $until: GitTimestamp!,
+    $after: String
+) {
+    repository(owner: $owner, name: $repo) {
+        ref(qualifiedName: $branch) {
+            name
+            target {
+                __typename
+                ... on Commit {
+                    history(since: $since, until: $until, first: 100, after: $after) {
+                        pageInfo {
+                            hasNextPage
+                            endCursor
+                        }
+                        nodes {
+                            oid
+                            message
+                            committedDate
+                            additions
+                            deletions
+                            changedFilesIfAvailable
+                            author {
+                                __typename
+                                name
+                                email
+                                user {
+                                    login
+                                    databaseId
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

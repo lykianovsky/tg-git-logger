@@ -77,15 +77,16 @@ impl WebhookEvent for WebhookReleaseEvent {
 
         // ── Описание ───────────────────────────────────────
         if let Some(body) = &self.body
-            && !body.trim().is_empty() {
-                let truncated = if body.len() > 500 {
-                    format!("{}…", &body[..500])
-                } else {
-                    body.clone()
-                };
+            && !body.trim().is_empty()
+        {
+            let truncated = if body.len() > 500 {
+                format!("{}…", &body[..500])
+            } else {
+                body.clone()
+            };
 
-                builder = builder.bold("📋 Описание").line(&truncated).empty_line();
-            }
+            builder = builder.bold("📋 Описание").line(&truncated).empty_line();
+        }
 
         // ── Ссылки ─────────────────────────────────────────
         if let Some(url) = &self.html_url {

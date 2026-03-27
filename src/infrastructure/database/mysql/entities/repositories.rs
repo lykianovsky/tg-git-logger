@@ -11,6 +11,7 @@ pub struct Model {
     pub owner: String,
     #[sea_orm(unique)]
     pub url: String,
+    pub social_chat_id: Option<i64>,
     pub created_at: DateTimeUtc,
     pub updated_at: DateTimeUtc,
 }

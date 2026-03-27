@@ -3,10 +3,13 @@ use crate::application::notification::commands::send_social_notify::executor::Se
 use crate::application::repository::commands::create_repository::executor::CreateRepositoryExecutor;
 use crate::application::repository::commands::create_repository_task_tracker::executor::CreateRepositoryTaskTrackerExecutor;
 use crate::application::repository::commands::delete_repository::executor::DeleteRepositoryExecutor;
+use crate::application::repository::commands::set_repository_notification_chat::executor::SetRepositoryNotificationChatExecutor;
+use crate::application::repository::commands::unset_repository_notification_chat::executor::UnsetRepositoryNotificationChatExecutor;
 use crate::application::repository::commands::update_repository::executor::UpdateRepositoryExecutor;
 use crate::application::repository::commands::update_repository_task_tracker::executor::UpdateRepositoryTaskTrackerExecutor;
 use crate::application::repository::queries::get_all_repositories::executor::GetAllRepositoriesExecutor;
 use crate::application::task::commands::move_task_to_test::executor::MoveTaskToTestExecutor;
+use crate::application::task::queries::get_task_card::executor::GetTaskCardExecutor;
 use crate::application::user::commands::bind_repository::executor::BindRepositoryExecutor;
 use crate::application::user::commands::register_via_oauth::executor::RegisterUserViaOAuthExecutor;
 use crate::application::user::commands::unbind_repository::executor::UnbindRepositoryExecutor;
@@ -26,6 +29,7 @@ pub struct ApplicationBoostrapExecutorsQueries {
     pub get_user_roles_by_telegram_id: Arc<GetUserRolesByTelegramIdExecutor>,
     pub get_user_bound_repositories: Arc<GetUserBoundRepositoriesExecutor>,
     pub get_all_repositories: Arc<GetAllRepositoriesExecutor>,
+    pub get_task_card: Arc<GetTaskCardExecutor>,
 }
 
 pub struct ApplicationBoostrapExecutorsCommands {
@@ -38,6 +42,8 @@ pub struct ApplicationBoostrapExecutorsCommands {
     pub create_repository_task_tracker: Arc<CreateRepositoryTaskTrackerExecutor>,
     pub update_repository: Arc<UpdateRepositoryExecutor>,
     pub update_repository_task_tracker: Arc<UpdateRepositoryTaskTrackerExecutor>,
+    pub set_repository_notification_chat: Arc<SetRepositoryNotificationChatExecutor>,
+    pub unset_repository_notification_chat: Arc<UnsetRepositoryNotificationChatExecutor>,
     pub bind_repository: Arc<BindRepositoryExecutor>,
     pub unbind_repository: Arc<UnbindRepositoryExecutor>,
     pub delete_repository: Arc<DeleteRepositoryExecutor>,
@@ -78,6 +84,9 @@ impl ApplicationBoostrapExecutors {
             )),
             get_all_repositories: Arc::new(GetAllRepositoriesExecutor::new(
                 shared_dependency.repository_repo.clone(),
+            )),
+            get_task_card: Arc::new(GetTaskCardExecutor::new(
+                shared_dependency.task_tracker_client.clone(),
             )),
         };
 
@@ -129,6 +138,16 @@ impl ApplicationBoostrapExecutors {
                 mysql_pool.clone(),
                 shared_dependency.repository_task_tracker_repo.clone(),
             )),
+            set_repository_notification_chat: Arc::new(SetRepositoryNotificationChatExecutor::new(
+                mysql_pool.clone(),
+                shared_dependency.repository_repo.clone(),
+            )),
+            unset_repository_notification_chat: Arc::new(
+                UnsetRepositoryNotificationChatExecutor::new(
+                    mysql_pool.clone(),
+                    shared_dependency.repository_repo.clone(),
+                ),
+            ),
             bind_repository: Arc::new(BindRepositoryExecutor::new(
                 mysql_pool.clone(),
                 shared_dependency.user_socials_repo.clone(),

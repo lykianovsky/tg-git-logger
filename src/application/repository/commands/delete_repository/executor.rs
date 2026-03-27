@@ -12,8 +12,14 @@ pub struct DeleteRepositoryExecutor {
 }
 
 impl DeleteRepositoryExecutor {
-    pub fn new(db: Arc<DatabaseConnection>, repository_repo: Arc<dyn RepositoryRepository>) -> Self {
-        Self { db, repository_repo }
+    pub fn new(
+        db: Arc<DatabaseConnection>,
+        repository_repo: Arc<dyn RepositoryRepository>,
+    ) -> Self {
+        Self {
+            db,
+            repository_repo,
+        }
     }
 }
 

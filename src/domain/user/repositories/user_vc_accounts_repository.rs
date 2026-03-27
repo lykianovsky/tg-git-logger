@@ -28,6 +28,15 @@ pub enum FindVersionControlServiceByUserIdError {
     NotFound,
 }
 
+#[derive(Debug, Error)]
+pub enum FindVersionControlServiceByLoginError {
+    #[error("Database error: {0}")]
+    DbError(String),
+
+    #[error("User not found")]
+    NotFound,
+}
+
 #[async_trait::async_trait]
 pub trait UserVersionControlAccountsRepository: Send + Sync {
     async fn create(
@@ -45,4 +54,9 @@ pub trait UserVersionControlAccountsRepository: Send + Sync {
         &self,
         id: &UserId,
     ) -> Result<UserVersionControlAccount, FindVersionControlServiceByUserIdError>;
+
+    async fn find_by_login(
+        &self,
+        login: &str,
+    ) -> Result<UserVersionControlAccount, FindVersionControlServiceByLoginError>;
 }

@@ -1,7 +1,7 @@
-use axum::extract::Path;
-use axum::http::{header, StatusCode};
-use axum::response::{IntoResponse, Response};
 use axum::Extension;
+use axum::extract::Path;
+use axum::http::{StatusCode, header};
+use axum::response::{IntoResponse, Response};
 use std::sync::Arc;
 
 use crate::bootstrap::shared_dependency::ApplicationSharedDependency;

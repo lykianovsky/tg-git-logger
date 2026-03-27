@@ -18,6 +18,15 @@ pub enum FindSocialServiceByIdError {
     NotFound,
 }
 
+#[derive(Debug, Error)]
+pub enum FindSocialServiceByUserIdError {
+    #[error("Database error: {0}")]
+    DbError(String),
+
+    #[error("User not found")]
+    NotFound,
+}
+
 #[async_trait::async_trait]
 pub trait UserSocialAccountsRepository: Send + Sync {
     async fn create(
@@ -30,4 +39,9 @@ pub trait UserSocialAccountsRepository: Send + Sync {
         &self,
         social_user_id: &SocialUserId,
     ) -> Result<UserSocialAccount, FindSocialServiceByIdError>;
+
+    async fn find_by_user_id(
+        &self,
+        user_id: &crate::domain::user::value_objects::user_id::UserId,
+    ) -> Result<UserSocialAccount, FindSocialServiceByUserIdError>;
 }

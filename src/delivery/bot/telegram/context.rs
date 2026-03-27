@@ -1,9 +1,9 @@
 use crate::config::application::ApplicationConfig;
 use crate::delivery::bot::telegram::commands::builder::TelegramBotCommand;
 use std::sync::Arc;
+use teloxide::Bot;
 use teloxide::prelude::{CallbackQuery, Message};
 use teloxide::types::User;
-use teloxide::Bot;
 
 pub struct TelegramBotCommandContext {
     pub bot: Bot,

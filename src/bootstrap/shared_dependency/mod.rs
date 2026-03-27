@@ -93,13 +93,16 @@ impl ApplicationSharedDependency {
         ));
 
         let user_connection_repositories_repo: Arc<dyn UserConnectionRepositoriesRepository> =
-            Arc::new(MySQLUserConnectionRepositoriesRepository::new(mysql_pool.clone()));
+            Arc::new(MySQLUserConnectionRepositoriesRepository::new(
+                mysql_pool.clone(),
+            ));
 
         let repository_repo: Arc<dyn RepositoryRepository> =
             Arc::new(MySQLRepositoryRepository::new(mysql_pool.clone()));
 
-        let repository_task_tracker_repo: Arc<dyn RepositoryTaskTrackerRepository> =
-            Arc::new(MySQLRepositoryTaskTrackerRepository::new(mysql_pool.clone()));
+        let repository_task_tracker_repo: Arc<dyn RepositoryTaskTrackerRepository> = Arc::new(
+            MySQLRepositoryTaskTrackerRepository::new(mysql_pool.clone()),
+        );
 
         let notification_service = Arc::new(CompositionNotificationService::new(
             config.telegram.bot_token.clone(),
@@ -120,12 +123,9 @@ impl ApplicationSharedDependency {
             KaitenTaskTrackerService::new(config.task_tracker.extract_pattern.clone()),
         );
 
-        let version_control_client: Arc<dyn VersionControlClient> =
-            Arc::new(GithubVersionControlClient::new(
-                config.github.api_base.clone(),
-                config.github.repository_owner.clone(),
-                config.github.repository.clone(),
-            ));
+        let version_control_client: Arc<dyn VersionControlClient> = Arc::new(
+            GithubVersionControlClient::new(config.github.api_base.clone()),
+        );
 
         Ok(Self {
             event_bus,

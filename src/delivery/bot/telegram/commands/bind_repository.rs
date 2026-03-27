@@ -3,7 +3,9 @@ use crate::application::user::queries::get_user_bound_repositories::query::GetUs
 use crate::bootstrap::executors::ApplicationBoostrapExecutors;
 use crate::delivery::bot::telegram::context::TelegramBotCommandContext;
 use crate::delivery::bot::telegram::dialogues::bind_repository::TelegramBotBindRepositoryState;
-use crate::delivery::bot::telegram::dialogues::{TelegramBotDialogueState, TelegramBotDialogueType};
+use crate::delivery::bot::telegram::dialogues::{
+    TelegramBotDialogueState, TelegramBotDialogueType,
+};
 use crate::domain::shared::command::CommandExecutor;
 use crate::domain::user::value_objects::social_user_id::SocialUserId;
 use std::collections::HashSet;
@@ -24,7 +26,11 @@ impl TelegramBotBindRepositoryCommandHandler {
         executors: Arc<ApplicationBoostrapExecutors>,
         dialogue: Arc<TelegramBotDialogueType>,
     ) -> Self {
-        Self { context, executors, dialogue }
+        Self {
+            context,
+            executors,
+            dialogue,
+        }
     }
 
     pub async fn execute(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {

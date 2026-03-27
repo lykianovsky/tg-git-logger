@@ -14,7 +14,7 @@ use lapin::options::{
     BasicConsumeOptions, ExchangeDeclareOptions, QueueBindOptions, QueueDeclareOptions,
 };
 use lapin::types::AMQPValue;
-use lapin::{types::FieldTable, Channel, Connection, ConnectionProperties};
+use lapin::{Channel, Connection, ConnectionProperties, types::FieldTable};
 use std::sync::Arc;
 use std::time::Duration;
 

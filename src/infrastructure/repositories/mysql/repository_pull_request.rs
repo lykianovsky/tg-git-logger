@@ -48,10 +48,7 @@ impl RepositoryPullRequestRepository for MySQLRepositoryPullRequestRepository {
         RepositoryPullRequest::from_mysql(result).map_err(CreatePullRequestError::DbError)
     }
 
-    async fn find_by_id(
-        &self,
-        id: i32,
-    ) -> Result<RepositoryPullRequest, FindPullRequestByIdError> {
+    async fn find_by_id(&self, id: i32) -> Result<RepositoryPullRequest, FindPullRequestByIdError> {
         let result = repository_pull_requests::Entity::find()
             .filter(repository_pull_requests::Column::Id.eq(id))
             .one(self.db.as_ref())

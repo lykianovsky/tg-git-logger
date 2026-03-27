@@ -109,10 +109,11 @@ impl MessageBuilder {
         let mut result = self.parts.concat();
 
         if let Some(max_length) = self.max_length
-            && result.len() > max_length {
-                result = result.chars().take(max_length - 3).collect::<String>();
-                result.push_str("...");
-            }
+            && result.len() > max_length
+        {
+            result = result.chars().take(max_length - 3).collect::<String>();
+            result.push_str("...");
+        }
 
         result
     }

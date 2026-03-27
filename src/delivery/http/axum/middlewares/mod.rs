@@ -1,11 +1,11 @@
 use crate::config::environment::ENV;
 use crate::infrastructure::contracts::github::headers::GithubHeaders;
-use axum::body::{to_bytes, Body, Bytes};
+use axum::body::{Body, Bytes, to_bytes};
 use axum::http::StatusCode;
 use axum::{extract::Request, middleware::Next, response::Response};
 use hmac::Hmac;
-use sha2::digest::Mac;
 use sha2::Sha256;
+use sha2::digest::Mac;
 
 pub struct GithubWebhookAuthorizationMiddleware {
     secret: String,

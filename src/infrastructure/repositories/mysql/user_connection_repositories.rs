@@ -2,8 +2,8 @@ use crate::domain::repository::value_objects::repository_id::RepositoryId;
 use crate::domain::user::entities::user_connection_repository::UserConnectionRepository;
 use crate::domain::user::repositories::user_connection_repositories_repository::{
     CreateUserConnectionRepositoryError, DeleteUserConnectionRepositoryError,
-    FindUserConnectionRepositoriesByUserIdError,
-    FindUserConnectionRepositoryByUserAndRepoError, UserConnectionRepositoriesRepository,
+    FindUserConnectionRepositoriesByUserIdError, FindUserConnectionRepositoryByUserAndRepoError,
+    UserConnectionRepositoriesRepository,
 };
 use crate::domain::user::value_objects::user_id::UserId;
 use crate::infrastructure::database::mysql::entities::user_connection_repositories;
@@ -38,10 +38,14 @@ impl UserConnectionRepositoriesRepository for MySQLUserConnectionRepositoriesRep
             ..Default::default()
         };
 
-        let result = model
-            .insert(txn)
-            .await
-            .map_err(|e| CreateUserConnectionRepositoryError::DbError(e.to_string()))?;
+        let result = model.insert(txn).await.map_err(|e| {
+            let msg = e.to_string();
+            if msg.contains("1062") || msg.contains("Duplicate entry") {
+                CreateUserConnectionRepositoryError::DuplicateEntry
+            } else {
+                CreateUserConnectionRepositoryError::DbError(msg)
+            }
+        })?;
 
         Ok(UserConnectionRepository::from_mysql(result))
     }
@@ -73,9 +77,7 @@ impl UserConnectionRepositoriesRepository for MySQLUserConnectionRepositoriesRep
             .filter(user_connection_repositories::Column::RepositoryId.eq(repository_id.0))
             .one(self.db.as_ref())
             .await
-            .map_err(|e| {
-                FindUserConnectionRepositoryByUserAndRepoError::DbError(e.to_string())
-            })?;
+            .map_err(|e| FindUserConnectionRepositoryByUserAndRepoError::DbError(e.to_string()))?;
 
         Ok(result.map(UserConnectionRepository::from_mysql))
     }

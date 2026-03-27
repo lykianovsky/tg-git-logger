@@ -10,7 +10,7 @@ use crate::delivery::http::axum::controllers::report::AxumReportController;
 use crate::delivery::http::axum::controllers::webhook::github::AxumWebhookGithubController;
 use crate::delivery::http::axum::middlewares::GithubWebhookAuthorizationMiddleware;
 use axum::routing::post;
-use axum::{routing::get, Extension, Router};
+use axum::{Extension, Router, routing::get};
 use std::sync::Arc;
 
 pub struct DeliveryHttpServerAxum {
@@ -27,12 +27,7 @@ impl DeliveryHttpServerAxum {
         config: Arc<ApplicationConfig>,
     ) -> Self {
         let middleware_config = config.clone();
-        let router = Self::build_router(
-            &executors,
-            &shared_dependency,
-            &config,
-            middleware_config,
-        );
+        let router = Self::build_router(&executors, &shared_dependency, &config, middleware_config);
 
         Self {
             executors,
@@ -50,8 +45,9 @@ impl DeliveryHttpServerAxum {
     ) -> Router {
         let oauth_routes = Router::new().route(
             "/github",
-            get(AxumOAuthGithubController::handle_post)
-                .layer(Extension(executors.commands.register_user_via_oauth.clone())),
+            get(AxumOAuthGithubController::handle_post).layer(Extension(
+                executors.commands.register_user_via_oauth.clone(),
+            )),
         );
 
         let webhook_routes = Router::new().route(

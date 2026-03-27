@@ -38,7 +38,7 @@ impl AxumWebhookGithubController {
 
         tracing::debug!("Parsed GitHub event type: {:?}", github_event_type);
 
-        if github_event_type == GithubEventType::Ping  {
+        if github_event_type == GithubEventType::Ping {
             tracing::info!("Received ping-pong GitHub event type: {}", raw_event_type);
             return StatusCode::OK;
         }
