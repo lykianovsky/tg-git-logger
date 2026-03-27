@@ -3,6 +3,10 @@
 //! All data transformations (stats, task extraction, HTML escaping) happen here
 //! in Rust, before being passed to the Askama template. The template itself
 //! contains no logic — it only iterates and renders pre-computed values.
+//!
+//! Two separate templates exist:
+//! - `PersonalReportTemplate` → `report/personal_report.html`
+//! - `RepoReportTemplate`     → `report/repo_report.html`
 
 use crate::domain::repository::entities::repository_task_tracker::RepositoryTaskTracker;
 use crate::domain::shared::date::range::DateRange;
@@ -14,7 +18,7 @@ use crate::domain::version_control::value_objects::report::{
 use askama::Template;
 use std::collections::{HashMap, HashSet};
 
-// ── View models ───────────────────────────────────────────────────────────────
+// ── Shared view models ────────────────────────────────────────────────────────
 
 pub struct DayActivity {
     /// Display label, e.g. "12 Jan"
@@ -39,6 +43,8 @@ pub struct ContributorRow {
     pub deletions: i64,
     /// Bar width in percent (0–100), relative to the top contributor.
     pub pct: usize,
+    /// Deduplicated tasks extracted from this contributor's commits and PRs.
+    pub tasks: Vec<TaskItem>,
 }
 
 pub struct PrRow {
@@ -72,16 +78,36 @@ pub struct CommitRow {
     pub date: String,
 }
 
-// ── Askama template ───────────────────────────────────────────────────────────
+// ── Personal-report-specific view models ─────────────────────────────────────
 
-/// All values are pre-escaped / pre-computed in Rust.
-/// The template uses `escape = "none"` so it outputs them verbatim.
+/// Commit count per day-of-week (Mon–Sun).
+pub struct DowBar {
+    /// Short label: "Пн", "Вт", …
+    pub day: &'static str,
+    pub commits: usize,
+    /// Bar height in percent (0–100), relative to the busiest day.
+    pub pct: usize,
+}
+
+/// Commit distribution across four time-of-day buckets.
+pub struct TimeOfDayBucket {
+    pub icon: &'static str,
+    pub label: &'static str,
+    pub commits: usize,
+    /// Width percent for the progress bar (0–100).
+    pub pct: usize,
+}
+
+// ── Askama templates ──────────────────────────────────────────────────────────
+
+/// Personal report template — data specific to a single author.
 #[derive(Template)]
-#[template(path = "report/full_report.html", escape = "none")]
-pub struct FullReportTemplate {
+#[template(path = "report/personal_report.html", escape = "none")]
+pub struct PersonalReportTemplate {
     // Header
-    pub title: String,
-    pub is_personal: bool,
+    pub author_name: String,
+    /// First letter of author login, upper-cased — used as avatar placeholder.
+    pub avatar_letter: String,
     pub repo_owner: String,
     pub repo_name: String,
     pub branch: String,
@@ -97,10 +123,52 @@ pub struct FullReportTemplate {
     pub total_changed_files: i64,
     pub active_days: usize,
     pub avg_commit_size: i64,
-    pub authors_count: usize,
     pub tasks_count: usize,
 
-    // Flattened PR summary (avoids nested struct in template)
+    // PR counters (personal)
+    pub pr_merged: usize,
+    pub pr_open: usize,
+    pub pr_closed: usize,
+    pub pr_merge_rate: String,
+
+    // Streak
+    /// Longest consecutive-day streak in the period.
+    pub longest_streak: usize,
+    /// Day with the most commits, e.g. "Пт, 24 Jan — 8 коммитов"
+    pub best_day: String,
+
+    // Sections
+    pub activity: Vec<DayActivity>,
+    pub dow_activity: Vec<DowBar>,
+    pub time_buckets: Vec<TimeOfDayBucket>,
+    pub tasks: Vec<TaskItem>,
+    pub pull_requests: Vec<PrRow>,
+    pub commits: Vec<CommitRow>,
+}
+
+/// Repository-wide report template — aggregates across all authors.
+#[derive(Template)]
+#[template(path = "report/repo_report.html", escape = "none")]
+pub struct RepoReportTemplate {
+    // Header
+    pub repo_owner: String,
+    pub repo_name: String,
+    pub branch: String,
+    pub period: String,
+    pub generated_at: String,
+
+    // Summary stats
+    pub commits_count: usize,
+    pub prs_count: usize,
+    pub total_additions: i64,
+    pub total_deletions: i64,
+    pub net_changes_str: String,
+    pub total_changed_files: i64,
+    pub authors_count: usize,
+    pub avg_commit_size: i64,
+    pub tasks_count: usize,
+
+    // PR summary
     pub pr_summary_merged: usize,
     pub pr_summary_open: usize,
     pub pr_summary_closed: usize,
@@ -118,6 +186,9 @@ pub struct FullReportTemplate {
 // ── Public entry point ────────────────────────────────────────────────────────
 
 /// Build and render the full HTML report for the given `report` data.
+///
+/// When `author` is `Some`, renders a personal report filtered to that author.
+/// When `author` is `None`, renders a repository-wide report.
 pub fn build_html_report(
     report: &VersionControlDateRangeReport,
     author: &Option<String>,
@@ -129,23 +200,69 @@ pub fn build_html_report(
     task_tracker_service: &dyn TaskTrackerService,
     kaiten_base: &str,
 ) -> Result<String, askama::Error> {
-    let task_url_template =
-        tracker.map(|t| format!("{}{}", kaiten_base, t.path_to_card));
+    let task_url_template = tracker.map(|t| format!("{}{}", kaiten_base, t.path_to_card));
     let extract_pattern = tracker.map(|t| t.extract_pattern_regexp.as_str());
 
+    let period = format!(
+        "{} — {}",
+        date_range.since.format("%d %b %Y"),
+        date_range.until.format("%d %b %Y")
+    );
+    let generated_at = chrono::Utc::now().format("%d %b %Y, %H:%M UTC").to_string();
+
+    match author {
+        Some(login) => build_personal_report(
+            report,
+            login,
+            period,
+            generated_at,
+            repo_owner,
+            repo_name,
+            branch,
+            task_url_template.as_deref(),
+            extract_pattern,
+            task_tracker_service,
+        ),
+        None => build_repo_report(
+            report,
+            period,
+            generated_at,
+            repo_owner,
+            repo_name,
+            branch,
+            task_url_template.as_deref(),
+            extract_pattern,
+            task_tracker_service,
+        ),
+    }
+}
+
+// ── Personal report builder ───────────────────────────────────────────────────
+
+#[allow(clippy::too_many_arguments)]
+fn build_personal_report(
+    report: &VersionControlDateRangeReport,
+    login: &str,
+    period: String,
+    generated_at: String,
+    repo_owner: &str,
+    repo_name: &str,
+    branch: &str,
+    task_url_template: Option<&str>,
+    extract_pattern: Option<&str>,
+    task_tracker_service: &dyn TaskTrackerService,
+) -> Result<String, askama::Error> {
     let commits = &report.commits;
     let prs = &report.pull_requests;
-
-    // ── Aggregate stats ───────────────────────────────────────────────────────
 
     let total_additions: i64 = commits.iter().map(|c| c.additions).sum();
     let total_deletions: i64 = commits.iter().map(|c| c.deletions).sum();
     let total_changed_files: i64 = commits.iter().filter_map(|c| c.changed_files).sum();
-    let net_changes = total_additions - total_deletions;
-    let net_changes_str = if net_changes >= 0 {
-        format!("+{}", net_changes)
+    let net = total_additions - total_deletions;
+    let net_changes_str = if net >= 0 {
+        format!("+{}", net)
     } else {
-        net_changes.to_string()
+        net.to_string()
     };
     let avg_commit_size = if commits.is_empty() {
         0
@@ -153,10 +270,116 @@ pub fn build_html_report(
         total_additions / commits.len() as i64
     };
 
-    let active_days: HashSet<String> = commits
+    let active_days_set: HashSet<String> = commits
         .iter()
         .map(|c| c.authored_at.format("%Y-%m-%d").to_string())
         .collect();
+
+    let (pr_merged, pr_open, pr_closed, pr_merge_rate, _) = compute_pr_summary(prs);
+
+    let activity = build_activity(commits);
+    let dow_activity = build_dow_activity(commits);
+    let time_buckets = build_time_buckets(commits);
+    let longest_streak = compute_longest_streak(commits);
+    let best_day = compute_best_day(commits);
+
+    let tasks = build_tasks(
+        commits,
+        prs,
+        task_url_template,
+        extract_pattern,
+        task_tracker_service,
+    );
+    let tasks_count = tasks.len();
+
+    let pull_requests = build_pr_rows(
+        prs,
+        task_url_template,
+        extract_pattern,
+        task_tracker_service,
+    );
+    let commit_rows = build_commit_rows(
+        commits,
+        task_url_template,
+        extract_pattern,
+        task_tracker_service,
+    );
+
+    let avatar_letter = login
+        .chars()
+        .next()
+        .unwrap_or('?')
+        .to_uppercase()
+        .to_string();
+
+    PersonalReportTemplate {
+        author_name: html_escape(login),
+        avatar_letter,
+        repo_owner: html_escape(repo_owner),
+        repo_name: html_escape(repo_name),
+        branch: html_escape(branch),
+        period,
+        generated_at,
+
+        commits_count: commits.len(),
+        prs_count: prs.len(),
+        total_additions,
+        total_deletions,
+        net_changes_str,
+        total_changed_files,
+        active_days: active_days_set.len(),
+        avg_commit_size,
+        tasks_count,
+
+        pr_merged,
+        pr_open,
+        pr_closed,
+        pr_merge_rate,
+
+        longest_streak,
+        best_day,
+
+        activity,
+        dow_activity,
+        time_buckets,
+        tasks,
+        pull_requests,
+        commits: commit_rows,
+    }
+    .render()
+}
+
+// ── Repository report builder ─────────────────────────────────────────────────
+
+#[allow(clippy::too_many_arguments)]
+fn build_repo_report(
+    report: &VersionControlDateRangeReport,
+    period: String,
+    generated_at: String,
+    repo_owner: &str,
+    repo_name: &str,
+    branch: &str,
+    task_url_template: Option<&str>,
+    extract_pattern: Option<&str>,
+    task_tracker_service: &dyn TaskTrackerService,
+) -> Result<String, askama::Error> {
+    let commits = &report.commits;
+    let prs = &report.pull_requests;
+
+    let total_additions: i64 = commits.iter().map(|c| c.additions).sum();
+    let total_deletions: i64 = commits.iter().map(|c| c.deletions).sum();
+    let total_changed_files: i64 = commits.iter().filter_map(|c| c.changed_files).sum();
+    let net = total_additions - total_deletions;
+    let net_changes_str = if net >= 0 {
+        format!("+{}", net)
+    } else {
+        net.to_string()
+    };
+    let avg_commit_size = if commits.is_empty() {
+        0
+    } else {
+        total_additions / commits.len() as i64
+    };
 
     let unique_authors: HashSet<String> = commits
         .iter()
@@ -167,80 +390,45 @@ pub fn build_html_report(
         })
         .collect();
 
-    // ── PR summary ────────────────────────────────────────────────────────────
-
-    let (
-        pr_merged,
-        pr_open,
-        pr_closed,
-        pr_merge_rate,
-        pr_avg_merge_time,
-    ) = compute_pr_summary(prs);
-
-    // ── Activity chart ────────────────────────────────────────────────────────
+    let (pr_merged, pr_open, pr_closed, pr_merge_rate, pr_avg_merge_time) = compute_pr_summary(prs);
 
     let activity = build_activity(commits);
-
-    // ── Tasks ─────────────────────────────────────────────────────────────────
-
     let tasks = build_tasks(
         commits,
         prs,
-        task_url_template.as_deref(),
+        task_url_template,
         extract_pattern,
         task_tracker_service,
     );
     let tasks_count = tasks.len();
 
-    // ── Contributors ──────────────────────────────────────────────────────────
-
-    let contributors = build_contributors(commits);
-
-    // ── PR rows ───────────────────────────────────────────────────────────────
+    let contributors = build_contributors(
+        commits,
+        prs,
+        task_url_template,
+        extract_pattern,
+        task_tracker_service,
+    );
 
     let pull_requests = build_pr_rows(
         prs,
-        task_url_template.as_deref(),
+        task_url_template,
         extract_pattern,
         task_tracker_service,
     );
-
-    // ── Commit rows ───────────────────────────────────────────────────────────
-
     let commit_rows = build_commit_rows(
         commits,
-        task_url_template.as_deref(),
+        task_url_template,
         extract_pattern,
         task_tracker_service,
     );
 
-    // ── Period ────────────────────────────────────────────────────────────────
-
-    let period = format!(
-        "{} — {}",
-        date_range.since.format("%d %b %Y"),
-        date_range.until.format("%d %b %Y")
-    );
-
-    let title = match author {
-        Some(a) => format!("Персональный отчёт: {}", html_escape(a)),
-        None => "Отчёт по репозиторию".to_string(),
-    };
-
-    let is_personal = author.is_some();
-
-    // ── Render ────────────────────────────────────────────────────────────────
-
-    FullReportTemplate {
-        title,
-        is_personal,
+    RepoReportTemplate {
         repo_owner: html_escape(repo_owner),
         repo_name: html_escape(repo_name),
         branch: html_escape(branch),
         period,
-        generated_at: chrono::Utc::now()
-            .format("%d %b %Y, %H:%M UTC")
-            .to_string(),
+        generated_at,
 
         commits_count: commits.len(),
         prs_count: prs.len(),
@@ -248,9 +436,8 @@ pub fn build_html_report(
         total_deletions,
         net_changes_str,
         total_changed_files,
-        active_days: active_days.len(),
-        avg_commit_size,
         authors_count: unique_authors.len(),
+        avg_commit_size,
         tasks_count,
 
         pr_summary_merged: pr_merged,
@@ -268,7 +455,7 @@ pub fn build_html_report(
     .render()
 }
 
-// ── Private helpers ───────────────────────────────────────────────────────────
+// ── Shared private helpers ────────────────────────────────────────────────────
 
 fn compute_pr_summary(
     prs: &[VersionControlDateRangeReportPullRequest],
@@ -301,11 +488,16 @@ fn compute_pr_summary(
         format_duration(total_merge_secs / merged.len() as f64)
     };
 
-    (merged.len(), open.len(), closed.len(), merge_rate, avg_merge_time)
+    (
+        merged.len(),
+        open.len(),
+        closed.len(),
+        merge_rate,
+        avg_merge_time,
+    )
 }
 
 fn build_activity(commits: &[VersionControlDateRangeReportCommit]) -> Vec<DayActivity> {
-    // key: "YYYY-MM-DD" for sorting; value: (display label, count)
     let mut day_map: HashMap<String, (String, usize)> = HashMap::new();
     for c in commits {
         let key = c.authored_at.format("%Y-%m-%d").to_string();
@@ -314,10 +506,8 @@ fn build_activity(commits: &[VersionControlDateRangeReportCommit]) -> Vec<DayAct
         entry.1 += 1;
     }
 
-    let mut days: Vec<(String, String, usize)> = day_map
-        .into_iter()
-        .map(|(k, (l, n))| (k, l, n))
-        .collect();
+    let mut days: Vec<(String, String, usize)> =
+        day_map.into_iter().map(|(k, (l, n))| (k, l, n)).collect();
     days.sort_by(|a, b| a.0.cmp(&b.0));
 
     let max = days.iter().map(|(_, _, n)| *n).max().unwrap_or(1);
@@ -327,10 +517,107 @@ fn build_activity(commits: &[VersionControlDateRangeReportCommit]) -> Vec<DayAct
         .map(|(_, label, count)| DayActivity {
             day: label,
             commits: count,
-            // Ensure a minimum 4 px so even single-commit days are visible.
-            bar_px: ((count * BAR_MAX_PX / max).max(4)),
+            bar_px: (count * BAR_MAX_PX / max).max(4),
         })
         .collect()
+}
+
+fn build_dow_activity(commits: &[VersionControlDateRangeReportCommit]) -> Vec<DowBar> {
+    const DAYS: [&str; 7] = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
+    let mut counts = [0usize; 7];
+
+    for c in commits {
+        // chrono weekday: Mon=0 … Sun=6
+        let idx = c.authored_at.weekday().num_days_from_monday() as usize;
+        counts[idx] += 1;
+    }
+
+    let max = *counts.iter().max().unwrap_or(&1);
+    let max = max.max(1);
+
+    DAYS.iter()
+        .enumerate()
+        .map(|(i, &day)| DowBar {
+            day,
+            commits: counts[i],
+            pct: counts[i] * 100 / max,
+        })
+        .collect()
+}
+
+fn build_time_buckets(commits: &[VersionControlDateRangeReportCommit]) -> Vec<TimeOfDayBucket> {
+    // Buckets: night 0-5, morning 6-11, day 12-17, evening 18-23
+    let mut counts = [0usize; 4];
+    for c in commits {
+        let h = c.authored_at.hour();
+        let idx = match h {
+            0..=5 => 0,
+            6..=11 => 1,
+            12..=17 => 2,
+            _ => 3,
+        };
+        counts[idx] += 1;
+    }
+
+    let total = counts.iter().sum::<usize>().max(1);
+    let icons = ["🌙", "🌅", "☀️", "🌆"];
+    let labels = ["Ночь (0–6)", "Утро (6–12)", "День (12–18)", "Вечер (18–24)"];
+
+    icons
+        .iter()
+        .zip(labels.iter())
+        .enumerate()
+        .map(|(i, (&icon, &label))| TimeOfDayBucket {
+            icon,
+            label,
+            commits: counts[i],
+            pct: counts[i] * 100 / total,
+        })
+        .collect()
+}
+
+fn compute_longest_streak(commits: &[VersionControlDateRangeReportCommit]) -> usize {
+    let mut days: Vec<chrono::NaiveDate> = commits
+        .iter()
+        .map(|c| c.authored_at.date_naive())
+        .collect::<HashSet<_>>()
+        .into_iter()
+        .collect();
+    days.sort();
+
+    if days.is_empty() {
+        return 0;
+    }
+
+    let mut max_streak = 1usize;
+    let mut cur = 1usize;
+
+    for i in 1..days.len() {
+        if days[i].signed_duration_since(days[i - 1]).num_days() == 1 {
+            cur += 1;
+            max_streak = max_streak.max(cur);
+        } else {
+            cur = 1;
+        }
+    }
+
+    max_streak
+}
+
+fn compute_best_day(commits: &[VersionControlDateRangeReportCommit]) -> String {
+    let mut day_map: HashMap<String, (String, usize)> = HashMap::new();
+    for c in commits {
+        let key = c.authored_at.format("%Y-%m-%d").to_string();
+        let label = c.authored_at.format("%d %b").to_string();
+        let e = day_map.entry(key).or_insert((label, 0));
+        e.1 += 1;
+    }
+
+    day_map
+        .into_iter()
+        .max_by_key(|(_, (_, n))| *n)
+        .map(|(_, (label, n))| format!("{} — {} коммитов", label, n))
+        .unwrap_or_else(|| "—".into())
 }
 
 fn build_tasks(
@@ -355,9 +642,8 @@ fn build_tasks(
             task_tracker_service.extract_all_matches_with_pattern(text, pattern)
         {
             if seen.insert(task_id.0) {
-                let url = url_template.replace("{id}", &task_id.0.to_string());
                 result.push(TaskItem {
-                    url,
+                    url: url_template.replace("{id}", &task_id.0.to_string()),
                     label: html_escape(&matched),
                 });
             }
@@ -367,12 +653,19 @@ fn build_tasks(
     result
 }
 
-fn build_contributors(commits: &[VersionControlDateRangeReportCommit]) -> Vec<ContributorRow> {
+fn build_contributors(
+    commits: &[VersionControlDateRangeReportCommit],
+    prs: &[VersionControlDateRangeReportPullRequest],
+    task_url_template: Option<&str>,
+    extract_pattern: Option<&str>,
+    task_tracker_service: &dyn TaskTrackerService,
+) -> Vec<ContributorRow> {
     #[derive(Default)]
     struct Stats {
         commits: usize,
         additions: i64,
         deletions: i64,
+        commit_messages: Vec<String>,
     }
 
     let mut map: HashMap<String, Stats> = HashMap::new();
@@ -386,6 +679,7 @@ fn build_contributors(commits: &[VersionControlDateRangeReportCommit]) -> Vec<Co
         e.commits += 1;
         e.additions += c.additions;
         e.deletions += c.deletions;
+        e.commit_messages.push(c.message.clone());
     }
 
     let mut top: Vec<(String, Stats)> = map.into_iter().collect();
@@ -394,14 +688,71 @@ fn build_contributors(commits: &[VersionControlDateRangeReportCommit]) -> Vec<Co
     let max_commits = top.first().map(|(_, s)| s.commits).unwrap_or(1);
 
     top.into_iter()
-        .map(|(name, stats)| ContributorRow {
-            name: html_escape(&name),
-            pct: stats.commits * 100 / max_commits,
-            commits: stats.commits,
-            additions: stats.additions,
-            deletions: stats.deletions,
+        .map(|(name, stats)| {
+            let tasks = extract_contributor_tasks(
+                &name,
+                &stats.commit_messages,
+                prs,
+                task_url_template,
+                extract_pattern,
+                task_tracker_service,
+            );
+            ContributorRow {
+                name: html_escape(&name),
+                pct: stats.commits * 100 / max_commits,
+                commits: stats.commits,
+                additions: stats.additions,
+                deletions: stats.deletions,
+                tasks,
+            }
         })
         .collect()
+}
+
+fn extract_contributor_tasks(
+    contributor: &str,
+    commit_messages: &[String],
+    prs: &[VersionControlDateRangeReportPullRequest],
+    task_url_template: Option<&str>,
+    extract_pattern: Option<&str>,
+    task_tracker_service: &dyn TaskTrackerService,
+) -> Vec<TaskItem> {
+    let (Some(url_template), Some(pattern)) = (task_url_template, extract_pattern) else {
+        return vec![];
+    };
+
+    let mut seen: HashSet<u64> = HashSet::new();
+    let mut tasks = Vec::new();
+
+    for msg in commit_messages {
+        for (matched, task_id) in
+            task_tracker_service.extract_all_matches_with_pattern(msg, pattern)
+        {
+            if seen.insert(task_id.0) {
+                tasks.push(TaskItem {
+                    url: url_template.replace("{id}", &task_id.0.to_string()),
+                    label: html_escape(&matched),
+                });
+            }
+        }
+    }
+
+    for pr in prs {
+        if pr.author.as_deref() == Some(contributor) {
+            for (matched, task_id) in
+                task_tracker_service.extract_all_matches_with_pattern(&pr.title, pattern)
+            {
+                if seen.insert(task_id.0) {
+                    tasks.push(TaskItem {
+                        url: url_template.replace("{id}", &task_id.0.to_string()),
+                        label: html_escape(&matched),
+                    });
+                }
+            }
+        }
+    }
+
+    tasks
 }
 
 fn build_pr_rows(
@@ -490,19 +841,19 @@ fn build_commit_rows(
 }
 
 /// Replaces the first task match in `text` with an HTML `<a>` link.
-/// Falls back to plain HTML-escaped text when no pattern / match found.
 fn linkify_task(
     text: &str,
     task_url_template: Option<&str>,
     extract_pattern: Option<&str>,
     task_tracker_service: &dyn TaskTrackerService,
 ) -> String {
+    tracing::debug!("{task_url_template:?} {extract_pattern:?} {text}");
+
     let (Some(url_template), Some(pattern)) = (task_url_template, extract_pattern) else {
         return html_escape(text);
     };
 
-    let Some((matched, task_id)) =
-        task_tracker_service.extract_match_with_pattern(text, pattern)
+    let Some((matched, task_id)) = task_tracker_service.extract_match_with_pattern(text, pattern)
     else {
         return html_escape(text);
     };
@@ -513,7 +864,7 @@ fn linkify_task(
         let before = &text[..pos];
         let after = &text[pos + matched.len()..];
         format!(
-            "{}<a href=\"{}\" class=\"task-link\">{}</a>{}",
+            "{}<a href=\"{}\" class=\"task-link\" target=\"_blank\" rel=\"noopener\">{}</a>{}",
             html_escape(before),
             html_escape(&url),
             html_escape(&matched),
@@ -539,3 +890,6 @@ fn html_escape(s: &str) -> String {
         .replace('>', "&gt;")
         .replace('"', "&quot;")
 }
+
+// chrono traits needed for .hour() and .weekday()
+use chrono::{Datelike, Timelike};
