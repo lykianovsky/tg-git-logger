@@ -20,7 +20,7 @@ impl JobConsumer for SendSocialNotifyJobConsumer {
         let payload: SendSocialNotifyJob = serde_json::from_slice(payload)
             .map_err(|e| JobConsumerError::DeserializationError(e.to_string()))?;
 
-        tracing::info!("Sending social notify job payload: {:?}", payload);
+        tracing::debug!(chat_id = %payload.chat_id.0, social_type = ?payload.social_type, "Processing send_social_notify job");
 
         if let Err(e) = self
             .executor
@@ -31,6 +31,7 @@ impl JobConsumer for SendSocialNotifyJobConsumer {
             })
             .await
         {
+            tracing::error!(error = %e, "send_social_notify failed, scheduling retry");
             return Ok(JobConsumerResponse::Retry(e.to_string()));
         };
 

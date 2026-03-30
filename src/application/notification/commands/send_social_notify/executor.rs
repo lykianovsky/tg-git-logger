@@ -25,7 +25,15 @@ impl CommandExecutor for SendSocialNotifyExecutor {
     async fn execute(&self, cmd: &Self::Command) -> Result<Self::Response, Self::Error> {
         self.notification_service
             .send_message(&cmd.social_type, &cmd.chat_id, &cmd.message)
-            .await?;
+            .await
+            .inspect_err(|e| {
+                tracing::error!(
+                    chat_id = %cmd.chat_id.0,
+                    social_type = ?cmd.social_type,
+                    error = %e,
+                    "Failed to send notification"
+                );
+            })?;
 
         Ok(SendSocialNotifyExecutorResponse {})
     }

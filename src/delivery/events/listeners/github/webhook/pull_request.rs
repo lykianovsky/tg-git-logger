@@ -54,10 +54,16 @@ impl WebhookPullRequestEventListener {
 #[async_trait]
 impl EventListener<WebhookPullRequestEvent> for WebhookPullRequestEventListener {
     async fn handle(&self, payload: &WebhookPullRequestEvent) {
+        tracing::debug!(
+            repo = %payload.repo,
+            pr = payload.number,
+            action = ?payload.action,
+            merged = payload.merged,
+            "PR webhook event received"
+        );
+
         let chat_id =
             resolve_chat_id(&self.repository_repo, &payload.repo, self.default_chat_id).await;
-
-        tracing::debug!("Chat id to send {} {}", chat_id.0, self.default_chat_id.0);
 
         self.publisher
             .publish(&SendSocialNotifyJob {
@@ -70,6 +76,11 @@ impl EventListener<WebhookPullRequestEvent> for WebhookPullRequestEventListener 
 
         if payload.merged && payload.action == WebhookPullRequestEventActionType::Closed {
             if let Some(task_id) = self.extract_task_id(&payload.repo, &payload.title).await {
+                tracing::debug!(
+                    task_id = %task_id.0,
+                    pr = payload.number,
+                    "Task extracted from merged PR, scheduling move to test"
+                );
                 self.publisher
                     .publish(&MoveTaskToTestJob { task_id })
                     .await

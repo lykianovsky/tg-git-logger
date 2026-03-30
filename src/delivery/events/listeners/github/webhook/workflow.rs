@@ -20,6 +20,14 @@ pub struct WebhookWorkflowEventListener {
 #[async_trait]
 impl EventListener<WebhookWorkflowEvent> for WebhookWorkflowEventListener {
     async fn handle(&self, payload: &WebhookWorkflowEvent) {
+        tracing::debug!(
+            repo = %payload.repo,
+            workflow = %payload.name,
+            status = %payload.status,
+            conclusion = ?payload.conclusion,
+            "Workflow webhook event received"
+        );
+
         let chat_id =
             resolve_chat_id(&self.repository_repo, &payload.repo, self.default_chat_id).await;
 

@@ -20,6 +20,12 @@ pub struct WebhookReleaseEventListener {
 #[async_trait]
 impl EventListener<WebhookReleaseEvent> for WebhookReleaseEventListener {
     async fn handle(&self, payload: &WebhookReleaseEvent) {
+        tracing::debug!(
+            repo = %payload.repo,
+            tag = %payload.tag_name,
+            "Release webhook event received"
+        );
+
         let chat_id =
             resolve_chat_id(&self.repository_repo, &payload.repo, self.default_chat_id).await;
 

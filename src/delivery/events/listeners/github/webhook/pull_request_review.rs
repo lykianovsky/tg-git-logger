@@ -21,10 +21,6 @@ pub struct WebhookPullRequestReviewEventListener {
 #[async_trait]
 impl EventListener<WebhookPullRequestReviewEvent> for WebhookPullRequestReviewEventListener {
     async fn handle(&self, payload: &WebhookPullRequestReviewEvent) {
-        if payload.state == WebhookPullRequestReviewState::Unknown {
-            return;
-        }
-
         if payload.reviewer.eq_ignore_ascii_case(&payload.pr_author) {
             return;
         }
@@ -58,6 +54,13 @@ impl EventListener<WebhookPullRequestReviewEvent> for WebhookPullRequestReviewEv
                 return;
             }
         };
+
+        tracing::debug!(
+            pr_author = %payload.pr_author,
+            reviewer = %payload.reviewer,
+            state = ?payload.state,
+            "Sending PR review DM notification"
+        );
 
         self.publisher
             .publish(&SendSocialNotifyJob {

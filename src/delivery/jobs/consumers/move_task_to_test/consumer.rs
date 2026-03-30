@@ -20,7 +20,7 @@ impl JobConsumer for MoveTaskToTestJobConsumer {
         let payload: MoveTaskToTestJob = serde_json::from_slice(payload)
             .map_err(|e| JobConsumerError::DeserializationError(e.to_string()))?;
 
-        tracing::info!("Sending task to column job payload: {:?}", payload);
+        tracing::debug!(task_id = %payload.task_id.0, "Processing move_task_to_test job");
 
         if let Err(e) = self
             .executor
@@ -29,6 +29,7 @@ impl JobConsumer for MoveTaskToTestJobConsumer {
             })
             .await
         {
+            tracing::error!(task_id = %payload.task_id.0, error = %e, "move_task_to_test failed, scheduling retry");
             return Ok(JobConsumerResponse::Retry(e.to_string()));
         };
 
