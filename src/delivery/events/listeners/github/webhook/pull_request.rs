@@ -2,8 +2,10 @@ use crate::delivery::events::listeners::github::webhook::resolve_chat_id;
 use crate::delivery::jobs::consumers::move_task_to_test::payload::MoveTaskToTestJob;
 use crate::delivery::jobs::consumers::send_social_notify::payload::SendSocialNotifyJob;
 use crate::domain::repository::repositories::repository_repository::RepositoryRepository;
+use crate::domain::repository::repositories::repository_task_tracker_repository::RepositoryTaskTrackerRepository;
 use crate::domain::shared::events::event_listener::EventListener;
 use crate::domain::task::services::task_tracker_service::TaskTrackerService;
+use crate::domain::task::value_objects::task_id::TaskId;
 use crate::domain::user::value_objects::social_chat_id::SocialChatId;
 use crate::domain::user::value_objects::social_type::SocialType;
 use crate::domain::webhook::events::WebhookEvent;
@@ -19,7 +21,34 @@ pub struct WebhookPullRequestEventListener {
     pub task_tracker_service: Arc<dyn TaskTrackerService>,
     pub publisher: Arc<dyn MessageBrokerPublisher>,
     pub repository_repo: Arc<dyn RepositoryRepository>,
+    pub repository_task_tracker_repo: Arc<dyn RepositoryTaskTrackerRepository>,
     pub default_chat_id: SocialChatId,
+}
+
+impl WebhookPullRequestEventListener {
+    async fn extract_task_id(&self, repo: &str, title: &str) -> Option<TaskId> {
+        let mut parts = repo.splitn(2, '/');
+        let (owner, name) = match (parts.next(), parts.next()) {
+            (Some(o), Some(n)) => (o, n),
+            _ => return None,
+        };
+
+        let repository = self
+            .repository_repo
+            .find_by_owner_and_name(owner, name)
+            .await
+            .ok()?;
+
+        let tracker = self
+            .repository_task_tracker_repo
+            .find_by_repository_id(repository.id)
+            .await
+            .ok()?;
+
+        self.task_tracker_service
+            .extract_match_with_pattern(title, &tracker.extract_pattern_regexp)
+            .map(|(_, task_id)| task_id)
+    }
 }
 
 #[async_trait]
@@ -40,10 +69,7 @@ impl EventListener<WebhookPullRequestEvent> for WebhookPullRequestEventListener 
             .ok();
 
         if payload.merged && payload.action == WebhookPullRequestEventActionType::Closed {
-            if let Some(task_id) = self
-                .task_tracker_service
-                .extract_task_id_by_pattern(&payload.title)
-            {
+            if let Some(task_id) = self.extract_task_id(&payload.repo, &payload.title).await {
                 self.publisher
                     .publish(&MoveTaskToTestJob { task_id })
                     .await

@@ -50,6 +50,10 @@ impl ApplicationDelivery for DeliveryEventListeners {
             .on(WebhookPullRequestEventListener {
                 publisher: self.shared_dependency.publisher.clone(),
                 repository_repo: repository_repo.clone(),
+                repository_task_tracker_repo: self
+                    .shared_dependency
+                    .repository_task_tracker_repo
+                    .clone(),
                 default_chat_id,
                 task_tracker_service: self.shared_dependency.task_tracker_service.clone(),
             })
