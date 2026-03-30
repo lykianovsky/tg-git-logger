@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Debug)]
 pub struct MoveTaskToTestJob {
     pub task_id: TaskId,
+    pub column_id: u64,
 }
 
 impl MoveTaskToTestJob {

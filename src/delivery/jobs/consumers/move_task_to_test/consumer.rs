@@ -26,6 +26,7 @@ impl JobConsumer for MoveTaskToTestJobConsumer {
             .executor
             .execute(&MoveTaskToTestExecutorCommand {
                 task_id: payload.task_id,
+                column_id: payload.column_id,
             })
             .await
         {

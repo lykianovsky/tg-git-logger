@@ -120,7 +120,6 @@ impl ApplicationBoostrapExecutors {
             move_task_to_test: Arc::new(MoveTaskToTestExecutor::new(
                 shared_dependency.task_tracker_client.clone(),
                 shared_dependency.task_tracker_service.clone(),
-                config.task_tracker.test_column_id,
             )),
             create_repository: Arc::new(CreateRepositoryExecutor::new(
                 mysql_pool.clone(),

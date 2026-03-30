@@ -26,7 +26,11 @@ pub struct WebhookPullRequestEventListener {
 }
 
 impl WebhookPullRequestEventListener {
-    async fn extract_task_id(&self, repo: &str, title: &str) -> Option<TaskId> {
+    async fn extract_task_id_and_column(
+        &self,
+        repo: &str,
+        title: &str,
+    ) -> Option<(TaskId, u64)> {
         let mut parts = repo.splitn(2, '/');
         let (owner, name) = match (parts.next(), parts.next()) {
             (Some(o), Some(n)) => (o, n),
@@ -45,9 +49,11 @@ impl WebhookPullRequestEventListener {
             .await
             .ok()?;
 
+        let column_id = tracker.qa_column_id as u64;
+
         self.task_tracker_service
             .extract_match_with_pattern(title, &tracker.extract_pattern_regexp)
-            .map(|(_, task_id)| task_id)
+            .map(|(_, task_id)| (task_id, column_id))
     }
 }
 
@@ -75,14 +81,17 @@ impl EventListener<WebhookPullRequestEvent> for WebhookPullRequestEventListener 
             .ok();
 
         if payload.merged && payload.action == WebhookPullRequestEventActionType::Closed {
-            if let Some(task_id) = self.extract_task_id(&payload.repo, &payload.title).await {
+            if let Some((task_id, column_id)) =
+                self.extract_task_id_and_column(&payload.repo, &payload.title).await
+            {
                 tracing::debug!(
                     task_id = %task_id.0,
+                    column_id = %column_id,
                     pr = payload.number,
                     "Task extracted from merged PR, scheduling move to test"
                 );
                 self.publisher
-                    .publish(&MoveTaskToTestJob { task_id })
+                    .publish(&MoveTaskToTestJob { task_id, column_id })
                     .await
                     .ok();
             }
