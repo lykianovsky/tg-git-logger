@@ -149,7 +149,7 @@ async fn choose_for_who(
             bot.edit_message_text(
                 chat_id,
                 message_id,
-                "❌ Не удалось загрузить список репозиториев. Попробуйте позже.",
+                t!("telegram_bot.dialogues.report.load_repos_error").to_string(),
             )
             .reply_markup(InlineKeyboardMarkup::default())
             .await?;
@@ -159,7 +159,7 @@ async fn choose_for_who(
             bot.edit_message_text(
                 chat_id,
                 message_id,
-                "У вас нет привязанных репозиториев. Используйте /bind_repository.",
+                t!("telegram_bot.dialogues.report.no_bound_repos").to_string(),
             )
             .reply_markup(InlineKeyboardMarkup::default())
             .await?;
@@ -185,7 +185,11 @@ async fn choose_for_who(
                 ))
                 .await?;
 
-            bot.edit_message_text(chat_id, message_id, "📦 Выберите репозиторий:")
+            bot.edit_message_text(
+                chat_id,
+                message_id,
+                t!("telegram_bot.dialogues.report.select_repository").to_string(),
+            )
                 .reply_markup(keyboard)
                 .await?;
         }
@@ -227,7 +231,7 @@ async fn choose_repository(
     bot.edit_message_text(
         chat_id,
         message_id,
-        "🌿 Введите название ветки (например: main, dev, master):",
+        t!("telegram_bot.dialogues.report.enter_branch").to_string(),
     )
     .reply_markup(InlineKeyboardMarkup::default())
     .await?;
@@ -248,8 +252,11 @@ async fn enter_branch(
     {
         Some(b) => b,
         None => {
-            bot.send_message(msg.chat.id, "❌ Введите название ветки текстом.")
-                .await?;
+            bot.send_message(
+                msg.chat.id,
+                t!("telegram_bot.dialogues.report.branch_required").to_string(),
+            )
+            .await?;
             return Ok(());
         }
     };
@@ -276,7 +283,10 @@ async fn enter_branch(
         ))
         .await?;
 
-    bot.send_message(msg.chat.id, "📊 Выберите диапазон дат:")
+    bot.send_message(
+        msg.chat.id,
+        t!("telegram_bot.dialogues.report.select_date_range").to_string(),
+    )
         .reply_markup(keyboard)
         .await?;
 
@@ -320,7 +330,7 @@ async fn create_report_by_date_range(
         bot.edit_message_text(
             chat_id,
             message_id,
-            "📅 Введите дату начала (формат: ДД.ММ.ГГГГ, например 01.03.2025):",
+            t!("telegram_bot.dialogues.report.enter_date_since").to_string(),
         )
         .reply_markup(InlineKeyboardMarkup::default())
         .await?;
@@ -336,7 +346,11 @@ async fn create_report_by_date_range(
         TelegramBotDateRangeAction::Custom => unreachable!(),
     };
 
-    bot.edit_message_text(chat_id, message_id, "⏳ Загружаем отчёт...")
+    bot.edit_message_text(
+        chat_id,
+        message_id,
+        t!("telegram_bot.dialogues.report.loading").to_string(),
+    )
         .reply_markup(InlineKeyboardMarkup::default())
         .await?;
 
@@ -375,9 +389,9 @@ async fn execute_and_send_report(
     match executor.execute(&cmd).await {
         Ok(response) => {
             let text = MessageBuilder::new()
-                .line("✅ Отчёт готов!")
+                .line(t!("telegram_bot.dialogues.report.ready").as_ref())
                 .empty_line()
-                .link("📊 Открыть полный отчёт", &response.report_url)
+                .link(t!("telegram_bot.dialogues.report.open_link").as_ref(), &response.report_url)
                 .build();
 
             bot.edit_message_text(chat_id, loading_message_id, text)
@@ -392,7 +406,11 @@ async fn execute_and_send_report(
             bot.edit_message_text(
                 chat_id,
                 loading_message_id,
-                format!("{}\n\nПопробуйте ввести другой диапазон.", error_text),
+                format!(
+                    "{}\n\n{}",
+                    error_text,
+                    t!("telegram_bot.dialogues.report.try_another_range")
+                ),
             )
             .await?;
 
@@ -416,8 +434,11 @@ async fn enter_date_since(
     {
         Some(v) => v,
         None => {
-            bot.send_message(msg.chat.id, "❌ Введите дату текстом в формате ДД.ММ.ГГГГ.")
-                .await?;
+            bot.send_message(
+                msg.chat.id,
+                t!("telegram_bot.dialogues.report.date_required").to_string(),
+            )
+            .await?;
             return Ok(());
         }
     };
@@ -425,7 +446,7 @@ async fn enter_date_since(
     if NaiveDate::parse_from_str(&input, "%d.%m.%Y").is_err() {
         bot.send_message(
             msg.chat.id,
-            "❌ Неверный формат даты. Используйте ДД.ММ.ГГГГ (например: 01.03.2025).",
+            t!("telegram_bot.dialogues.report.date_format_error_since").to_string(),
         )
         .await?;
         return Ok(());
@@ -444,7 +465,7 @@ async fn enter_date_since(
 
     bot.send_message(
         msg.chat.id,
-        "📅 Введите дату окончания (формат: ДД.ММ.ГГГГ, например 31.03.2025):",
+        t!("telegram_bot.dialogues.report.enter_date_until").to_string(),
     )
     .await?;
 
@@ -465,8 +486,11 @@ async fn enter_date_until(
     {
         Some(v) => v,
         None => {
-            bot.send_message(msg.chat.id, "❌ Введите дату текстом в формате ДД.ММ.ГГГГ.")
-                .await?;
+            bot.send_message(
+                msg.chat.id,
+                t!("telegram_bot.dialogues.report.date_required").to_string(),
+            )
+            .await?;
             return Ok(());
         }
     };
@@ -477,7 +501,7 @@ async fn enter_date_until(
             tracing::error!(since = %since, "Failed to re-parse since date in enter_date_until");
             bot.send_message(
                 msg.chat.id,
-                "❌ Внутренняя ошибка. Начните заново с /report.",
+                t!("telegram_bot.dialogues.report.internal_error").to_string(),
             )
             .await?;
             dialogue.exit().await.ok();
@@ -490,7 +514,7 @@ async fn enter_date_until(
         Err(_) => {
             bot.send_message(
                 msg.chat.id,
-                "❌ Неверный формат даты. Используйте ДД.ММ.ГГГГ (например: 31.03.2025).",
+                t!("telegram_bot.dialogues.report.date_format_error_until").to_string(),
             )
             .await?;
             return Ok(());
@@ -500,7 +524,7 @@ async fn enter_date_until(
     if until_date < since_date {
         bot.send_message(
             msg.chat.id,
-            "❌ Дата окончания не может быть раньше даты начала.",
+            t!("telegram_bot.dialogues.report.date_range_invalid").to_string(),
         )
         .await?;
         return Ok(());
@@ -522,7 +546,7 @@ async fn enter_date_until(
         SocialUserId(msg.from.as_ref().map(|u| u.id.0 as i32).unwrap_or_default());
 
     let loading = bot
-        .send_message(msg.chat.id, "⏳ Загружаем отчёт...")
+        .send_message(msg.chat.id, t!("telegram_bot.dialogues.report.loading").to_string())
         .await?;
 
     let cmd = BuildVersionControlDateRangeReportExecutorCommand {

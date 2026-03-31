@@ -38,7 +38,7 @@ impl TelegramBotTaskCommandHandler {
                 self.bot
                     .send_message(
                         self.msg.chat.id,
-                        "❌ Введите числовой ID карточки: <code>/task 12345</code>",
+                        t!("telegram_bot.commands.task.invalid_id").to_string(),
                     )
                     .parse_mode(ParseMode::Html)
                     .await?;
@@ -48,7 +48,7 @@ impl TelegramBotTaskCommandHandler {
 
         let loading = self
             .bot
-            .send_message(self.msg.chat.id, "⏳ Ищем карточку...")
+            .send_message(self.msg.chat.id, t!("telegram_bot.commands.task.searching").to_string())
             .await?;
 
         let text = match self
@@ -58,17 +58,18 @@ impl TelegramBotTaskCommandHandler {
             })
             .await
         {
-            Ok(card) => format!(
-                "📋 <b>{}</b>\n🔗 <a href=\"{}\">Открыть карточку →</a>",
-                teloxide::utils::html::escape(&card.title),
-                card.url,
-            ),
+            Ok(card) => t!(
+                "telegram_bot.commands.task.card",
+                title = teloxide::utils::html::escape(&card.title),
+                url = card.url
+            )
+            .to_string(),
             Err(GetTaskCardError::NotFound) => {
-                format!("❌ Карточка <code>{}</code> не найдена.", id)
+                t!("telegram_bot.commands.task.not_found", id = id).to_string()
             }
             Err(GetTaskCardError::ClientError(e)) => {
                 tracing::error!(error = %e, task_id = id, "Failed to fetch task card");
-                "❌ Ошибка при получении карточки. Попробуйте позже.".to_string()
+                t!("telegram_bot.commands.task.error").to_string()
             }
         };
 

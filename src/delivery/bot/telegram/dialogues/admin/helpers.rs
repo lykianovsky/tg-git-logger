@@ -13,7 +13,3 @@ pub fn parse_integer(msg: &Message) -> Option<i32> {
     msg.text().and_then(|t| t.trim().parse().ok())
 }
 
-/// Дружелюбное сообщение об ошибке операции с БД.
-pub fn db_error_message(action: &str) -> String {
-    format!("❌ Не удалось {}. Попробуйте позже.", action)
-}

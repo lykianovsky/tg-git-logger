@@ -18,7 +18,14 @@
       "Bash(grep -A 5 \"no method named \\\\`weekday\\\\`\")",
       "Bash(xargs wc:*)",
       "Bash(xargs head:*)",
-      "Bash(grep -E \"\\\\.rs$\")"
+      "Bash(grep -E \"\\\\.rs$\")",
+      "Bash(find D:codetg-git-logger/src/delivery -type f -name *.rs)",
+      "Bash(findstr /C:\"warning:\")",
+      "Bash(findstr /V \"unused import\")",
+      "Bash(findstr /V \"migration\")",
+      "Bash(findstr \"^warning\")",
+      "Bash(del:*)",
+      "Bash(findstr \"^error\")"
     ]
   }
 }

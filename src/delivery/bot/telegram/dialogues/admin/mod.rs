@@ -181,7 +181,11 @@ impl TelegramBotDialogueAdminDispatcher {
                     ])
                     .build();
 
-                bot.edit_message_text(chat_id, message_id, "📦 Репозитории:")
+                bot.edit_message_text(
+                    chat_id,
+                    message_id,
+                    t!("telegram_bot.dialogues.admin.repositories_title").to_string(),
+                )
                     .reply_markup(keyboard)
                     .await?;
             }
@@ -190,7 +194,11 @@ impl TelegramBotDialogueAdminDispatcher {
                     Ok(r) => r,
                     Err(e) => {
                         tracing::error!(error = %e, "Failed to get queues stats");
-                        bot.edit_message_text(chat_id, message_id, "❌ Не удалось получить статистику очередей.")
+                        bot.edit_message_text(
+                            chat_id,
+                            message_id,
+                            t!("telegram_bot.dialogues.admin.queues_stats_error").to_string(),
+                        )
                             .await?;
                         dialogue.exit().await.ok();
                         return Ok(());
@@ -198,23 +206,26 @@ impl TelegramBotDialogueAdminDispatcher {
                 };
 
                 let mut builder = MessageBuilder::new()
-                    .bold("📊 Статистика очередей")
+                    .bold(t!("telegram_bot.dialogues.admin.queues_stats_title").as_ref())
                     .empty_line();
 
                 for stat in &response.stats {
                     let status = if stat.pending_messages == 0 {
-                        "🟢 idle"
+                        t!("telegram_bot.dialogues.admin.queue_status.idle")
                     } else if stat.pending_messages < 10 {
-                        "🟡 active"
+                        t!("telegram_bot.dialogues.admin.queue_status.active")
                     } else {
-                        "🔴 overloaded"
+                        t!("telegram_bot.dialogues.admin.queue_status.overloaded")
                     };
 
                     builder = builder
-                        .section_bold(&stat.queue_name, status)
-                        .section_code("  👷 Воркеры", &stat.active_workers.to_string())
+                        .section_bold(&stat.queue_name, status.as_ref())
                         .section_code(
-                            "  📨 В очереди",
+                            t!("telegram_bot.dialogues.admin.queue_workers").as_ref(),
+                            &stat.active_workers.to_string(),
+                        )
+                        .section_code(
+                            t!("telegram_bot.dialogues.admin.queue_pending").as_ref(),
                             &stat.pending_messages.to_string(),
                         )
                         .empty_line();
@@ -239,7 +250,7 @@ impl TelegramBotDialogueAdminDispatcher {
                     bot.edit_message_text(
                         chat_id,
                         message_id,
-                        "❌ Нет доступных репозиториев. Сначала создайте репозиторий.",
+                        t!("telegram_bot.dialogues.admin.no_repositories").to_string(),
                     )
                     .await?;
                     dialogue.exit().await.ok();
@@ -267,7 +278,7 @@ impl TelegramBotDialogueAdminDispatcher {
                 bot.edit_message_text(
                     chat_id,
                     message_id,
-                    "📦 Выберите репозиторий для таск-трекера:",
+                    t!("telegram_bot.dialogues.admin.task_tracker_select_repository").to_string(),
                 )
                 .reply_markup(keyboard)
                 .await?;

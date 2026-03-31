@@ -1,7 +1,7 @@
 use crate::application::repository::commands::create_repository::command::CreateRepositoryCommand;
 use crate::bootstrap::executors::ApplicationBoostrapExecutors;
 use crate::delivery::bot::telegram::dialogues::admin::TelegramBotDialogueAdminState;
-use crate::delivery::bot::telegram::dialogues::admin::helpers::{db_error_message, extract_text};
+use crate::delivery::bot::telegram::dialogues::admin::helpers::extract_text;
 use crate::delivery::bot::telegram::dialogues::{
     TelegramBotDialogueState, TelegramBotDialogueType,
 };
@@ -41,8 +41,11 @@ impl TelegramBotDialogueAdminRepositoryCreateDispatcher {
         let name = match extract_text(&msg) {
             Some(v) => v,
             None => {
-                bot.send_message(msg.chat.id, "❌ Введите название репозитория текстом.")
-                    .await?;
+                bot.send_message(
+                    msg.chat.id,
+                    t!("telegram_bot.dialogues.admin.repository.create.name_required").to_string(),
+                )
+                .await?;
                 return Ok(());
             }
         };
@@ -53,7 +56,10 @@ impl TelegramBotDialogueAdminRepositoryCreateDispatcher {
             ))
             .await?;
 
-        bot.send_message(msg.chat.id, "👤 Введите владельца (owner):")
+        bot.send_message(
+            msg.chat.id,
+            t!("telegram_bot.dialogues.admin.repository.create.enter_owner").to_string(),
+        )
             .await?;
         Ok(())
     }
@@ -67,8 +73,12 @@ impl TelegramBotDialogueAdminRepositoryCreateDispatcher {
         let owner = match extract_text(&msg) {
             Some(v) => v,
             None => {
-                bot.send_message(msg.chat.id, "❌ Введите владельца репозитория текстом.")
-                    .await?;
+                bot.send_message(
+                    msg.chat.id,
+                    t!("telegram_bot.dialogues.admin.repository.create.owner_required")
+                        .to_string(),
+                )
+                .await?;
                 return Ok(());
             }
         };
@@ -79,7 +89,10 @@ impl TelegramBotDialogueAdminRepositoryCreateDispatcher {
             ))
             .await?;
 
-        bot.send_message(msg.chat.id, "🔗 Введите URL репозитория:")
+        bot.send_message(
+            msg.chat.id,
+            t!("telegram_bot.dialogues.admin.repository.create.enter_url").to_string(),
+        )
             .await?;
         Ok(())
     }
@@ -94,14 +107,20 @@ impl TelegramBotDialogueAdminRepositoryCreateDispatcher {
         let url = match extract_text(&msg) {
             Some(v) => v,
             None => {
-                bot.send_message(msg.chat.id, "❌ Введите URL репозитория текстом.")
-                    .await?;
+                bot.send_message(
+                    msg.chat.id,
+                    t!("telegram_bot.dialogues.admin.repository.create.url_required").to_string(),
+                )
+                .await?;
                 return Ok(());
             }
         };
 
         let loading = bot
-            .send_message(msg.chat.id, "⏳ Создаём репозиторий...")
+            .send_message(
+                msg.chat.id,
+                t!("telegram_bot.dialogues.admin.repository.create.loading").to_string(),
+            )
             .await?;
 
         match executors
@@ -114,10 +133,12 @@ impl TelegramBotDialogueAdminRepositoryCreateDispatcher {
                 bot.edit_message_text(
                     msg.chat.id,
                     loading.id,
-                    format!(
-                        "✅ Репозиторий <b>{}/{}</b> успешно создан.",
-                        r.repository.owner, r.repository.name
-                    ),
+                    t!(
+                        "telegram_bot.dialogues.admin.repository.create.success",
+                        owner = r.repository.owner,
+                        name = r.repository.name
+                    )
+                    .to_string(),
                 )
                 .parse_mode(teloxide::types::ParseMode::Html)
                 .await?;
@@ -127,7 +148,7 @@ impl TelegramBotDialogueAdminRepositoryCreateDispatcher {
                 bot.edit_message_text(
                     msg.chat.id,
                     loading.id,
-                    db_error_message("создать репозиторий"),
+                    t!("telegram_bot.dialogues.admin.repository.create.db_error").to_string(),
                 )
                 .await?;
             }

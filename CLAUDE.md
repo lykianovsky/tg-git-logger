@@ -278,6 +278,46 @@ The caller (scheduler, delivery handler, consumer) is responsible for deciding w
 - Use the fluent builder pattern (methods returning `self`) only for value-object assembly like `MessageBuilder`.
 - No `Default` derives unless all fields have meaningful zero values.
 
+### MessageBuilder
+
+All Telegram message text must be assembled with `MessageBuilder` from `utils::builder::message`. Never build message
+strings manually with `format!` or string concatenation.
+
+Available methods:
+
+| Method | Output |
+|---|---|
+| `.line(text)` | `text\n` |
+| `.bold(text)` | `<b>text</b>\n` |
+| `.italic(text)` | `<i>text</i>\n` |
+| `.code(text)` | `<code>text</code>\n` |
+| `.section(title, content)` | `<b>title:</b> content\n` |
+| `.section_bold(title, content)` | `<b>title:</b> <b>content</b>\n` |
+| `.section_code(title, content)` | `<b>title:</b> <code>content</code>\n` |
+| `.link(text, url)` | `<a href="url">text</a>\n` |
+| `.emoji(emoji)` | raw emoji (no newline) |
+| `.empty_line()` | `\n` |
+| `.raw(text)` | raw text, no escaping, no newline |
+| `.with_html_escape(true)` | enable HTML escaping for all subsequent `.line()`/`.section()` calls |
+| `.with_max_length(n)` | truncate result to `n` chars with `...` |
+
+Call `.build()` at the end to get the final `String`.
+
+```rust
+// GOOD
+let text = MessageBuilder::new()
+    .bold("🔔 New PR")
+    .section("Author", &pr.author)
+    .link("Open PR", &pr.url)
+    .build();
+
+// BAD — raw format! for Telegram messages
+let text = format!("<b>🔔 New PR</b>\n<b>Author:</b> {}\n", pr.author);
+```
+
+Use `.with_html_escape(true)` when content comes from external input (user names, commit messages, PR titles) to prevent
+broken HTML in Telegram messages.
+
 ### Config
 
 - New config values go in `src/config/application/mod.rs` as typed fields (not raw strings passed around).

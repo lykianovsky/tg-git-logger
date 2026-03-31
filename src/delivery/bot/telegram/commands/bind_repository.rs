@@ -49,7 +49,7 @@ impl TelegramBotBindRepositoryCommandHandler {
                 tracing::error!(error = %e, "Failed to get all repositories");
                 self.context
                     .bot
-                    .send_message(self.context.msg.chat.id, format!("❌ Ошибка: {e}"))
+                    .send_message(self.context.msg.chat.id, format!("❌ Ошибка: {e}")) // dynamic error
                     .await?;
                 return Ok(());
             }
@@ -58,7 +58,10 @@ impl TelegramBotBindRepositoryCommandHandler {
         if all_repos.is_empty() {
             self.context
                 .bot
-                .send_message(self.context.msg.chat.id, "Нет доступных репозиториев.")
+                .send_message(
+                    self.context.msg.chat.id,
+                    t!("telegram_bot.commands.bind_repository.no_repositories").to_string(),
+                )
                 .await?;
             return Ok(());
         }
@@ -96,7 +99,7 @@ impl TelegramBotBindRepositoryCommandHandler {
             .bot
             .send_message(
                 self.context.msg.chat.id,
-                "📦 Выберите репозиторий для привязки/отвязки:\n(✅ — уже привязан)",
+                t!("telegram_bot.commands.bind_repository.select_repository").to_string(),
             )
             .reply_markup(keyboard)
             .await?;

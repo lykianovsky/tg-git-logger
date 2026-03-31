@@ -51,7 +51,7 @@ pub async fn handle(
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     if let TelegramBotCommand::SetupWebhook = &cmd {
         if !matches!(msg.chat.kind, ChatKind::Public(_)) {
-            bot.send_message(msg.chat.id, "Эта команда доступна только в чате группы.")
+            bot.send_message(msg.chat.id, t!("telegram_bot.commands.group_only").to_string())
                 .await?;
             return Ok(());
         }
@@ -74,7 +74,7 @@ pub async fn handle(
 
     // All other commands are private-chat only
     if !matches!(msg.chat.kind, ChatKind::Private(_)) {
-        bot.send_message(msg.chat.id, "Эта команда доступна только в приватном чате.")
+        bot.send_message(msg.chat.id, t!("telegram_bot.commands.private_only").to_string())
             .await?;
         return Ok(());
     }

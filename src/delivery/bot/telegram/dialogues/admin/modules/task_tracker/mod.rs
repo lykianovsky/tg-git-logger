@@ -1,7 +1,7 @@
 use crate::application::repository::commands::update_repository_task_tracker::command::UpdateRepositoryTaskTrackerCommand;
 use crate::bootstrap::executors::ApplicationBoostrapExecutors;
 use crate::delivery::bot::telegram::dialogues::admin::TelegramBotDialogueAdminState;
-use crate::delivery::bot::telegram::dialogues::admin::helpers::{db_error_message, extract_text};
+use crate::delivery::bot::telegram::dialogues::admin::helpers::extract_text;
 use crate::delivery::bot::telegram::dialogues::{
     TelegramBotDialogueState, TelegramBotDialogueType,
 };
@@ -143,7 +143,7 @@ impl TelegramBotDialogueAdminTaskTrackerDispatcher {
                 bot.edit_message_text(
                     msg.chat().id,
                     msg.id(),
-                    "⚙️ Настройки таск-трекера уже заданы. Что хотите сделать?",
+                    t!("telegram_bot.dialogues.admin.task_tracker.settings_exist").to_string(),
                 )
                 .reply_markup(keyboard)
                 .await?;
@@ -203,12 +203,29 @@ impl TelegramBotDialogueAdminTaskTrackerDispatcher {
                     Ok(t) => {
                         let text = MessageBuilder::new()
                             .with_html_escape(true)
-                            .bold("📋 Настройки таск-трекера")
+                            .bold(
+                                t!("telegram_bot.dialogues.admin.task_tracker.settings_title")
+                                    .as_ref(),
+                            )
                             .empty_line()
-                            .section_code("🏢 Space ID", &t.space_id.to_string())
-                            .section_code("📋 QA Column ID", &t.qa_column_id.to_string())
-                            .section_code("🔍 Regex паттерн", &t.extract_pattern_regexp)
-                            .section_code("🗂 Путь к карточке", &t.path_to_card)
+                            .section_code(
+                                t!("telegram_bot.dialogues.admin.task_tracker.space_id").as_ref(),
+                                &t.space_id.to_string(),
+                            )
+                            .section_code(
+                                t!("telegram_bot.dialogues.admin.task_tracker.qa_column_id")
+                                    .as_ref(),
+                                &t.qa_column_id.to_string(),
+                            )
+                            .section_code(
+                                t!("telegram_bot.dialogues.admin.task_tracker.regex_pattern")
+                                    .as_ref(),
+                                &t.extract_pattern_regexp,
+                            )
+                            .section_code(
+                                t!("telegram_bot.dialogues.admin.task_tracker.card_path").as_ref(),
+                                &t.path_to_card,
+                            )
                             .build();
 
                         bot.edit_message_text(msg.chat().id, msg.id(), text)
@@ -221,7 +238,7 @@ impl TelegramBotDialogueAdminTaskTrackerDispatcher {
                         bot.edit_message_text(
                             msg.chat().id,
                             msg.id(),
-                            db_error_message("загрузить настройки таск-трекера"),
+                            t!("telegram_bot.dialogues.admin.task_tracker.load_error").to_string(),
                         )
                         .await?;
                     }
@@ -244,7 +261,11 @@ impl TelegramBotDialogueAdminTaskTrackerDispatcher {
                     ))
                     .await?;
 
-                bot.edit_message_text(msg.chat().id, msg.id(), "✏️ Что хотите изменить?")
+                bot.edit_message_text(
+                    msg.chat().id,
+                    msg.id(),
+                    t!("telegram_bot.dialogues.admin.task_tracker.what_to_edit").to_string(),
+                )
                     .reply_markup(keyboard)
                     .await?;
             }
@@ -302,7 +323,7 @@ impl TelegramBotDialogueAdminTaskTrackerDispatcher {
                 bot.edit_message_text(
                     msg.chat().id,
                     msg.id(),
-                    "🔍 Введите новый regex-паттерн:\n\nВводите как есть, без экранирования. Например: \\bZB-(\\d+)\\b",
+                    t!("telegram_bot.dialogues.admin.task_tracker.enter_new_pattern").to_string(),
                 )
                 .reply_markup(InlineKeyboardMarkup::default())
                 .await?;
@@ -333,8 +354,11 @@ impl TelegramBotDialogueAdminTaskTrackerDispatcher {
         let new_pattern = match extract_text(&msg) {
             Some(v) => v,
             None => {
-                bot.send_message(msg.chat.id, "❌ Введите regex-паттерн текстом.")
-                    .await?;
+                bot.send_message(
+                    msg.chat.id,
+                    t!("telegram_bot.dialogues.admin.task_tracker.pattern_required").to_string(),
+                )
+                .await?;
                 return Ok(());
             }
         };
@@ -351,7 +375,7 @@ impl TelegramBotDialogueAdminTaskTrackerDispatcher {
                 tracing::error!(error = %e, "Failed to load task tracker for patch");
                 bot.send_message(
                     msg.chat.id,
-                    db_error_message("загрузить настройки таск-трекера"),
+                    t!("telegram_bot.dialogues.admin.task_tracker.load_error").to_string(),
                 )
                 .await?;
                 dialogue.exit().await.ok();
@@ -370,7 +394,10 @@ impl TelegramBotDialogueAdminTaskTrackerDispatcher {
         };
 
         let loading = bot
-            .send_message(msg.chat.id, "⏳ Сохраняем изменения...")
+            .send_message(
+                msg.chat.id,
+                t!("telegram_bot.dialogues.admin.task_tracker.saving").to_string(),
+            )
             .await?;
 
         match executors
@@ -380,15 +407,19 @@ impl TelegramBotDialogueAdminTaskTrackerDispatcher {
             .await
         {
             Ok(_) => {
-                bot.edit_message_text(msg.chat.id, loading.id, "✅ Regex паттерн обновлён.")
-                    .await?;
+                bot.edit_message_text(
+                    msg.chat.id,
+                    loading.id,
+                    t!("telegram_bot.dialogues.admin.task_tracker.pattern_updated").to_string(),
+                )
+                .await?;
             }
             Err(e) => {
                 tracing::error!(error = %e, "Failed to update extract pattern");
                 bot.edit_message_text(
                     msg.chat.id,
                     loading.id,
-                    db_error_message("сохранить изменения"),
+                    t!("telegram_bot.dialogues.admin.task_tracker.save_changes_error").to_string(),
                 )
                 .await?;
             }
@@ -409,7 +440,11 @@ impl TelegramBotDialogueAdminTaskTrackerDispatcher {
         repository_id: i32,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let loading_msg = bot
-            .edit_message_text(chat_id, message_id, "⏳ Загружаю список пространств...")
+            .edit_message_text(
+                chat_id,
+                message_id,
+                t!("telegram_bot.dialogues.admin.task_tracker.loading_spaces").to_string(),
+            )
             .reply_markup(InlineKeyboardMarkup::default())
             .await?;
 
@@ -420,7 +455,7 @@ impl TelegramBotDialogueAdminTaskTrackerDispatcher {
                 bot.edit_message_text(
                     chat_id,
                     loading_msg.id,
-                    "❌ Не удалось загрузить список пространств. Проверьте подключение к Kaiten.",
+                    t!("telegram_bot.dialogues.admin.task_tracker.spaces_load_error").to_string(),
                 )
                 .await?;
                 dialogue.exit().await.ok();
@@ -429,7 +464,11 @@ impl TelegramBotDialogueAdminTaskTrackerDispatcher {
         };
 
         if spaces.is_empty() {
-            bot.edit_message_text(chat_id, loading_msg.id, "❌ Пространства не найдены.")
+            bot.edit_message_text(
+                chat_id,
+                loading_msg.id,
+                t!("telegram_bot.dialogues.admin.task_tracker.no_spaces").to_string(),
+            )
                 .await?;
             dialogue.exit().await.ok();
             return Ok(());
@@ -446,7 +485,11 @@ impl TelegramBotDialogueAdminTaskTrackerDispatcher {
             ))
             .await?;
 
-        bot.edit_message_text(chat_id, loading_msg.id, "🏢 Выберите пространство (space):")
+        bot.edit_message_text(
+            chat_id,
+            loading_msg.id,
+            t!("telegram_bot.dialogues.admin.task_tracker.select_space").to_string(),
+        )
             .reply_markup(InlineKeyboardMarkup::new(buttons))
             .await?;
 
@@ -477,7 +520,11 @@ impl TelegramBotDialogueAdminTaskTrackerDispatcher {
         };
 
         let loading = bot
-            .edit_message_text(msg.chat().id, msg.id(), "⏳ Загружаю список досок...")
+            .edit_message_text(
+                msg.chat().id,
+                msg.id(),
+                t!("telegram_bot.dialogues.admin.task_tracker.loading_boards").to_string(),
+            )
             .reply_markup(InlineKeyboardMarkup::default())
             .await?;
 
@@ -488,7 +535,7 @@ impl TelegramBotDialogueAdminTaskTrackerDispatcher {
                 bot.edit_message_text(
                     msg.chat().id,
                     loading.id,
-                    "❌ Не удалось загрузить список досок.",
+                    t!("telegram_bot.dialogues.admin.task_tracker.boards_load_error").to_string(),
                 )
                 .await?;
                 dialogue.exit().await.ok();
@@ -500,7 +547,7 @@ impl TelegramBotDialogueAdminTaskTrackerDispatcher {
             bot.edit_message_text(
                 msg.chat().id,
                 loading.id,
-                "❌ В выбранном пространстве нет досок.",
+                t!("telegram_bot.dialogues.admin.task_tracker.no_boards").to_string(),
             )
             .await?;
             dialogue.exit().await.ok();
@@ -521,7 +568,11 @@ impl TelegramBotDialogueAdminTaskTrackerDispatcher {
             ))
             .await?;
 
-        bot.edit_message_text(msg.chat().id, loading.id, "📋 Выберите доску:")
+        bot.edit_message_text(
+            msg.chat().id,
+            loading.id,
+            t!("telegram_bot.dialogues.admin.task_tracker.select_board").to_string(),
+        )
             .reply_markup(InlineKeyboardMarkup::new(buttons))
             .await?;
 
@@ -552,7 +603,11 @@ impl TelegramBotDialogueAdminTaskTrackerDispatcher {
         };
 
         let loading = bot
-            .edit_message_text(msg.chat().id, msg.id(), "⏳ Загружаю список колонок...")
+            .edit_message_text(
+                msg.chat().id,
+                msg.id(),
+                t!("telegram_bot.dialogues.admin.task_tracker.loading_columns").to_string(),
+            )
             .reply_markup(InlineKeyboardMarkup::default())
             .await?;
 
@@ -563,7 +618,7 @@ impl TelegramBotDialogueAdminTaskTrackerDispatcher {
                 bot.edit_message_text(
                     msg.chat().id,
                     loading.id,
-                    "❌ Не удалось загрузить список колонок.",
+                    t!("telegram_bot.dialogues.admin.task_tracker.columns_load_error").to_string(),
                 )
                 .await?;
                 dialogue.exit().await.ok();
@@ -575,7 +630,7 @@ impl TelegramBotDialogueAdminTaskTrackerDispatcher {
             bot.edit_message_text(
                 msg.chat().id,
                 loading.id,
-                "❌ На выбранной доске нет колонок.",
+                t!("telegram_bot.dialogues.admin.task_tracker.no_columns").to_string(),
             )
             .await?;
             dialogue.exit().await.ok();
@@ -600,7 +655,7 @@ impl TelegramBotDialogueAdminTaskTrackerDispatcher {
         bot.edit_message_text(
             msg.chat().id,
             loading.id,
-            "🎯 Выберите колонку QA (куда перемещать задачи):",
+            t!("telegram_bot.dialogues.admin.task_tracker.select_qa_column").to_string(),
         )
         .reply_markup(InlineKeyboardMarkup::new(buttons))
         .await?;
@@ -643,7 +698,7 @@ impl TelegramBotDialogueAdminTaskTrackerDispatcher {
         bot.edit_message_text(
             msg.chat().id,
             msg.id(),
-            "🔍 Введите regex-паттерн для извлечения ID задачи из PR:\n\nВводите как есть, без экранирования. Например: \\bZB-(\\d+)\\b",
+            t!("telegram_bot.dialogues.admin.task_tracker.enter_pattern").to_string(),
         )
         .reply_markup(InlineKeyboardMarkup::default())
         .await?;
@@ -663,8 +718,11 @@ impl TelegramBotDialogueAdminTaskTrackerDispatcher {
         let extract_pattern = match extract_text(&msg) {
             Some(v) => v,
             None => {
-                bot.send_message(msg.chat.id, "❌ Введите regex-паттерн текстом.")
-                    .await?;
+                bot.send_message(
+                    msg.chat.id,
+                    t!("telegram_bot.dialogues.admin.task_tracker.pattern_required").to_string(),
+                )
+                .await?;
                 return Ok(());
             }
         };
@@ -680,7 +738,10 @@ impl TelegramBotDialogueAdminTaskTrackerDispatcher {
         };
 
         let loading = bot
-            .send_message(msg.chat.id, "⏳ Сохраняем настройки...")
+            .send_message(
+                msg.chat.id,
+                t!("telegram_bot.dialogues.admin.task_tracker.saving").to_string(),
+            )
             .await?;
 
         match executors
@@ -693,7 +754,7 @@ impl TelegramBotDialogueAdminTaskTrackerDispatcher {
                 bot.edit_message_text(
                     msg.chat.id,
                     loading.id,
-                    "✅ Настройки таск-трекера успешно сохранены.",
+                    t!("telegram_bot.dialogues.admin.task_tracker.saved").to_string(),
                 )
                 .await?;
             }
@@ -702,7 +763,7 @@ impl TelegramBotDialogueAdminTaskTrackerDispatcher {
                 bot.edit_message_text(
                     msg.chat.id,
                     loading.id,
-                    db_error_message("сохранить настройки таск-трекера"),
+                    t!("telegram_bot.dialogues.admin.task_tracker.save_error").to_string(),
                 )
                 .await?;
             }
