@@ -15,12 +15,13 @@ use crate::delivery::bot::telegram::keyboards::actions::admin_repository::Telegr
 use crate::domain::repository::entities::repository::Repository;
 use crate::domain::repository::value_objects::repository_id::RepositoryId;
 use crate::domain::shared::command::CommandExecutor;
+use crate::utils::builder::message::MessageBuilder;
 use std::error::Error;
 use std::sync::Arc;
 use teloxide::dispatching::DpHandlerDescription;
 use teloxide::dptree::case;
 use teloxide::prelude::*;
-use teloxide::types::{InlineKeyboardButton, InlineKeyboardMarkup};
+use teloxide::types::{InlineKeyboardButton, InlineKeyboardMarkup, ParseMode};
 use teloxide::{Bot, dptree};
 
 pub struct TelegramBotDialogueAdminRepositoryDispatcher {}
@@ -34,6 +35,10 @@ impl TelegramBotDialogueAdminRepositoryDispatcher {
                     .endpoint(Self::handle_menu),
             )
             .branch(TelegramBotDialogueAdminRepositoryEditDispatcher::query_branches())
+            .branch(
+                case![TelegramBotDialogueAdminState::ViewRepositorySelect]
+                    .endpoint(Self::handle_view_select),
+            )
             .branch(
                 case![TelegramBotDialogueAdminState::DeleteRepositorySelect]
                     .endpoint(Self::handle_delete_select),
@@ -80,6 +85,46 @@ impl TelegramBotDialogueAdminRepositoryDispatcher {
         let message_id = msg.id();
 
         match action {
+            TelegramBotAdminRepositoryAction::View => {
+                let repositories: Vec<Repository> = executors
+                    .commands
+                    .create_repository
+                    .repository_repo
+                    .find_all()
+                    .await
+                    .unwrap_or_default();
+
+                if repositories.is_empty() {
+                    bot.edit_message_text(chat_id, message_id, "ℹ️ Нет созданных репозиториев.")
+                        .await?;
+                    dialogue.exit().await.ok();
+                    return Ok(());
+                }
+
+                let buttons: Vec<Vec<InlineKeyboardButton>> = repositories
+                    .into_iter()
+                    .map(|r| {
+                        vec![InlineKeyboardButton::callback(
+                            format!("{}/{}", r.owner, r.name),
+                            format!("repo_view_select_{}", r.id.0),
+                        )]
+                    })
+                    .collect();
+
+                dialogue
+                    .update(TelegramBotDialogueState::Admin(
+                        TelegramBotDialogueAdminState::ViewRepositorySelect,
+                    ))
+                    .await?;
+
+                bot.edit_message_text(
+                    chat_id,
+                    message_id,
+                    "🔍 Выберите репозиторий для просмотра:",
+                )
+                .reply_markup(InlineKeyboardMarkup::new(buttons))
+                .await?;
+            }
             TelegramBotAdminRepositoryAction::Create => {
                 dialogue
                     .update(TelegramBotDialogueState::Admin(
@@ -172,6 +217,81 @@ impl TelegramBotDialogueAdminRepositoryDispatcher {
             }
         }
 
+        Ok(())
+    }
+
+    async fn handle_view_select(
+        bot: Bot,
+        dialogue: TelegramBotDialogueType,
+        executors: Arc<ApplicationBoostrapExecutors>,
+        query: CallbackQuery,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        bot.answer_callback_query(query.id.clone()).await?;
+
+        let data = query.data.as_deref().unwrap_or("");
+        let repository_id: i32 = match data
+            .strip_prefix("repo_view_select_")
+            .and_then(|s| s.parse().ok())
+        {
+            Some(id) => id,
+            None => {
+                tracing::error!(data = %data, "Invalid repo_view_select callback");
+                return Ok(());
+            }
+        };
+
+        let msg = match query.message {
+            Some(m) => m,
+            None => return Ok(()),
+        };
+
+        let repo = match executors
+            .commands
+            .create_repository
+            .repository_repo
+            .find_by_id(RepositoryId(repository_id))
+            .await
+        {
+            Ok(r) => r,
+            Err(e) => {
+                tracing::error!(error = %e, repository_id, "Repository not found for view");
+                bot.edit_message_text(
+                    msg.chat().id,
+                    msg.id(),
+                    "❌ Репозиторий не найден. Возможно, он был удалён.",
+                )
+                .reply_markup(InlineKeyboardMarkup::default())
+                .await?;
+                dialogue.exit().await.ok();
+                return Ok(());
+            }
+        };
+
+        let chat_info = match repo.social_chat_id {
+            Some(id) => id.0.to_string(),
+            None => "глобальный чат".to_string(),
+        };
+
+        let text = MessageBuilder::new()
+            .bold(&format!("📦 {}/{}", repo.owner, repo.name))
+            .section("URL", &repo.url)
+            .section("Уведомления", &chat_info)
+            .section(
+                "Создан",
+                &repo.created_at.format("%d %b %Y, %H:%M UTC").to_string(),
+            )
+            .section(
+                "Обновлён",
+                &repo.updated_at.format("%d %b %Y, %H:%M UTC").to_string(),
+            )
+            .build();
+
+        bot.edit_message_text(msg.chat().id, msg.id(), text)
+            .parse_mode(ParseMode::Html)
+            .reply_markup(InlineKeyboardMarkup::default())
+            .await?;
+
+        dialogue.exit().await.ok();
         Ok(())
     }
 

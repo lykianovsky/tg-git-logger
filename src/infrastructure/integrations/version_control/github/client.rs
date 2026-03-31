@@ -1,7 +1,8 @@
 use crate::domain::shared::date::range::DateRange;
 use crate::domain::version_control::ports::version_control_client::{
-    VersionControlClient, VersionControlClientDateRangeReportError,
-    VersionControlClientGetUserError, VersionControlClientGetUserResponse,
+    VersionControlClient, VersionControlClientBranchCheckError,
+    VersionControlClientDateRangeReportError, VersionControlClientGetUserError,
+    VersionControlClientGetUserResponse,
 };
 use crate::domain::version_control::value_objects::report::{
     VersionControlDateRangeReport, VersionControlDateRangeReportAuthor,
@@ -353,5 +354,42 @@ impl VersionControlClient for GithubVersionControlClient {
             commits,
             pull_requests,
         })
+    }
+
+    async fn branch_exists(
+        &self,
+        access_token: &str,
+        owner: &str,
+        repo: &str,
+        branch: &str,
+    ) -> Result<bool, VersionControlClientBranchCheckError> {
+        let url = format!("{}/repos/{}/{}/branches/{}", self.base, owner, repo, branch);
+
+        let resp = self
+            .client
+            .get(&url)
+            .bearer_auth(access_token)
+            .header("User-Agent", "Telegram-Git-App")
+            .send()
+            .await
+            .map_err(|e| VersionControlClientBranchCheckError::Transport(e.to_string()))?;
+
+        match resp.status() {
+            status if status.is_success() => Ok(true),
+            status if status == reqwest::StatusCode::NOT_FOUND => Ok(false),
+            status
+                if status == reqwest::StatusCode::FORBIDDEN
+                    || status == reqwest::StatusCode::UNAUTHORIZED =>
+            {
+                Err(VersionControlClientBranchCheckError::Unauthorized(format!(
+                    "GitHub returned {}",
+                    status
+                )))
+            }
+            status => Err(VersionControlClientBranchCheckError::Transport(format!(
+                "Unexpected status: {}",
+                status
+            ))),
+        }
     }
 }

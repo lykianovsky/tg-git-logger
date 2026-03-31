@@ -5,6 +5,7 @@ mod keyboards;
 
 use crate::bootstrap::executors::ApplicationBoostrapExecutors;
 use crate::config::application::ApplicationConfig;
+use crate::domain::task::ports::task_tracker_client::TaskTrackerClient;
 use crate::delivery::bot::telegram::dialogues::TelegramBotDialogueState;
 use crate::delivery::bot::telegram::dialogues::admin::TelegramBotDialogueAdminDispatcher;
 use crate::delivery::bot::telegram::dialogues::bind_repository::TelegramBotBindRepositoryDispatcher;
@@ -22,14 +23,20 @@ use teloxide::utils::command::BotCommands;
 pub struct DeliveryBotMessengerTelegram {
     executors: Arc<ApplicationBoostrapExecutors>,
     config: Arc<ApplicationConfig>,
+    task_tracker_client: Arc<dyn TaskTrackerClient>,
 }
 
 impl DeliveryBotMessengerTelegram {
     pub fn new(
         executors: Arc<ApplicationBoostrapExecutors>,
         config: Arc<ApplicationConfig>,
+        task_tracker_client: Arc<dyn TaskTrackerClient>,
     ) -> Self {
-        Self { executors, config }
+        Self {
+            executors,
+            config,
+            task_tracker_client,
+        }
     }
 }
 
@@ -74,7 +81,9 @@ impl ApplicationDelivery for DeliveryBotMessengerTelegram {
             .dependencies(dptree::deps![
                 InMemStorage::<TelegramBotDialogueState>::new(),
                 self.executors.clone(),
-                self.config.clone()
+                self.config.clone(),
+                self.executors.queries.get_queues_stats.clone(),
+                self.task_tracker_client.clone()
             ])
             .enable_ctrlc_handler()
             .build()

@@ -4,6 +4,8 @@ use strum_macros::{AsRefStr, EnumString};
 
 #[derive(EnumString, AsRefStr, Debug, Clone)]
 pub enum TelegramBotAdminRepositoryAction {
+    #[strum(serialize = "admin_repository_view")]
+    View,
     #[strum(serialize = "admin_repository_create")]
     Create,
     #[strum(serialize = "admin_repository_edit")]
@@ -23,6 +25,7 @@ impl TelegramBotKeyboardAction for TelegramBotAdminRepositoryAction {
 
     fn label(&self) -> &'static str {
         match self {
+            TelegramBotAdminRepositoryAction::View => "🔍 Просмотр",
             TelegramBotAdminRepositoryAction::Create => "➕ Создать новый",
             TelegramBotAdminRepositoryAction::Edit => "✏️ Редактировать",
             TelegramBotAdminRepositoryAction::Delete => "🗑 Удалить",

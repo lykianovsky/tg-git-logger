@@ -12,6 +12,8 @@ pub enum TelegramBotDateRangeAction {
     LastMonth,
     #[strum(serialize = "this_month")]
     ThisMonth,
+    #[strum(serialize = "custom_date_range")]
+    Custom,
 }
 
 impl TelegramBotKeyboardAction for TelegramBotDateRangeAction {
@@ -29,6 +31,7 @@ impl TelegramBotKeyboardAction for TelegramBotDateRangeAction {
             TelegramBotDateRangeAction::Last2Weeks => "📅 Последние 2 недели",
             TelegramBotDateRangeAction::LastMonth => "📅 Последний месяц",
             TelegramBotDateRangeAction::ThisMonth => "📅 Этот месяц",
+            TelegramBotDateRangeAction::Custom => "📆 Свой диапазон",
         }
     }
 }

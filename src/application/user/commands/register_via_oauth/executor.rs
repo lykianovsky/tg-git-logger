@@ -43,9 +43,13 @@ impl CommandExecutor for RegisterUserViaOAuthExecutor {
     async fn execute(&self, cmd: &Self::Command) -> Result<Self::Response, Self::Error> {
         let _guard = self.mutex.lock(cmd.code.clone()).await;
 
-        let txn = self.db.begin().await?;
+        let txn = self
+            .db
+            .begin()
+            .await
+            .map_err(|e| RegisterUserViaOAuthExecutorError::DbError(e.to_string()))?;
 
-        tracing::debug!("{:?}", cmd.state);
+        tracing::debug!(state = ?cmd.state, "Starting OAuth registration");
 
         if let Ok(..) = self
             .user_socials_repo
@@ -137,7 +141,9 @@ impl CommandExecutor for RegisterUserViaOAuthExecutor {
             )
             .await?;
 
-        txn.commit().await?;
+        txn.commit()
+            .await
+            .map_err(|e| RegisterUserViaOAuthExecutorError::DbError(e.to_string()))?;
 
         Ok(RegisterUserViaOAuthExecutorResponse {
             user,

@@ -1,4 +1,6 @@
 use crate::application::auth::commands::create_oauth_link::executor::CreateOAuthLinkExecutor;
+use crate::application::monitoring::queries::get_queues_stats::executor::GetQueuesStatsExecutor;
+use crate::domain::monitoring::ports::workers_stats_provider::WorkersStatsProvider;
 use crate::application::notification::commands::send_social_notify::executor::SendSocialNotifyExecutor;
 use crate::application::repository::commands::create_repository::executor::CreateRepositoryExecutor;
 use crate::application::repository::commands::create_repository_task_tracker::executor::CreateRepositoryTaskTrackerExecutor;
@@ -30,6 +32,7 @@ pub struct ApplicationBoostrapExecutorsQueries {
     pub get_user_bound_repositories: Arc<GetUserBoundRepositoriesExecutor>,
     pub get_all_repositories: Arc<GetAllRepositoriesExecutor>,
     pub get_task_card: Arc<GetTaskCardExecutor>,
+    pub get_queues_stats: Arc<GetQueuesStatsExecutor>,
 }
 
 pub struct ApplicationBoostrapExecutorsCommands {
@@ -59,6 +62,7 @@ impl ApplicationBoostrapExecutors {
         config: Arc<ApplicationConfig>,
         mysql_pool: Arc<DatabaseConnection>,
         shared_dependency: Arc<ApplicationSharedDependency>,
+        stats_provider: Arc<dyn WorkersStatsProvider>,
     ) -> Self {
         let queries = ApplicationBoostrapExecutorsQueries {
             build_report_by_range: Arc::new(BuildVersionControlDateRangeReportExecutor::new(
@@ -88,6 +92,7 @@ impl ApplicationBoostrapExecutors {
             get_task_card: Arc::new(GetTaskCardExecutor::new(
                 shared_dependency.task_tracker_client.clone(),
             )),
+            get_queues_stats: Arc::new(GetQueuesStatsExecutor { stats_provider }),
         };
 
         let commands = ApplicationBoostrapExecutorsCommands {

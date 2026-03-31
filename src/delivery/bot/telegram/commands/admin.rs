@@ -68,6 +68,7 @@ impl TelegramBotAdminCommandHandler {
         let keyboard = KeyboardBuilder::new()
             .row::<TelegramBotAdminAction>(vec![TelegramBotAdminAction::ConfigureRepository])
             .row::<TelegramBotAdminAction>(vec![TelegramBotAdminAction::ConfigureTaskTracker])
+            .row::<TelegramBotAdminAction>(vec![TelegramBotAdminAction::QueuesStats])
             .build();
 
         self.dialogue

@@ -7,25 +7,27 @@ use crate::bootstrap::executors::ApplicationBoostrapExecutors;
 use crate::delivery::bot::telegram::dialogues::{
     TelegramBotDialogueState, TelegramBotDialogueType,
 };
-use crate::delivery::bot::telegram::keyboards::actions::TelegramBotKeyboardAction;
 use crate::delivery::bot::telegram::keyboards::actions::date_range::TelegramBotDateRangeAction;
 use crate::delivery::bot::telegram::keyboards::actions::for_who::TelegramBotForWhoAction;
+use crate::delivery::bot::telegram::keyboards::actions::TelegramBotKeyboardAction;
 use crate::delivery::bot::telegram::keyboards::builder::KeyboardBuilder;
 use crate::domain::repository::value_objects::repository_id::RepositoryId;
 use crate::domain::shared::command::CommandExecutor;
 use crate::domain::shared::date::range::DateRange;
 use crate::domain::user::value_objects::social_user_id::SocialUserId;
 use crate::utils::builder::message::MessageBuilder;
+use chrono::NaiveDate;
 use std::error::Error;
 use std::sync::Arc;
 use teloxide::dispatching::{DpHandlerDescription, UpdateFilterExt};
-use teloxide::dptree::{Handler, case};
+use teloxide::dptree::{case, Handler};
 use teloxide::payloads::{EditMessageTextSetters, SendMessageSetters};
 use teloxide::prelude::{Requester, Update};
 use teloxide::types::{
     CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message, ParseMode,
 };
-use teloxide::{Bot, dptree};
+use teloxide::types::ChatId;
+use teloxide::{dptree, Bot};
 
 #[derive(Debug, Clone, Default)]
 pub enum TelegramBotDialogueReportByDateRangeState {
@@ -45,6 +47,19 @@ pub enum TelegramBotDialogueReportByDateRangeState {
         for_who_action: TelegramBotForWhoAction,
         repository_id: i32,
         branch: String,
+    },
+
+    EnterDateSince {
+        for_who_action: TelegramBotForWhoAction,
+        repository_id: i32,
+        branch: String,
+    },
+
+    EnterDateUntil {
+        for_who_action: TelegramBotForWhoAction,
+        repository_id: i32,
+        branch: String,
+        since: String,
     },
 }
 
@@ -70,13 +85,31 @@ impl TelegramBotDialogueReportByDateRangeDispatcher {
                 .endpoint(create_report_by_date_range),
             );
 
-        let messages = Update::filter_message().branch(
-            case![TelegramBotDialogueReportByDateRangeState::EnterBranch {
-                for_who_action,
-                repository_id
-            }]
-            .endpoint(enter_branch),
-        );
+        let messages = Update::filter_message()
+            .branch(
+                case![TelegramBotDialogueReportByDateRangeState::EnterBranch {
+                    for_who_action,
+                    repository_id
+                }]
+                .endpoint(enter_branch),
+            )
+            .branch(
+                case![TelegramBotDialogueReportByDateRangeState::EnterDateSince {
+                    for_who_action,
+                    repository_id,
+                    branch
+                }]
+                .endpoint(enter_date_since),
+            )
+            .branch(
+                case![TelegramBotDialogueReportByDateRangeState::EnterDateUntil {
+                    for_who_action,
+                    repository_id,
+                    branch,
+                    since
+                }]
+                .endpoint(enter_date_until),
+            );
 
         dptree::entry().branch(callbacks).branch(messages)
     }
@@ -230,6 +263,7 @@ async fn enter_branch(
             TelegramBotDateRangeAction::LastMonth,
             TelegramBotDateRangeAction::ThisMonth,
         ])
+        .row::<TelegramBotDateRangeAction>(vec![TelegramBotDateRangeAction::Custom])
         .build();
 
     dialogue
@@ -268,23 +302,39 @@ async fn create_report_by_date_range(
         }
     };
 
+    let msg = query.message.unwrap();
+    let chat_id = msg.chat().id;
+    let message_id = msg.id();
+
+    if matches!(date_range_action, TelegramBotDateRangeAction::Custom) {
+        dialogue
+            .update(TelegramBotDialogueState::ReportByDateRange(
+                TelegramBotDialogueReportByDateRangeState::EnterDateSince {
+                    for_who_action,
+                    repository_id,
+                    branch,
+                },
+            ))
+            .await?;
+
+        bot.edit_message_text(
+            chat_id,
+            message_id,
+            "📅 Введите дату начала (формат: ДД.ММ.ГГГГ, например 01.03.2025):",
+        )
+        .reply_markup(InlineKeyboardMarkup::default())
+        .await?;
+
+        return Ok(());
+    }
+
     let date_range = match date_range_action {
         TelegramBotDateRangeAction::LastWeek => DateRange::last_week(),
         TelegramBotDateRangeAction::Last2Weeks => DateRange::last_2_weeks(),
         TelegramBotDateRangeAction::LastMonth => DateRange::last_month(),
         TelegramBotDateRangeAction::ThisMonth => DateRange::this_month(),
+        TelegramBotDateRangeAction::Custom => unreachable!(),
     };
-
-    let for_who = match for_who_action {
-        TelegramBotForWhoAction::Me => BuildVersionControlDateRangeReportExecutorCommandForWho::Me,
-        TelegramBotForWhoAction::Repository => {
-            BuildVersionControlDateRangeReportExecutorCommandForWho::Repository
-        }
-    };
-
-    let msg = query.message.unwrap();
-    let chat_id = msg.chat().id;
-    let message_id = msg.id();
 
     bot.edit_message_text(chat_id, message_id, "⏳ Загружаем отчёт...")
         .reply_markup(InlineKeyboardMarkup::default())
@@ -293,24 +343,44 @@ async fn create_report_by_date_range(
     let cmd = BuildVersionControlDateRangeReportExecutorCommand {
         social_user_id: SocialUserId(query.from.id.0 as i32),
         date_range,
-        for_who,
+        for_who: map_for_who(&for_who_action),
         repository_id: RepositoryId(repository_id),
         branch,
     };
 
+    execute_and_send_report(&bot, &dialogue, &executors, chat_id, message_id, cmd).await
+}
+
+fn map_for_who(
+    action: &TelegramBotForWhoAction,
+) -> BuildVersionControlDateRangeReportExecutorCommandForWho {
+    match action {
+        TelegramBotForWhoAction::Me => BuildVersionControlDateRangeReportExecutorCommandForWho::Me,
+        TelegramBotForWhoAction::Repository => {
+            BuildVersionControlDateRangeReportExecutorCommandForWho::Repository
+        }
+    }
+}
+
+async fn execute_and_send_report(
+    bot: &Bot,
+    dialogue: &TelegramBotDialogueType,
+    executors: &Arc<ApplicationBoostrapExecutors>,
+    chat_id: ChatId,
+    loading_message_id: teloxide::types::MessageId,
+    cmd: BuildVersionControlDateRangeReportExecutorCommand,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let executor = executors.queries.build_report_by_range.clone();
 
     match executor.execute(&cmd).await {
         Ok(response) => {
-            let msg = MessageBuilder::new()
+            let text = MessageBuilder::new()
                 .line("✅ Отчёт готов!")
                 .empty_line()
                 .link("📊 Открыть полный отчёт", &response.report_url)
                 .build();
 
-            tracing::debug!("REPORT URL: {}", response.report_url);
-
-            bot.edit_message_text(chat_id, message_id, msg)
+            bot.edit_message_text(chat_id, loading_message_id, text)
                 .parse_mode(ParseMode::Html)
                 .await?;
 
@@ -319,25 +389,149 @@ async fn create_report_by_date_range(
         Err(error) => {
             let error_text = executor.friendly_error_message(&error);
 
-            // Не завершаем диалог — оставляем состояние DateRange для повтора
-            let retry_keyboard =
-                InlineKeyboardMarkup::new(vec![vec![InlineKeyboardButton::callback(
-                    "🔄 Попробовать снова",
-                    date_range_action.to_callback_data(),
-                )]]);
-
             bot.edit_message_text(
                 chat_id,
-                message_id,
-                format!(
-                    "{}\n\nМожете попробовать снова с теми же параметрами.",
-                    error_text
-                ),
+                loading_message_id,
+                format!("{}\n\nПопробуйте ввести другой диапазон.", error_text),
             )
-            .reply_markup(retry_keyboard)
             .await?;
+
+            dialogue.exit().await.ok();
+        }
+    }
+
+    Ok(())
+}
+
+async fn enter_date_since(
+    bot: Bot,
+    dialogue: TelegramBotDialogueType,
+    msg: Message,
+    (for_who_action, repository_id, branch): (TelegramBotForWhoAction, i32, String),
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let input = match msg
+        .text()
+        .map(|t| t.trim().to_string())
+        .filter(|s| !s.is_empty())
+    {
+        Some(v) => v,
+        None => {
+            bot.send_message(msg.chat.id, "❌ Введите дату текстом в формате ДД.ММ.ГГГГ.")
+                .await?;
+            return Ok(());
         }
     };
 
+    if NaiveDate::parse_from_str(&input, "%d.%m.%Y").is_err() {
+        bot.send_message(
+            msg.chat.id,
+            "❌ Неверный формат даты. Используйте ДД.ММ.ГГГГ (например: 01.03.2025).",
+        )
+        .await?;
+        return Ok(());
+    }
+
+    dialogue
+        .update(TelegramBotDialogueState::ReportByDateRange(
+            TelegramBotDialogueReportByDateRangeState::EnterDateUntil {
+                for_who_action,
+                repository_id,
+                branch,
+                since: input,
+            },
+        ))
+        .await?;
+
+    bot.send_message(
+        msg.chat.id,
+        "📅 Введите дату окончания (формат: ДД.ММ.ГГГГ, например 31.03.2025):",
+    )
+    .await?;
+
     Ok(())
+}
+
+async fn enter_date_until(
+    bot: Bot,
+    dialogue: TelegramBotDialogueType,
+    executors: Arc<ApplicationBoostrapExecutors>,
+    msg: Message,
+    (for_who_action, repository_id, branch, since): (TelegramBotForWhoAction, i32, String, String),
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let until_input = match msg
+        .text()
+        .map(|t| t.trim().to_string())
+        .filter(|s| !s.is_empty())
+    {
+        Some(v) => v,
+        None => {
+            bot.send_message(msg.chat.id, "❌ Введите дату текстом в формате ДД.ММ.ГГГГ.")
+                .await?;
+            return Ok(());
+        }
+    };
+
+    let since_date = match NaiveDate::parse_from_str(&since, "%d.%m.%Y") {
+        Ok(d) => d,
+        Err(_) => {
+            tracing::error!(since = %since, "Failed to re-parse since date in enter_date_until");
+            bot.send_message(
+                msg.chat.id,
+                "❌ Внутренняя ошибка. Начните заново с /report.",
+            )
+            .await?;
+            dialogue.exit().await.ok();
+            return Ok(());
+        }
+    };
+
+    let until_date = match NaiveDate::parse_from_str(&until_input, "%d.%m.%Y") {
+        Ok(d) => d,
+        Err(_) => {
+            bot.send_message(
+                msg.chat.id,
+                "❌ Неверный формат даты. Используйте ДД.ММ.ГГГГ (например: 31.03.2025).",
+            )
+            .await?;
+            return Ok(());
+        }
+    };
+
+    if until_date < since_date {
+        bot.send_message(
+            msg.chat.id,
+            "❌ Дата окончания не может быть раньше даты начала.",
+        )
+        .await?;
+        return Ok(());
+    }
+
+    let since_dt = since_date
+        .and_hms_opt(0, 0, 0)
+        .expect("midnight is always valid")
+        .and_utc();
+
+    let until_dt = until_date
+        .and_hms_opt(23, 59, 59)
+        .expect("23:59:59 is always valid")
+        .and_utc();
+
+    let date_range = DateRange::new(since_dt, until_dt);
+
+    let social_user_id =
+        SocialUserId(msg.from.as_ref().map(|u| u.id.0 as i32).unwrap_or_default());
+
+    let loading = bot
+        .send_message(msg.chat.id, "⏳ Загружаем отчёт...")
+        .await?;
+
+    let cmd = BuildVersionControlDateRangeReportExecutorCommand {
+        social_user_id,
+        date_range,
+        for_who: map_for_who(&for_who_action),
+        repository_id: RepositoryId(repository_id),
+        branch,
+    };
+
+    execute_and_send_report(&bot, &dialogue, &executors, msg.chat.id, loading.id, cmd).await
 }

@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 use thiserror::Error;
+use tokio_util::sync::CancellationToken;
 
 #[derive(Error, Debug)]
 pub enum MessageBrokerWorkerStartError {
@@ -11,5 +12,8 @@ pub enum MessageBrokerWorkerStartError {
 pub trait MessageBrokerWorker: Send + Sync + 'static {
     fn name(&self) -> &str;
 
-    async fn start(self: Box<Self>) -> Result<(), MessageBrokerWorkerStartError>;
+    async fn start(
+        self: Box<Self>,
+        cancel: CancellationToken,
+    ) -> Result<(), MessageBrokerWorkerStartError>;
 }

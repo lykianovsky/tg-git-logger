@@ -1,6 +1,5 @@
 use crate::infrastructure::drivers::message_broker::contracts::broker::MessageBroker;
 use crate::infrastructure::drivers::message_broker::contracts::queue::MessageBrokerQueue;
-
 use crate::infrastructure::processing::event_bus::EventBus;
 use crate::infrastructure::processing::worker::{
     MessageBrokerWorker, MessageBrokerWorkerStartError,
@@ -8,6 +7,7 @@ use crate::infrastructure::processing::worker::{
 use async_trait::async_trait;
 use futures::StreamExt;
 use std::sync::Arc;
+use tokio_util::sync::CancellationToken;
 
 pub struct MessageBrokerEventsWorker {
     name: String,
@@ -38,7 +38,10 @@ impl MessageBrokerWorker for MessageBrokerEventsWorker {
         self.name.as_str()
     }
 
-    async fn start(self: Box<Self>) -> Result<(), MessageBrokerWorkerStartError> {
+    async fn start(
+        self: Box<Self>,
+        cancel: CancellationToken,
+    ) -> Result<(), MessageBrokerWorkerStartError> {
         let queue = &*self.queue.clone();
 
         let mut stream = self
@@ -49,29 +52,45 @@ impl MessageBrokerWorker for MessageBrokerEventsWorker {
                 MessageBrokerWorkerStartError::FailedToCreateConsumerStream(e.to_string())
             })?;
 
-        while let Some(delivery) = stream.next().await {
-            tracing::debug!(
-                "MessageBrokerEventsWorker, FROM_WORKER {}: {}",
-                self.name,
-                delivery.envelope.name
-            );
+        loop {
+            tokio::select! {
+                _ = cancel.cancelled() => {
+                    tracing::info!(worker = %self.name, "Worker cancelled, shutting down");
+                    break;
+                }
+                delivery = stream.next() => {
+                    let delivery = match delivery {
+                        Some(d) => d,
+                        None => {
+                            tracing::warn!(worker = %self.name, "Stream closed");
+                            break;
+                        }
+                    };
 
-            if let Err(e) = self
-                .event_bus
-                .dispatch_raw(&delivery.envelope.name, &delivery.envelope.payload)
-                .await
-            {
-                tracing::error!(
-                    event = %delivery.envelope.name,
-                    error = %e,
-                    "Failed to dispatch event"
-                );
+                    tracing::debug!(
+                        worker = %self.name,
+                        event = %delivery.envelope.name,
+                        "Received event"
+                    );
 
-                delivery.reject(&e.to_string()).await;
-                continue;
+                    if let Err(e) = self
+                        .event_bus
+                        .dispatch_raw(&delivery.envelope.name, &delivery.envelope.payload)
+                        .await
+                    {
+                        tracing::error!(
+                            event = %delivery.envelope.name,
+                            error = %e,
+                            "Failed to dispatch event"
+                        );
+
+                        delivery.reject(&e.to_string()).await;
+                        continue;
+                    }
+
+                    delivery.ack().await;
+                }
             }
-
-            delivery.ack().await;
         }
 
         Ok(())

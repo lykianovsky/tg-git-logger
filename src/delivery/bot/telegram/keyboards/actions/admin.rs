@@ -8,6 +8,8 @@ pub enum TelegramBotAdminAction {
     ConfigureRepository,
     #[strum(serialize = "admin_configure_task_tracker")]
     ConfigureTaskTracker,
+    #[strum(serialize = "admin_queues_stats")]
+    QueuesStats,
 }
 
 impl TelegramBotKeyboardAction for TelegramBotAdminAction {
@@ -21,8 +23,9 @@ impl TelegramBotKeyboardAction for TelegramBotAdminAction {
 
     fn label(&self) -> &'static str {
         match self {
-            TelegramBotAdminAction::ConfigureRepository => "⚙️ Настроить репозиторий",
+            TelegramBotAdminAction::ConfigureRepository => "📦 Репозитории",
             TelegramBotAdminAction::ConfigureTaskTracker => "⚙️ Настроить таск-трекер",
+            TelegramBotAdminAction::QueuesStats => "📊 Очереди и воркеры",
         }
     }
 }

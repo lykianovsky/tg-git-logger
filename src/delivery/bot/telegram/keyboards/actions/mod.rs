@@ -1,6 +1,8 @@
 pub mod admin;
 pub mod admin_repository;
 pub mod admin_repository_edit_field;
+pub mod admin_task_tracker;
+pub mod admin_task_tracker_edit_field;
 pub mod choose_role;
 pub mod date_range;
 pub mod for_who;

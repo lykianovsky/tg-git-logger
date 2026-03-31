@@ -31,6 +31,15 @@ pub enum VersionControlClientDateRangeReportError {
     BranchNotFound(String),
 }
 
+#[derive(Debug, Error)]
+pub enum VersionControlClientBranchCheckError {
+    #[error("Unauthorized: {0}")]
+    Unauthorized(String),
+
+    #[error("Transport error: {0}")]
+    Transport(String),
+}
+
 #[async_trait]
 pub trait VersionControlClient: Send + Sync {
     async fn get_user(
@@ -47,4 +56,12 @@ pub trait VersionControlClient: Send + Sync {
         range: &DateRange,
         author: Option<&str>,
     ) -> Result<VersionControlDateRangeReport, VersionControlClientDateRangeReportError>;
+
+    async fn branch_exists(
+        &self,
+        access_token: &str,
+        owner: &str,
+        repo: &str,
+        branch: &str,
+    ) -> Result<bool, VersionControlClientBranchCheckError>;
 }

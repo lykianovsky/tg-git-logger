@@ -1,6 +1,9 @@
 pub mod helpers;
 pub mod modules;
 
+use crate::application::monitoring::queries::get_queues_stats::executor::GetQueuesStatsExecutor;
+use crate::application::monitoring::queries::get_queues_stats::query::GetQueuesStatsQuery;
+use crate::domain::shared::command::CommandExecutor as _;
 use crate::bootstrap::executors::ApplicationBoostrapExecutors;
 use crate::delivery::bot::telegram::dialogues::admin::modules::repository::TelegramBotDialogueAdminRepositoryDispatcher;
 use crate::delivery::bot::telegram::dialogues::admin::modules::task_tracker::TelegramBotDialogueAdminTaskTrackerDispatcher;
@@ -10,9 +13,11 @@ use crate::delivery::bot::telegram::dialogues::{
 use crate::delivery::bot::telegram::keyboards::actions::TelegramBotKeyboardAction;
 use crate::delivery::bot::telegram::keyboards::actions::admin::TelegramBotAdminAction;
 use crate::delivery::bot::telegram::keyboards::builder::KeyboardBuilder;
+use crate::utils::builder::message::MessageBuilder;
 use std::error::Error;
 use std::sync::Arc;
 use teloxide::dispatching::DpHandlerDescription;
+use teloxide::types::ParseMode;
 use teloxide::dptree::case;
 use teloxide::prelude::*;
 use teloxide::types::InlineKeyboardButton;
@@ -62,6 +67,9 @@ pub enum TelegramBotDialogueAdminState {
         repository_id: i32,
     },
 
+    // Просмотр
+    ViewRepositorySelect,
+
     // Удаление
     DeleteRepositorySelect,
     DeleteRepositoryConfirm {
@@ -70,23 +78,37 @@ pub enum TelegramBotDialogueAdminState {
 
     // ── Таск-трекер ─────────────────────────────────────────────────────────
     ConfigureTaskTrackerSelectRepository,
-    ConfigureTaskTrackerSpaceId {
+
+    // Меню существующих настроек (View / Edit / Reconfigure)
+    ConfigureTaskTrackerMenu {
         repository_id: i32,
     },
-    ConfigureTaskTrackerQaColumnId {
+
+    // Редактирование паттерна (единственное поле, которое нельзя получить из API)
+    ConfigureTaskTrackerEditSelectField {
+        repository_id: i32,
+    },
+    ConfigureTaskTrackerEditExtractPattern {
+        repository_id: i32,
+    },
+
+    // Интерактивный выбор через API (создание / перенастройка)
+    ConfigureTaskTrackerSelectSpace {
+        repository_id: i32,
+    },
+    ConfigureTaskTrackerSelectBoard {
         repository_id: i32,
         space_id: i32,
     },
-    ConfigureTaskTrackerExtractPattern {
+    ConfigureTaskTrackerSelectColumn {
+        repository_id: i32,
+        space_id: i32,
+        board_id: i32,
+    },
+    ConfigureTaskTrackerEnterPattern {
         repository_id: i32,
         space_id: i32,
         qa_column_id: i32,
-    },
-    ConfigureTaskTrackerPathToCard {
-        repository_id: i32,
-        space_id: i32,
-        qa_column_id: i32,
-        extract_pattern: String,
     },
 }
 
@@ -101,7 +123,8 @@ impl TelegramBotDialogueAdminDispatcher {
                     .endpoint(TelegramBotDialogueAdminDispatcher::handle_menu),
             )
             .branch(TelegramBotDialogueAdminRepositoryDispatcher::query_branches())
-            .branch(TelegramBotDialogueAdminTaskTrackerDispatcher::query_branches());
+            .branch(TelegramBotDialogueAdminTaskTrackerDispatcher::query_branches())
+            .branch(TelegramBotDialogueAdminTaskTrackerDispatcher::menu_query_branches());
 
         let messages = Update::filter_message()
             .branch(TelegramBotDialogueAdminRepositoryDispatcher::message_branches())
@@ -114,6 +137,7 @@ impl TelegramBotDialogueAdminDispatcher {
         bot: Bot,
         dialogue: TelegramBotDialogueType,
         executors: Arc<ApplicationBoostrapExecutors>,
+        get_queues_stats: Arc<GetQueuesStatsExecutor>,
         query: CallbackQuery,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         bot.answer_callback_query(query.id.clone()).await?;
@@ -146,6 +170,9 @@ impl TelegramBotDialogueAdminDispatcher {
 
                 let keyboard = KeyboardBuilder::new()
                     .row::<TelegramBotAdminRepositoryAction>(vec![
+                        TelegramBotAdminRepositoryAction::View,
+                    ])
+                    .row::<TelegramBotAdminRepositoryAction>(vec![
                         TelegramBotAdminRepositoryAction::Create,
                         TelegramBotAdminRepositoryAction::Edit,
                     ])
@@ -157,6 +184,47 @@ impl TelegramBotDialogueAdminDispatcher {
                 bot.edit_message_text(chat_id, message_id, "📦 Репозитории:")
                     .reply_markup(keyboard)
                     .await?;
+            }
+            TelegramBotAdminAction::QueuesStats => {
+                let response = match get_queues_stats.execute(&GetQueuesStatsQuery).await {
+                    Ok(r) => r,
+                    Err(e) => {
+                        tracing::error!(error = %e, "Failed to get queues stats");
+                        bot.edit_message_text(chat_id, message_id, "❌ Не удалось получить статистику очередей.")
+                            .await?;
+                        dialogue.exit().await.ok();
+                        return Ok(());
+                    }
+                };
+
+                let mut builder = MessageBuilder::new()
+                    .bold("📊 Статистика очередей")
+                    .empty_line();
+
+                for stat in &response.stats {
+                    let status = if stat.pending_messages == 0 {
+                        "🟢 idle"
+                    } else if stat.pending_messages < 10 {
+                        "🟡 active"
+                    } else {
+                        "🔴 overloaded"
+                    };
+
+                    builder = builder
+                        .section_bold(&stat.queue_name, status)
+                        .section_code("  👷 Воркеры", &stat.active_workers.to_string())
+                        .section_code(
+                            "  📨 В очереди",
+                            &stat.pending_messages.to_string(),
+                        )
+                        .empty_line();
+                }
+
+                bot.edit_message_text(chat_id, message_id, builder.build())
+                    .parse_mode(ParseMode::Html)
+                    .await?;
+
+                dialogue.exit().await.ok();
             }
             TelegramBotAdminAction::ConfigureTaskTracker => {
                 let repositories = executors

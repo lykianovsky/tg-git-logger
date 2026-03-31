@@ -11,7 +11,7 @@ use thiserror::Error;
 #[derive(Error, Debug)]
 pub enum RegisterUserViaOAuthExecutorError {
     #[error("Database error: {0}")]
-    DbError(#[from] sea_orm::error::DbErr),
+    DbError(String),
 
     #[error("User by social user id = {0} already exists")]
     UserBySocialUserIdAlreadyExists(i32),

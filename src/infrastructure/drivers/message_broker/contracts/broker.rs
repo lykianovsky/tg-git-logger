@@ -19,6 +19,12 @@ pub enum MessageBrokerSetupError {
     SetupError(String),
 }
 
+#[derive(Error, Debug)]
+pub enum MessageBrokerQueueDepthError {
+    #[error("Failed to get queue depth: {0}")]
+    QueueDeclareError(String),
+}
+
 #[async_trait]
 pub trait MessageBroker: Send + Sync {
     async fn consume<'a>(
@@ -31,4 +37,9 @@ pub trait MessageBroker: Send + Sync {
         &self,
         queues: Vec<Arc<MessageBrokerQueue>>,
     ) -> Result<(), MessageBrokerSetupError>;
+
+    async fn queue_depth(
+        &self,
+        queue_name: &str,
+    ) -> Result<u32, MessageBrokerQueueDepthError>;
 }

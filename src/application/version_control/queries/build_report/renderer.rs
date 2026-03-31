@@ -847,8 +847,6 @@ fn linkify_task(
     extract_pattern: Option<&str>,
     task_tracker_service: &dyn TaskTrackerService,
 ) -> String {
-    tracing::debug!("{task_url_template:?} {extract_pattern:?} {text}");
-
     let (Some(url_template), Some(pattern)) = (task_url_template, extract_pattern) else {
         return html_escape(text);
     };
