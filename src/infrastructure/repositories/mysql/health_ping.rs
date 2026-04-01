@@ -32,6 +32,7 @@ impl MySQLHealthPingRepository {
             last_status: model.last_status,
             last_response_ms: model.last_response_ms,
             last_error_message: model.last_error_message,
+            failed_since: model.failed_since,
             created_at: model.created_at,
             updated_at: model.updated_at,
         }
@@ -119,6 +120,7 @@ impl HealthPingRepository for MySQLHealthPingRepository {
         active_model.last_status = Set(ping.last_status.clone());
         active_model.last_response_ms = Set(ping.last_response_ms);
         active_model.last_error_message = Set(ping.last_error_message.clone());
+        active_model.failed_since = Set(ping.failed_since);
 
         let result = active_model
             .update(self.db.as_ref())

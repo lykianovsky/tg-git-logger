@@ -15,6 +15,7 @@ pub struct Model {
     pub last_status: Option<String>,
     pub last_response_ms: Option<i32>,
     pub last_error_message: Option<String>,
+    pub failed_since: Option<DateTimeUtc>,
     pub created_at: DateTimeUtc,
     pub updated_at: DateTimeUtc,
 }

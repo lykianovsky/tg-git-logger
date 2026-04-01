@@ -34,6 +34,7 @@ impl CommandExecutor for CreateHealthPingExecutor {
             last_status: None,
             last_response_ms: None,
             last_error_message: None,
+            failed_since: None,
             created_at: Utc::now(),
             updated_at: Utc::now(),
         };

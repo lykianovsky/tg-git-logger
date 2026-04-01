@@ -13,6 +13,7 @@ pub struct HealthPing {
     pub last_status: Option<String>,
     pub last_response_ms: Option<i32>,
     pub last_error_message: Option<String>,
+    pub failed_since: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }

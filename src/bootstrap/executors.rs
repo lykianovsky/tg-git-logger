@@ -1,6 +1,7 @@
 use crate::application::auth::commands::create_oauth_link::executor::CreateOAuthLinkExecutor;
 use crate::application::digest::commands::create_digest_subscription::executor::CreateDigestSubscriptionExecutor;
 use crate::application::digest::commands::send_due_digests::executor::SendDueDigestsExecutor;
+use crate::application::health_ping::commands::check_all_health_pings::executor::CheckAllHealthPingsExecutor;
 use crate::application::health_ping::commands::create_health_ping::executor::CreateHealthPingExecutor;
 use crate::application::health_ping::commands::delete_health_ping::executor::DeleteHealthPingExecutor;
 use crate::application::health_ping::commands::update_health_ping::executor::UpdateHealthPingExecutor;
@@ -74,6 +75,7 @@ pub struct ApplicationBoostrapExecutorsCommands {
     pub update_digest_subscription: Arc<UpdateDigestSubscriptionExecutor>,
     pub toggle_digest_subscription: Arc<ToggleDigestSubscriptionExecutor>,
     pub delete_digest_subscription: Arc<DeleteDigestSubscriptionExecutor>,
+    pub check_all_health_pings: Arc<CheckAllHealthPingsExecutor>,
     pub create_health_ping: Arc<CreateHealthPingExecutor>,
     pub update_health_ping: Arc<UpdateHealthPingExecutor>,
     pub update_health_ping_status: Arc<UpdateHealthPingStatusExecutor>,
@@ -240,6 +242,14 @@ impl ApplicationBoostrapExecutors {
 
             delete_digest_subscription: Arc::new(DeleteDigestSubscriptionExecutor::new(
                 shared_dependency.digest_subscription_repo.clone(),
+            )),
+
+            check_all_health_pings: Arc::new(CheckAllHealthPingsExecutor::new(
+                shared_dependency.health_ping_repo.clone(),
+                shared_dependency.health_check_client.clone(),
+                shared_dependency.notification_service.clone(),
+                shared_dependency.user_has_roles_repo.clone(),
+                shared_dependency.user_socials_repo.clone(),
             )),
 
             create_health_ping: Arc::new(CreateHealthPingExecutor::new(

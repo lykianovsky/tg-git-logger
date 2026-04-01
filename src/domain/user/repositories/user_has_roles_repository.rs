@@ -41,4 +41,9 @@ pub trait UserHasRolesRepository: Send + Sync {
     ) -> Result<(), RemoveRoleFromUserError>;
 
     async fn get_all(&self, user_id: UserId) -> Result<Vec<Role>, GetAllUserRolesError>;
+
+    async fn find_user_ids_by_role(
+        &self,
+        role_name: RoleName,
+    ) -> Result<Vec<UserId>, GetAllUserRolesError>;
 }

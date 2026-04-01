@@ -19,6 +19,8 @@ use crate::infrastructure::drivers::message_broker::contracts::broker::MessageBr
 use crate::infrastructure::drivers::message_broker::contracts::publisher::MessageBrokerPublisher;
 use crate::infrastructure::drivers::message_broker::rabbitmq::broker::MessageBrokerRabbitMQ;
 use crate::infrastructure::drivers::message_broker::rabbitmq::publisher::MessageBrokerRabbitMQPublisher;
+use crate::domain::health_ping::ports::health_check_client::HealthCheckClient;
+use crate::infrastructure::integrations::health_check::ReqwestHealthCheckClient;
 use crate::infrastructure::integrations::oauth::github::GithubOAuthClient;
 use crate::infrastructure::integrations::task_tracker::kaiten::{
     KaitenClient, KaitenClientBase, KaitenClientToken,
@@ -55,6 +57,7 @@ pub struct ApplicationSharedDependency {
     pub user_connection_repositories_repo: Arc<dyn UserConnectionRepositoriesRepository>,
     pub digest_subscription_repo: Arc<dyn DigestSubscriptionRepository>,
     pub health_ping_repo: Arc<dyn HealthPingRepository>,
+    pub health_check_client: Arc<dyn HealthCheckClient>,
     pub repository_repo: Arc<dyn RepositoryRepository>,
     pub repository_task_tracker_repo: Arc<dyn RepositoryTaskTrackerRepository>,
     pub notification_service: Arc<CompositionNotificationService>,
@@ -109,6 +112,9 @@ impl ApplicationSharedDependency {
         let health_ping_repo: Arc<dyn HealthPingRepository> =
             Arc::new(MySQLHealthPingRepository::new(mysql_pool.clone()));
 
+        let health_check_client: Arc<dyn HealthCheckClient> =
+            Arc::new(ReqwestHealthCheckClient::new());
+
         let repository_repo: Arc<dyn RepositoryRepository> =
             Arc::new(MySQLRepositoryRepository::new(mysql_pool.clone()));
 
@@ -153,6 +159,7 @@ impl ApplicationSharedDependency {
             user_connection_repositories_repo,
             digest_subscription_repo,
             health_ping_repo,
+            health_check_client,
             repository_repo,
             repository_task_tracker_repo,
             notification_service,
