@@ -61,7 +61,6 @@ impl ApplicationBootstrap {
         let move_task_to_test_executor = Arc::new(MoveTaskToTestExecutor::new(
             shared_dependency.task_tracker_client.clone(),
             shared_dependency.task_tracker_service.clone(),
-            config.task_tracker.test_column_id,
         ));
 
         let job_consumers_registry = Arc::new(
