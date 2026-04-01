@@ -12,6 +12,7 @@ use crate::domain::user::value_objects::social_chat_id::SocialChatId;
 use crate::domain::user::value_objects::social_type::SocialType;
 use crate::utils::builder::message::MessageBuilder;
 use chrono::Utc;
+use rust_i18n::t;
 use std::sync::Arc;
 
 pub struct CheckAllHealthPingsExecutor {
@@ -56,18 +57,18 @@ impl CheckAllHealthPingsExecutor {
         };
 
         for user_id in &admin_user_ids {
-            let social = match self.user_socials_repo.find_by_user_id(user_id).await
-            {
-                Ok(s) => s,
-                Err(e) => {
-                    tracing::error!(
-                        error = %e,
-                        user_id = user_id.0,
-                        "Failed to find social account for admin"
-                    );
-                    continue;
-                }
-            };
+            let social =
+                match self.user_socials_repo.find_by_user_id(user_id).await {
+                    Ok(s) => s,
+                    Err(e) => {
+                        tracing::error!(
+                            error = %e,
+                            user_id = user_id.0,
+                            "Failed to find social account for admin"
+                        );
+                        continue;
+                    }
+                };
 
             let chat_id = SocialChatId(social.social_user_id.0 as i64);
 
@@ -111,7 +112,8 @@ impl CommandExecutor for CheckAllHealthPingsExecutor {
             updated_ping.last_error_message = result.error_message.clone();
             updated_ping.last_checked_at = Some(now);
 
-            let was_ok = ping.last_status.as_deref() != Some("error");
+            let was_failing =
+                ping.last_status.as_deref() == Some("error");
 
             if result.is_success {
                 // Recovery: was failing, now ok
@@ -123,15 +125,24 @@ impl CommandExecutor for CheckAllHealthPingsExecutor {
 
                     let message = MessageBuilder::new()
                         .with_html_escape(true)
-                        .bold("✅ Сервис восстановлен")
+                        .bold(&t!("telegram_bot.dialogues.admin.health_ping_notification.service_recovered").to_string())
                         .empty_line()
-                        .section("Сервис", &ping.name)
-                        .section("URL", &ping.url)
                         .section(
-                            "Время ответа",
-                            &format!("{} мс", result.response_ms),
+                            &t!("telegram_bot.dialogues.admin.health_ping_notification.field_service").to_string(),
+                            &ping.name,
                         )
-                        .section("Был недоступен", &downtime_text);
+                        .section(
+                            &t!("telegram_bot.dialogues.admin.health_ping_notification.field_url").to_string(),
+                            &ping.url,
+                        )
+                        .section(
+                            &t!("telegram_bot.dialogues.admin.health_ping_notification.field_response_time").to_string(),
+                            &t!("telegram_bot.dialogues.admin.health_ping_notification.ms_suffix", value = result.response_ms).to_string(),
+                        )
+                        .section(
+                            &t!("telegram_bot.dialogues.admin.health_ping_notification.field_downtime").to_string(),
+                            &downtime_text,
+                        );
 
                     self.notify_admins(&message).await;
 
@@ -145,9 +156,8 @@ impl CommandExecutor for CheckAllHealthPingsExecutor {
                     );
                 }
             } else {
-                // Failure
-                if was_ok || ping.failed_since.is_none() {
-                    // First failure — set failed_since, send notification
+                // Failure: notify only on first transition to error
+                if !was_failing && ping.failed_since.is_none() {
                     updated_ping.failed_since = Some(now);
 
                     let error_text = result
@@ -157,11 +167,20 @@ impl CommandExecutor for CheckAllHealthPingsExecutor {
 
                     let message = MessageBuilder::new()
                         .with_html_escape(true)
-                        .bold("🔴 Сервис недоступен")
+                        .bold(&t!("telegram_bot.dialogues.admin.health_ping_notification.service_down").to_string())
                         .empty_line()
-                        .section("Сервис", &ping.name)
-                        .section("URL", &ping.url)
-                        .section("Ошибка", error_text);
+                        .section(
+                            &t!("telegram_bot.dialogues.admin.health_ping_notification.field_service").to_string(),
+                            &ping.name,
+                        )
+                        .section(
+                            &t!("telegram_bot.dialogues.admin.health_ping_notification.field_url").to_string(),
+                            &ping.url,
+                        )
+                        .section(
+                            &t!("telegram_bot.dialogues.admin.health_ping_notification.field_error").to_string(),
+                            error_text,
+                        );
 
                     self.notify_admins(&message).await;
 
@@ -199,15 +218,28 @@ fn format_duration(duration: chrono::Duration) -> String {
     let total_seconds = duration.num_seconds();
 
     if total_seconds < 60 {
-        return format!("{} сек", total_seconds);
+        return t!(
+            "telegram_bot.dialogues.admin.health_ping_notification.duration_seconds",
+            value = total_seconds
+        )
+        .to_string();
     }
 
     let hours = total_seconds / 3600;
     let minutes = (total_seconds % 3600) / 60;
 
     if hours > 0 {
-        format!("{} ч {} мин", hours, minutes)
+        t!(
+            "telegram_bot.dialogues.admin.health_ping_notification.duration_hours_minutes",
+            hours = hours,
+            minutes = minutes
+        )
+        .to_string()
     } else {
-        format!("{} мин", minutes)
+        t!(
+            "telegram_bot.dialogues.admin.health_ping_notification.duration_minutes",
+            value = minutes
+        )
+        .to_string()
     }
 }

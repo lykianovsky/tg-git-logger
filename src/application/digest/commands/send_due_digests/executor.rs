@@ -10,6 +10,7 @@ use crate::domain::user::value_objects::social_chat_id::SocialChatId;
 use crate::domain::user::value_objects::social_type::SocialType;
 use crate::utils::builder::message::MessageBuilder;
 use chrono::{Datelike, Utc};
+use rust_i18n::t;
 use std::sync::Arc;
 
 pub struct SendDueDigestsExecutor {
@@ -114,15 +115,19 @@ impl CommandExecutor for SendDueDigestsExecutor {
             };
 
             let type_label = match sub.digest_type {
-                DigestType::Daily => "ежедневный",
-                DigestType::Weekly => "еженедельный",
+                DigestType::Daily => {
+                    t!("notifications.digest.type_daily").to_string()
+                }
+                DigestType::Weekly => {
+                    t!("notifications.digest.type_weekly").to_string()
+                }
             };
 
             let message = MessageBuilder::new()
-                .bold(&format!("📬 Дайджест ({})", type_label))
+                .bold(&t!("notifications.digest.title", "type" = type_label).to_string())
                 .empty_line()
-                .line("Здесь будет сводка по активности в репозиториях.")
-                .line("Функция генерации отчёта будет расширена.")
+                .line(&t!("notifications.digest.placeholder_body").to_string())
+                .line(&t!("notifications.digest.placeholder_note").to_string())
                 .empty_line()
                 .italic(&format!("⏰ {}", now.format("%d.%m.%Y %H:%M")));
 

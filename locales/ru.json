@@ -1,5 +1,49 @@
 {
   "hello": "Привет, %{name}",
+  "notifications": {
+    "registration": {
+      "failed_title": "❌ Ошибка регистрации",
+      "failed_body": "Не удалось завершить авторизацию через OAuth.",
+      "failed_retry": "🔁 Попробуйте ещё раз.",
+      "failed_support": "Если проблема повторяется — обратитесь в поддержку.",
+      "success_title": "✅ Регистрация успешно завершена!",
+      "success_user_id": "👤 Пользователь (user_id): %{id}",
+      "success_github": "🔗 GitHub: %{login}",
+      "success_social": "📱 Соц. сеть: %{social_type}",
+      "success_chat_id": "🆔 Chat ID: %{chat_id}",
+      "success_ready": "🚀 Теперь можно пользоваться ботом!",
+      "success_admin_greeting": "🎉 Приветствуем, Великий Админ! Добро пожаловать в командный зал управления!"
+    },
+    "digest": {
+      "title": "📬 Дайджест (%{type})",
+      "type_daily": "ежедневный",
+      "type_weekly": "еженедельный",
+      "placeholder_body": "Здесь будет сводка по активности в репозиториях.",
+      "placeholder_note": "Функция генерации отчёта будет расширена."
+    }
+  },
+  "report": {
+    "errors": {
+      "unauthorized": "🔐 Нет доступа к репозиторию.\nПричина: %{reason}",
+      "transport": "🌐 Ошибка соединения: %{reason}",
+      "branch_not_found": "🌿 Ветка %{branch} не найдена в репозитории.",
+      "not_registered": "🔐 Вы должны пройти регистрацию",
+      "not_configured": "⚙️ Функция отчётов не настроена. Обратитесь к администратору.",
+      "unknown": "❌ Неизвестная ошибка"
+    },
+    "renderer": {
+      "days": ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"],
+      "time_night": "Ночь (0–6)",
+      "time_morning": "Утро (6–12)",
+      "time_day": "День (12–18)",
+      "time_evening": "Вечер (18–24)",
+      "best_day": "%{label} — %{count} коммитов",
+      "duration_seconds": "%{value} сек",
+      "duration_minutes": "%{value} мин",
+      "duration_hours": "%{value} ч",
+      "duration_days": "%{value} дн"
+    }
+  },
   "telegram_bot": {
     "common": {
       "no": "❌ Нет",
@@ -210,6 +254,19 @@
           "confirm_delete": "🗑 Удалить этот пинг?",
           "confirm_yes": "✅ Да, удалить",
           "deleted": "✅ Пинг удалён."
+        },
+        "health_ping_notification": {
+          "service_recovered": "✅ Сервис восстановлен",
+          "service_down": "🔴 Сервис недоступен",
+          "field_service": "Сервис",
+          "field_url": "URL",
+          "field_response_time": "Время ответа",
+          "field_downtime": "Был недоступен",
+          "field_error": "Ошибка",
+          "ms_suffix": "%{value} мс",
+          "duration_seconds": "%{value} сек",
+          "duration_minutes": "%{value} мин",
+          "duration_hours_minutes": "%{hours} ч %{minutes} мин"
         },
         "task_tracker": {
           "settings_exist": "⚙️ Настройки таск-трекера уже заданы. Что хотите сделать?",

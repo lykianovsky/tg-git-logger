@@ -110,7 +110,7 @@ impl ApplicationBoostrapWorkersManager {
                 scaler: AutoScalerConfig {
                     min_workers: 1,
                     max_workers: 3,
-                    scale_up_ratio: 2,
+                    tasks_per_worker_threshold: 2,
                     idle_ticks_to_scale_down: 3,
                     poll_interval: Duration::from_secs(10),
                 },
@@ -124,7 +124,7 @@ impl ApplicationBoostrapWorkersManager {
                 AutoScalerConfig {
                     min_workers: 2,
                     max_workers: 10,
-                    scale_up_ratio: 2,
+                    tasks_per_worker_threshold: 2,
                     idle_ticks_to_scale_down: 5,
                     poll_interval: Duration::from_secs(10),
                 },
@@ -134,7 +134,7 @@ impl ApplicationBoostrapWorkersManager {
                 AutoScalerConfig {
                     min_workers: 1,
                     max_workers: 5,
-                    scale_up_ratio: 3,
+                    tasks_per_worker_threshold: 3,
                     idle_ticks_to_scale_down: 3,
                     poll_interval: Duration::from_secs(10),
                 },
@@ -144,7 +144,7 @@ impl ApplicationBoostrapWorkersManager {
                 AutoScalerConfig {
                     min_workers: 1,
                     max_workers: 3,
-                    scale_up_ratio: 5,
+                    tasks_per_worker_threshold: 5,
                     idle_ticks_to_scale_down: 2,
                     poll_interval: Duration::from_secs(15),
                 },

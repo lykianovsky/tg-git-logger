@@ -16,6 +16,7 @@ use crate::domain::version_control::value_objects::report::{
     VersionControlDateRangeReportPullRequest,
 };
 use askama::Template;
+use rust_i18n::t;
 use std::collections::{HashMap, HashSet};
 
 // ── Shared view models ────────────────────────────────────────────────────────
@@ -82,8 +83,7 @@ pub struct CommitRow {
 
 /// Commit count per day-of-week (Mon–Sun).
 pub struct DowBar {
-    /// Short label: "Пн", "Вт", …
-    pub day: &'static str,
+    pub day: String,
     pub commits: usize,
     /// Bar height in percent (0–100), relative to the busiest day.
     pub pct: usize,
@@ -92,7 +92,7 @@ pub struct DowBar {
 /// Commit distribution across four time-of-day buckets.
 pub struct TimeOfDayBucket {
     pub icon: &'static str,
-    pub label: &'static str,
+    pub label: String,
     pub commits: usize,
     /// Width percent for the progress bar (0–100).
     pub pct: usize,
@@ -523,7 +523,15 @@ fn build_activity(commits: &[VersionControlDateRangeReportCommit]) -> Vec<DayAct
 }
 
 fn build_dow_activity(commits: &[VersionControlDateRangeReportCommit]) -> Vec<DowBar> {
-    const DAYS: [&str; 7] = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
+    let days = [
+        t!("report.renderer.days.0").to_string(),
+        t!("report.renderer.days.1").to_string(),
+        t!("report.renderer.days.2").to_string(),
+        t!("report.renderer.days.3").to_string(),
+        t!("report.renderer.days.4").to_string(),
+        t!("report.renderer.days.5").to_string(),
+        t!("report.renderer.days.6").to_string(),
+    ];
     let mut counts = [0usize; 7];
 
     for c in commits {
@@ -535,9 +543,9 @@ fn build_dow_activity(commits: &[VersionControlDateRangeReportCommit]) -> Vec<Do
     let max = *counts.iter().max().unwrap_or(&1);
     let max = max.max(1);
 
-    DAYS.iter()
+    days.into_iter()
         .enumerate()
-        .map(|(i, &day)| DowBar {
+        .map(|(i, day)| DowBar {
             day,
             commits: counts[i],
             pct: counts[i] * 100 / max,
@@ -561,13 +569,18 @@ fn build_time_buckets(commits: &[VersionControlDateRangeReportCommit]) -> Vec<Ti
 
     let total = counts.iter().sum::<usize>().max(1);
     let icons = ["🌙", "🌅", "☀️", "🌆"];
-    let labels = ["Ночь (0–6)", "Утро (6–12)", "День (12–18)", "Вечер (18–24)"];
+    let labels = [
+        t!("report.renderer.time_night").to_string(),
+        t!("report.renderer.time_morning").to_string(),
+        t!("report.renderer.time_day").to_string(),
+        t!("report.renderer.time_evening").to_string(),
+    ];
 
     icons
         .iter()
-        .zip(labels.iter())
+        .zip(labels.into_iter())
         .enumerate()
-        .map(|(i, (&icon, &label))| TimeOfDayBucket {
+        .map(|(i, (&icon, label))| TimeOfDayBucket {
             icon,
             label,
             commits: counts[i],
@@ -616,7 +629,9 @@ fn compute_best_day(commits: &[VersionControlDateRangeReportCommit]) -> String {
     day_map
         .into_iter()
         .max_by_key(|(_, (_, n))| *n)
-        .map(|(_, (label, n))| format!("{} — {} коммитов", label, n))
+        .map(|(_, (label, n))| {
+            t!("report.renderer.best_day", label = label, count = n).to_string()
+        })
         .unwrap_or_else(|| "—".into())
 }
 
@@ -875,10 +890,22 @@ fn linkify_task(
 
 fn format_duration(seconds: f64) -> String {
     match seconds {
-        s if s < 60.0 => format!("{:.0} сек", s),
-        s if s < 3600.0 => format!("{:.0} мин", s / 60.0),
-        s if s < 86400.0 => format!("{:.1} ч", s / 3600.0),
-        s => format!("{:.1} дн", s / 86400.0),
+        s if s < 60.0 => {
+            t!("report.renderer.duration_seconds", value = format!("{:.0}", s))
+                .to_string()
+        }
+        s if s < 3600.0 => {
+            t!("report.renderer.duration_minutes", value = format!("{:.0}", s / 60.0))
+                .to_string()
+        }
+        s if s < 86400.0 => {
+            t!("report.renderer.duration_hours", value = format!("{:.1}", s / 3600.0))
+                .to_string()
+        }
+        s => {
+            t!("report.renderer.duration_days", value = format!("{:.1}", s / 86400.0))
+                .to_string()
+        }
     }
 }
 

@@ -9,6 +9,7 @@ use teloxide::prelude::Dialogue;
 
 pub mod admin;
 pub mod bind_repository;
+pub mod helpers;
 pub mod digest;
 pub mod registration;
 pub mod report;

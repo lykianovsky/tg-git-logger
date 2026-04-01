@@ -1,5 +1,6 @@
-use crate::delivery::bot::telegram::keyboards::actions::TelegramBotKeyboardAction;
-use std::str::FromStr;
+use crate::delivery::bot::telegram::keyboards::actions::{
+    impl_keyboard_action, KeyboardActionLabel,
+};
 use strum_macros::{AsRefStr, EnumString};
 
 #[derive(Clone, Debug, EnumString, AsRefStr)]
@@ -10,15 +11,7 @@ pub enum TelegramBotConfirmAction {
     No,
 }
 
-impl TelegramBotKeyboardAction for TelegramBotConfirmAction {
-    fn to_callback_data(&self) -> &str {
-        self.as_ref()
-    }
-
-    fn from_callback_data(data: &str) -> Result<Self, String> {
-        Self::from_str(data).map_err(|e| e.to_string())
-    }
-
+impl KeyboardActionLabel for TelegramBotConfirmAction {
     fn label(&self) -> &'static str {
         match self {
             Self::Yes => "✅ Да",
@@ -26,3 +19,5 @@ impl TelegramBotKeyboardAction for TelegramBotConfirmAction {
         }
     }
 }
+
+impl_keyboard_action!(TelegramBotConfirmAction);

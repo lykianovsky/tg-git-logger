@@ -11,7 +11,7 @@ use crate::delivery::bot::telegram::dialogues::admin::modules::users::TelegramBo
 use crate::delivery::bot::telegram::dialogues::{
     TelegramBotDialogueState, TelegramBotDialogueType,
 };
-use crate::delivery::bot::telegram::keyboards::actions::TelegramBotKeyboardAction;
+use crate::delivery::bot::telegram::dialogues::helpers::parse_callback;
 use crate::delivery::bot::telegram::keyboards::actions::admin::TelegramBotAdminAction;
 use crate::delivery::bot::telegram::keyboards::builder::KeyboardBuilder;
 use crate::utils::builder::message::MessageBuilder;
@@ -188,27 +188,17 @@ impl TelegramBotDialogueAdminDispatcher {
         executors: Arc<ApplicationBoostrapExecutors>,
         query: CallbackQuery,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        bot.answer_callback_query(query.id.clone()).await?;
-
-        let data = query.data.as_deref().unwrap_or("");
-
-        let action = match TelegramBotAdminAction::from_callback_data(data) {
-            Ok(a) => a,
-            Err(e) => {
-                tracing::error!(error = %e, "Unknown admin menu action");
-                return Ok(());
-            }
-        };
-
-        let msg = match query.message {
-            Some(m) => m,
+        let ctx = match parse_callback::<TelegramBotAdminAction>(&bot, &query)
+            .await?
+        {
+            Some(c) => c,
             None => return Ok(()),
         };
 
-        let chat_id = msg.chat().id;
-        let message_id = msg.id();
+        let chat_id = ctx.chat_id;
+        let message_id = ctx.message_id;
 
-        match action {
+        match ctx.action {
             TelegramBotAdminAction::ConfigureRepository => {
                 dialogue
                     .update(TelegramBotDialogueState::Admin(

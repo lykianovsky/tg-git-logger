@@ -1,15 +1,3 @@
-use teloxide::prelude::Message;
-
-/// Извлекает текстовое содержимое сообщения, обрезая пробелы.
-/// Возвращает None если сообщение не содержит текста или текст пустой.
-pub fn extract_text(msg: &Message) -> Option<String> {
-    msg.text()
-        .map(|t| t.trim().to_string())
-        .filter(|s| !s.is_empty())
-}
-
-/// Парсит целое число из текстового сообщения.
-pub fn parse_integer(msg: &Message) -> Option<i32> {
-    msg.text().and_then(|t| t.trim().parse().ok())
-}
-
+pub use crate::delivery::bot::telegram::dialogues::helpers::{
+    extract_text, parse_integer,
+};

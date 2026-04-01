@@ -32,11 +32,11 @@ pub enum TelegramBotDigestState {
     ChooseType,
 
     ChooseRepository {
-        digest_type: String,
+        digest_type: DigestType,
     },
 
     ChooseTime {
-        digest_type: String,
+        digest_type: DigestType,
         repository_id: Option<i32>,
     },
 
@@ -258,11 +258,14 @@ async fn handle_choose_type(
         TelegramBotDigestRepositoryAction::Cancel.to_callback_data(),
     )]);
 
+    let digest_type = match DigestType::from_str(data) {
+        Some(t) => t,
+        None => return Ok(()),
+    };
+
     dialogue
         .update(TelegramBotDialogueState::Digest(
-            TelegramBotDigestState::ChooseRepository {
-                digest_type: data.to_string(),
-            },
+            TelegramBotDigestState::ChooseRepository { digest_type },
         ))
         .await?;
 
@@ -280,7 +283,7 @@ async fn handle_choose_repository(
     bot: Bot,
     dialogue: TelegramBotDialogueType,
     query: CallbackQuery,
-    digest_type: String,
+    digest_type: DigestType,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     bot.answer_callback_query(query.id.clone()).await?;
 
@@ -332,7 +335,7 @@ async fn handle_choose_time(
     dialogue: TelegramBotDialogueType,
     executors: Arc<ApplicationBoostrapExecutors>,
     msg: Message,
-    (digest_type, repository_id): (String, Option<i32>),
+    (digest_type, repository_id): (DigestType, Option<i32>),
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let text = msg.text().unwrap_or("").trim();
 
@@ -376,12 +379,7 @@ async fn handle_choose_time(
 
     let social_user_id = SocialUserId(msg.from.as_ref().map(|u| u.id.0 as i32).unwrap_or(0));
 
-    let parsed_type = match DigestType::from_str(&digest_type) {
-        Some(t) => t,
-        None => return Ok(()),
-    };
-
-    let day_of_week = if parsed_type == DigestType::Weekly {
+    let day_of_week = if digest_type == DigestType::Weekly {
         Some(1) // Monday
     } else {
         None
@@ -390,7 +388,7 @@ async fn handle_choose_time(
     let cmd = CreateDigestSubscriptionCommand {
         social_user_id,
         repository_id: repository_id.map(RepositoryId),
-        digest_type: parsed_type,
+        digest_type,
         send_hour: hour,
         send_minute: minute,
         day_of_week,

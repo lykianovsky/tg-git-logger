@@ -17,6 +17,7 @@ use crate::domain::version_control::ports::version_control_client::{
 use crate::infrastructure::drivers::cache::contract::CacheService;
 use crate::utils::builder::message::MessageBuilder;
 use crate::utils::security::crypto::reversible::ReversibleCipher;
+use rust_i18n::t;
 use sha2::{Digest, Sha256};
 use std::sync::Arc;
 
@@ -71,28 +72,29 @@ impl BuildVersionControlDateRangeReportExecutor {
         match error {
             BuildVersionControlDateRangeReportExecutorError::VersionControlClientDateRangeReportError(
                 VersionControlClientDateRangeReportError::Unauthorized(reason),
-            ) => format!("🔐 Нет доступа к репозиторию.\nПричина: {}", reason),
+            ) => t!("report.errors.unauthorized", reason = reason).to_string(),
 
             BuildVersionControlDateRangeReportExecutorError::VersionControlClientDateRangeReportError(
                 VersionControlClientDateRangeReportError::Transport(reason),
-            ) => format!("🌐 Ошибка соединения: {}", reason),
+            ) => t!("report.errors.transport", reason = reason).to_string(),
 
             BuildVersionControlDateRangeReportExecutorError::VersionControlClientDateRangeReportError(
                 VersionControlClientDateRangeReportError::BranchNotFound(branch),
-            ) => format!(
-                "🌿 Ветка {} не найдена в репозитории.",
-                MessageBuilder::escape_html(branch)
-            ),
+            ) => t!(
+                "report.errors.branch_not_found",
+                branch = MessageBuilder::escape_html(branch)
+            )
+            .to_string(),
 
             BuildVersionControlDateRangeReportExecutorError::FindSocialServiceByIdError(..) => {
-                "🔐 Вы должны пройти регистрацию".to_string()
+                t!("report.errors.not_registered").to_string()
             }
 
             BuildVersionControlDateRangeReportExecutorError::BaseUrlNotConfigured => {
-                "⚙️ Функция отчётов не настроена. Обратитесь к администратору.".to_string()
+                t!("report.errors.not_configured").to_string()
             }
 
-            _ => "❌ Неизвестная ошибка".to_string(),
+            _ => t!("report.errors.unknown").to_string(),
         }
     }
 

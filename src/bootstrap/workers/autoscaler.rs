@@ -9,8 +9,9 @@ pub struct AutoScalerConfig {
     pub min_workers: usize,
     /// Maximum number of workers — never scale above this.
     pub max_workers: usize,
-    /// Scale up when `depth > active_workers * scale_up_ratio`.
-    pub scale_up_ratio: usize,
+    /// Max tasks per worker before spawning a new one.
+    /// Scale up when `depth > active_workers * tasks_per_worker_threshold`.
+    pub tasks_per_worker_threshold: usize,
     /// How many consecutive idle ticks before scaling down by one.
     pub idle_ticks_to_scale_down: u32,
     /// How often to check queue depth.
@@ -95,7 +96,9 @@ impl AutoScaler {
         } else {
             self.idle_ticks = 0;
 
-            if depth > active * self.config.scale_up_ratio && active < self.config.max_workers {
+            if depth > active * self.config.tasks_per_worker_threshold
+                && active < self.config.max_workers
+            {
                 pool.spawn_worker();
 
                 tracing::info!(

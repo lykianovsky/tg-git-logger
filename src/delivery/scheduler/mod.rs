@@ -69,12 +69,12 @@ impl ApplicationDelivery for DeliveryScheduler {
             .await
             .expect("JobScheduler failed to add health ping job");
 
-        // Digest sender — every minute
+        // Digest sender — every minute at :30 (staggered from health pings)
         let digest_executors = self.executors.clone();
 
         scheduler
             .add(
-                Job::new_async("0 * * * * *", move |_uuid, _lock| {
+                Job::new_async("30 * * * * *", move |_uuid, _lock| {
                     let executors = digest_executors.clone();
 
                     Box::pin(async move {
