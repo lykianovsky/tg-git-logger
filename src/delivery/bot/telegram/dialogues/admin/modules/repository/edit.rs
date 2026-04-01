@@ -1,11 +1,12 @@
 use crate::application::repository::commands::update_repository::command::UpdateRepositoryCommand;
 use crate::bootstrap::executors::ApplicationBoostrapExecutors;
 use crate::delivery::bot::telegram::dialogues::admin::TelegramBotDialogueAdminState;
-use crate::delivery::bot::telegram::dialogues::admin::helpers::{db_error_message, extract_text};
+use crate::delivery::bot::telegram::dialogues::admin::helpers::extract_text;
 use crate::delivery::bot::telegram::dialogues::{
     TelegramBotDialogueState, TelegramBotDialogueType,
 };
 use crate::delivery::bot::telegram::keyboards::actions::TelegramBotKeyboardAction;
+use crate::delivery::bot::telegram::keyboards::actions::admin_repository::REPO_SELECT_PREFIX;
 use crate::delivery::bot::telegram::keyboards::actions::admin_repository_edit_field::TelegramBotAdminRepositoryEditField;
 use crate::delivery::bot::telegram::keyboards::builder::KeyboardBuilder;
 use crate::domain::repository::value_objects::repository_id::RepositoryId;
@@ -66,7 +67,7 @@ impl TelegramBotDialogueAdminRepositoryEditDispatcher {
 
         let data = query.data.as_deref().unwrap_or("");
         let repository_id: i32 = match data
-            .strip_prefix("repo_select_")
+            .strip_prefix(REPO_SELECT_PREFIX)
             .and_then(|s| s.parse().ok())
         {
             Some(id) => id,
@@ -89,7 +90,9 @@ impl TelegramBotDialogueAdminRepositoryEditDispatcher {
             .await
         {
             Ok(r) => format!("📦 <b>{}/{}</b>\n🔗 {}", r.owner, r.name, r.url),
-            Err(_) => "Текущие данные недоступны.".to_string(),
+            Err(_) => {
+                t!("telegram_bot.dialogues.admin.repository.data_unavailable").to_string()
+            }
         };
 
         let keyboard = KeyboardBuilder::new()
@@ -111,7 +114,11 @@ impl TelegramBotDialogueAdminRepositoryEditDispatcher {
         bot.edit_message_text(
             msg.chat().id,
             msg.id(),
-            format!("{}\n\nЧто редактируем?", current_info),
+            format!(
+            "{}{}",
+            current_info,
+            t!("telegram_bot.dialogues.admin.repository.what_to_edit")
+        ),
         )
         .parse_mode(teloxide::types::ParseMode::Html)
         .reply_markup(keyboard)
@@ -145,15 +152,15 @@ impl TelegramBotDialogueAdminRepositoryEditDispatcher {
         let (next_state, prompt) = match field {
             TelegramBotAdminRepositoryEditField::Name => (
                 TelegramBotDialogueAdminState::EditRepositoryName { repository_id },
-                "📝 Введите новое название репозитория:",
+                t!("telegram_bot.dialogues.admin.repository.edit.enter_name"),
             ),
             TelegramBotAdminRepositoryEditField::Owner => (
                 TelegramBotDialogueAdminState::EditRepositoryOwner { repository_id },
-                "👤 Введите нового владельца (owner):",
+                t!("telegram_bot.dialogues.admin.repository.edit.enter_owner"),
             ),
             TelegramBotAdminRepositoryEditField::Url => (
                 TelegramBotDialogueAdminState::EditRepositoryUrl { repository_id },
-                "🔗 Введите новый URL репозитория:",
+                t!("telegram_bot.dialogues.admin.repository.edit.enter_url"),
             ),
         };
 
@@ -161,7 +168,7 @@ impl TelegramBotDialogueAdminRepositoryEditDispatcher {
             .update(TelegramBotDialogueState::Admin(next_state))
             .await?;
 
-        bot.edit_message_text(msg.chat().id, msg.id(), prompt)
+        bot.edit_message_text(msg.chat().id, msg.id(), prompt.to_string())
             .reply_markup(teloxide::types::InlineKeyboardMarkup::default())
             .await?;
         Ok(())
@@ -177,8 +184,11 @@ impl TelegramBotDialogueAdminRepositoryEditDispatcher {
         let new_value = match extract_text(&msg) {
             Some(v) => v,
             None => {
-                bot.send_message(msg.chat.id, "❌ Введите новое название текстом.")
-                    .await?;
+                bot.send_message(
+                    msg.chat.id,
+                    t!("telegram_bot.dialogues.admin.repository.edit.name_required").to_string(),
+                )
+                .await?;
                 return Ok(());
             }
         };
@@ -204,8 +214,11 @@ impl TelegramBotDialogueAdminRepositoryEditDispatcher {
         let new_value = match extract_text(&msg) {
             Some(v) => v,
             None => {
-                bot.send_message(msg.chat.id, "❌ Введите нового владельца текстом.")
-                    .await?;
+                bot.send_message(
+                    msg.chat.id,
+                    t!("telegram_bot.dialogues.admin.repository.edit.owner_required").to_string(),
+                )
+                .await?;
                 return Ok(());
             }
         };
@@ -231,8 +244,11 @@ impl TelegramBotDialogueAdminRepositoryEditDispatcher {
         let new_value = match extract_text(&msg) {
             Some(v) => v,
             None => {
-                bot.send_message(msg.chat.id, "❌ Введите новый URL текстом.")
-                    .await?;
+                bot.send_message(
+                    msg.chat.id,
+                    t!("telegram_bot.dialogues.admin.repository.edit.url_required").to_string(),
+                )
+                .await?;
                 return Ok(());
             }
         };
@@ -269,7 +285,7 @@ impl TelegramBotDialogueAdminRepositoryEditDispatcher {
                 tracing::error!(error = %e, repository_id = repository_id, "Repository not found for edit");
                 bot.send_message(
                     msg.chat.id,
-                    "❌ Репозиторий не найден. Возможно, он был удалён.",
+                    t!("telegram_bot.dialogues.admin.repository.not_found").to_string(),
                 )
                 .await?;
                 dialogue.exit().await.ok();
@@ -298,17 +314,24 @@ impl TelegramBotDialogueAdminRepositoryEditDispatcher {
             },
         };
 
-        let loading = bot.send_message(msg.chat.id, "⏳ Сохраняем...").await?;
+        let loading = bot
+            .send_message(
+                msg.chat.id,
+                t!("telegram_bot.dialogues.admin.repository.edit.loading").to_string(),
+            )
+            .await?;
 
         match executors.commands.update_repository.execute(&cmd).await {
             Ok(r) => {
                 bot.edit_message_text(
                     msg.chat.id,
                     loading.id,
-                    format!(
-                        "✅ Репозиторий <b>{}/{}</b> успешно обновлён.",
-                        r.repository.owner, r.repository.name
-                    ),
+                    t!(
+                        "telegram_bot.dialogues.admin.repository.edit.success",
+                        owner = r.repository.owner,
+                        name = r.repository.name
+                    )
+                    .to_string(),
                 )
                 .parse_mode(teloxide::types::ParseMode::Html)
                 .await?;
@@ -318,7 +341,7 @@ impl TelegramBotDialogueAdminRepositoryEditDispatcher {
                 bot.edit_message_text(
                     msg.chat.id,
                     loading.id,
-                    db_error_message("сохранить изменения"),
+                    t!("telegram_bot.dialogues.admin.repository.edit.db_error").to_string(),
                 )
                 .await?;
             }

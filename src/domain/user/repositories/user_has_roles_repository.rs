@@ -19,6 +19,12 @@ pub enum GetAllUserRolesError {
     InvalidField(String),
 }
 
+#[derive(Debug, Error)]
+pub enum RemoveRoleFromUserError {
+    #[error("Database error: {0}")]
+    DbError(String),
+}
+
 #[async_trait::async_trait]
 pub trait UserHasRolesRepository: Send + Sync {
     async fn assign(
@@ -28,5 +34,16 @@ pub trait UserHasRolesRepository: Send + Sync {
         role_name: RoleName,
     ) -> Result<(), AssignRoleToUserError>;
 
+    async fn remove(
+        &self,
+        user_id: UserId,
+        role_name: RoleName,
+    ) -> Result<(), RemoveRoleFromUserError>;
+
     async fn get_all(&self, user_id: UserId) -> Result<Vec<Role>, GetAllUserRolesError>;
+
+    async fn find_user_ids_by_role(
+        &self,
+        role_name: RoleName,
+    ) -> Result<Vec<UserId>, GetAllUserRolesError>;
 }

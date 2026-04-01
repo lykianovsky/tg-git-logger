@@ -2,6 +2,8 @@
 
 pub mod prelude;
 
+pub mod digest_subscriptions;
+pub mod health_pings;
 pub mod repositories;
 pub mod repository_pull_requests;
 pub mod repository_task_tracker;

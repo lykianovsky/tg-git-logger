@@ -1,5 +1,6 @@
-use crate::delivery::bot::telegram::keyboards::actions::TelegramBotKeyboardAction;
-use std::str::FromStr;
+use crate::delivery::bot::telegram::keyboards::actions::{
+    impl_keyboard_action, KeyboardActionLabel,
+};
 
 use crate::domain::role::value_objects::role_name::RoleName;
 use strum_macros::{AsRefStr, EnumString};
@@ -21,15 +22,17 @@ impl From<TelegramBotChooseRoleAction> for RoleName {
     }
 }
 
-impl TelegramBotKeyboardAction for TelegramBotChooseRoleAction {
-    fn to_callback_data(&self) -> &str {
-        self.as_ref()
+impl TelegramBotChooseRoleAction {
+    pub fn try_from_role(role: &RoleName) -> Option<Self> {
+        match role {
+            RoleName::Developer => Some(Self::Developer),
+            RoleName::QualityAssurance => Some(Self::QualityAssurance),
+            _ => None,
+        }
     }
+}
 
-    fn from_callback_data(data: &str) -> Result<Self, String> {
-        Self::from_str(data).map_err(|e| e.to_string())
-    }
-
+impl KeyboardActionLabel for TelegramBotChooseRoleAction {
     fn label(&self) -> &'static str {
         match self {
             TelegramBotChooseRoleAction::Developer => "👨‍💻 Разработчик",
@@ -37,3 +40,5 @@ impl TelegramBotKeyboardAction for TelegramBotChooseRoleAction {
         }
     }
 }
+
+impl_keyboard_action!(TelegramBotChooseRoleAction);

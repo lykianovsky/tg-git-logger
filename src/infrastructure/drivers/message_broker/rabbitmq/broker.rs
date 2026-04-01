@@ -1,6 +1,6 @@
 use crate::infrastructure::drivers::message_broker::contracts::acknowledger::BrokerMessageAcknowledger;
 use crate::infrastructure::drivers::message_broker::contracts::broker::{
-    MessageBroker, MessageBrokerConsumeError, MessageBrokerSetupError,
+    MessageBroker, MessageBrokerConsumeError, MessageBrokerQueueDepthError, MessageBrokerSetupError,
 };
 use crate::infrastructure::drivers::message_broker::contracts::delivery::BrokerDelivery;
 use crate::infrastructure::drivers::message_broker::contracts::envelope::MessageBrokerEnvelope;
@@ -11,12 +11,12 @@ use crate::infrastructure::drivers::message_broker::rabbitmq::additional_headers
 use async_trait::async_trait;
 use futures::StreamExt;
 use lapin::options::{
-    BasicConsumeOptions, ExchangeDeclareOptions, QueueBindOptions, QueueDeclareOptions,
+    BasicConsumeOptions, BasicQosOptions, ExchangeDeclareOptions, QueueBindOptions,
+    QueueDeclareOptions,
 };
 use lapin::types::AMQPValue;
 use lapin::{Channel, Connection, ConnectionProperties, types::FieldTable};
 use std::sync::Arc;
-use std::time::Duration;
 
 pub const EXCHANGE_NAME: &str = "domain.exchange";
 pub const EXCHANGE_KIND: lapin::ExchangeKind = lapin::ExchangeKind::Topic;
@@ -284,6 +284,11 @@ impl MessageBroker for MessageBrokerRabbitMQ {
             .await
             .map_err(|e| MessageBrokerConsumeError::ChannelCreate(e.to_string()))?;
 
+        channel
+            .basic_qos(1, BasicQosOptions::default())
+            .await
+            .map_err(|e| MessageBrokerConsumeError::ChannelCreate(e.to_string()))?;
+
         let stream = channel
             .basic_consume(
                 &queue.name,
@@ -362,5 +367,22 @@ impl MessageBroker for MessageBrokerRabbitMQ {
         }
 
         Ok(())
+    }
+
+    async fn queue_depth(&self, queue_name: &str) -> Result<u32, MessageBrokerQueueDepthError> {
+        let queue = self
+            .channel
+            .queue_declare(
+                queue_name,
+                QueueDeclareOptions {
+                    passive: true,
+                    ..Default::default()
+                },
+                FieldTable::default(),
+            )
+            .await
+            .map_err(|e| MessageBrokerQueueDepthError::QueueDeclareError(e.to_string()))?;
+
+        Ok(queue.message_count())
     }
 }

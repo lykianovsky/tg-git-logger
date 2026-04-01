@@ -1,0 +1,245 @@
+use crate::application::health_ping::commands::check_all_health_pings::command::CheckAllHealthPingsCommand;
+use crate::application::health_ping::commands::check_all_health_pings::error::CheckAllHealthPingsExecutorError;
+use crate::application::health_ping::commands::check_all_health_pings::response::CheckAllHealthPingsResponse;
+use crate::domain::health_ping::ports::health_check_client::HealthCheckClient;
+use crate::domain::health_ping::repositories::health_ping_repository::HealthPingRepository;
+use crate::domain::notification::services::notification_service::NotificationService;
+use crate::domain::role::value_objects::role_name::RoleName;
+use crate::domain::shared::command::CommandExecutor;
+use crate::domain::user::repositories::user_has_roles_repository::UserHasRolesRepository;
+use crate::domain::user::repositories::user_social_accounts_repository::UserSocialAccountsRepository;
+use crate::domain::user::value_objects::social_chat_id::SocialChatId;
+use crate::domain::user::value_objects::social_type::SocialType;
+use crate::utils::builder::message::MessageBuilder;
+use chrono::Utc;
+use rust_i18n::t;
+use std::sync::Arc;
+
+pub struct CheckAllHealthPingsExecutor {
+    health_ping_repo: Arc<dyn HealthPingRepository>,
+    health_check_client: Arc<dyn HealthCheckClient>,
+    notification_service: Arc<dyn NotificationService>,
+    user_has_roles_repo: Arc<dyn UserHasRolesRepository>,
+    user_socials_repo: Arc<dyn UserSocialAccountsRepository>,
+}
+
+impl CheckAllHealthPingsExecutor {
+    pub fn new(
+        health_ping_repo: Arc<dyn HealthPingRepository>,
+        health_check_client: Arc<dyn HealthCheckClient>,
+        notification_service: Arc<dyn NotificationService>,
+        user_has_roles_repo: Arc<dyn UserHasRolesRepository>,
+        user_socials_repo: Arc<dyn UserSocialAccountsRepository>,
+    ) -> Self {
+        Self {
+            health_ping_repo,
+            health_check_client,
+            notification_service,
+            user_has_roles_repo,
+            user_socials_repo,
+        }
+    }
+
+    async fn notify_admins(&self, message: &MessageBuilder) {
+        let admin_user_ids = match self
+            .user_has_roles_repo
+            .find_user_ids_by_role(RoleName::Admin)
+            .await
+        {
+            Ok(ids) => ids,
+            Err(e) => {
+                tracing::error!(
+                    error = %e,
+                    "Failed to fetch admin user IDs for health ping notification"
+                );
+                return;
+            }
+        };
+
+        for user_id in &admin_user_ids {
+            let social =
+                match self.user_socials_repo.find_by_user_id(user_id).await {
+                    Ok(s) => s,
+                    Err(e) => {
+                        tracing::error!(
+                            error = %e,
+                            user_id = user_id.0,
+                            "Failed to find social account for admin"
+                        );
+                        continue;
+                    }
+                };
+
+            let chat_id = SocialChatId(social.social_user_id.0 as i64);
+
+            if let Err(e) = self
+                .notification_service
+                .send_message(&SocialType::Telegram, &chat_id, message)
+                .await
+            {
+                tracing::error!(
+                    error = %e,
+                    user_id = user_id.0,
+                    "Failed to send health ping notification to admin"
+                );
+            }
+        }
+    }
+}
+
+impl CommandExecutor for CheckAllHealthPingsExecutor {
+    type Command = CheckAllHealthPingsCommand;
+    type Response = CheckAllHealthPingsResponse;
+    type Error = CheckAllHealthPingsExecutorError;
+
+    async fn execute(
+        &self,
+        _cmd: &Self::Command,
+    ) -> Result<Self::Response, Self::Error> {
+        let pings = self.health_ping_repo.find_active_due().await?;
+
+        let now = Utc::now();
+        let mut checked_count = 0;
+        let mut failed_count = 0;
+        let mut recovered_count = 0;
+
+        for ping in &pings {
+            let result = self.health_check_client.check(&ping.url).await;
+
+            let mut updated_ping = ping.clone();
+            updated_ping.last_status = Some(result.status_text.clone());
+            updated_ping.last_response_ms = Some(result.response_ms);
+            updated_ping.last_error_message = result.error_message.clone();
+            updated_ping.last_checked_at = Some(now);
+
+            let was_failing =
+                ping.last_status.as_deref() == Some("error");
+
+            if result.is_success {
+                // Recovery: was failing, now ok
+                if let Some(failed_since) = ping.failed_since {
+                    let downtime = now.signed_duration_since(failed_since);
+                    let downtime_text = format_duration(downtime);
+
+                    updated_ping.failed_since = None;
+
+                    let message = MessageBuilder::new()
+                        .with_html_escape(true)
+                        .bold(&t!("telegram_bot.dialogues.admin.health_ping_notification.service_recovered").to_string())
+                        .empty_line()
+                        .section(
+                            &t!("telegram_bot.dialogues.admin.health_ping_notification.field_service").to_string(),
+                            &ping.name,
+                        )
+                        .section(
+                            &t!("telegram_bot.dialogues.admin.health_ping_notification.field_url").to_string(),
+                            &ping.url,
+                        )
+                        .section(
+                            &t!("telegram_bot.dialogues.admin.health_ping_notification.field_response_time").to_string(),
+                            &t!("telegram_bot.dialogues.admin.health_ping_notification.ms_suffix", value = result.response_ms).to_string(),
+                        )
+                        .section(
+                            &t!("telegram_bot.dialogues.admin.health_ping_notification.field_downtime").to_string(),
+                            &downtime_text,
+                        );
+
+                    self.notify_admins(&message).await;
+
+                    recovered_count += 1;
+
+                    tracing::info!(
+                        ping_name = %ping.name,
+                        downtime = %downtime_text,
+                        response_ms = result.response_ms,
+                        "Health ping recovered"
+                    );
+                }
+            } else {
+                // Failure: notify only on first transition to error
+                if !was_failing && ping.failed_since.is_none() {
+                    updated_ping.failed_since = Some(now);
+
+                    let error_text = result
+                        .error_message
+                        .as_deref()
+                        .unwrap_or("unknown");
+
+                    let message = MessageBuilder::new()
+                        .with_html_escape(true)
+                        .bold(&t!("telegram_bot.dialogues.admin.health_ping_notification.service_down").to_string())
+                        .empty_line()
+                        .section(
+                            &t!("telegram_bot.dialogues.admin.health_ping_notification.field_service").to_string(),
+                            &ping.name,
+                        )
+                        .section(
+                            &t!("telegram_bot.dialogues.admin.health_ping_notification.field_url").to_string(),
+                            &ping.url,
+                        )
+                        .section(
+                            &t!("telegram_bot.dialogues.admin.health_ping_notification.field_error").to_string(),
+                            error_text,
+                        );
+
+                    self.notify_admins(&message).await;
+
+                    tracing::warn!(
+                        ping_name = %ping.name,
+                        error = error_text,
+                        "Health ping failed"
+                    );
+                }
+                // Repeated failure — failed_since already set, don't spam
+
+                failed_count += 1;
+            }
+
+            if let Err(e) = self.health_ping_repo.update(&updated_ping).await {
+                tracing::error!(
+                    error = %e,
+                    ping_name = %ping.name,
+                    "Failed to update health ping status"
+                );
+            }
+
+            checked_count += 1;
+        }
+
+        Ok(CheckAllHealthPingsResponse {
+            checked_count,
+            failed_count,
+            recovered_count,
+        })
+    }
+}
+
+fn format_duration(duration: chrono::Duration) -> String {
+    let total_seconds = duration.num_seconds();
+
+    if total_seconds < 60 {
+        return t!(
+            "telegram_bot.dialogues.admin.health_ping_notification.duration_seconds",
+            value = total_seconds
+        )
+        .to_string();
+    }
+
+    let hours = total_seconds / 3600;
+    let minutes = (total_seconds % 3600) / 60;
+
+    if hours > 0 {
+        t!(
+            "telegram_bot.dialogues.admin.health_ping_notification.duration_hours_minutes",
+            hours = hours,
+            minutes = minutes
+        )
+        .to_string()
+    } else {
+        t!(
+            "telegram_bot.dialogues.admin.health_ping_notification.duration_minutes",
+            value = minutes
+        )
+        .to_string()
+    }
+}

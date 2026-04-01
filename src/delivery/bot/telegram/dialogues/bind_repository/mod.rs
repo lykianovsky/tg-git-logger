@@ -5,6 +5,9 @@ use crate::bootstrap::executors::ApplicationBoostrapExecutors;
 use crate::delivery::bot::telegram::dialogues::{
     TelegramBotDialogueState, TelegramBotDialogueType,
 };
+use crate::delivery::bot::telegram::keyboards::actions::TelegramBotKeyboardAction;
+use crate::delivery::bot::telegram::keyboards::actions::confirm::TelegramBotConfirmAction;
+use crate::delivery::bot::telegram::keyboards::builder::KeyboardBuilder;
 use crate::domain::repository::value_objects::repository_id::RepositoryId;
 use crate::domain::shared::command::CommandExecutor;
 use crate::domain::user::value_objects::social_user_id::SocialUserId;
@@ -73,15 +76,20 @@ async fn handle_select(
 
     match executors.commands.bind_repository.execute(&cmd).await {
         Ok(_) => {
-            bot.send_message(msg.chat().id, "✅ Вы успешно привязались к репозиторию!")
-                .await?;
+            bot.send_message(
+                msg.chat().id,
+                t!("telegram_bot.dialogues.bind_repository.bound_success").to_string(),
+            )
+            .await?;
             dialogue.exit().await.ok();
         }
         Err(BindRepositoryExecutorError::AlreadyBound) => {
-            let keyboard = InlineKeyboardMarkup::new(vec![vec![
-                InlineKeyboardButton::callback("✅ Да, отвязаться", repository_id.to_string()),
-                InlineKeyboardButton::callback("❌ Нет", "cancel"),
-            ]]);
+            let keyboard = KeyboardBuilder::new()
+                .row::<TelegramBotConfirmAction>(vec![
+                    TelegramBotConfirmAction::Yes,
+                    TelegramBotConfirmAction::No,
+                ])
+                .build();
 
             dialogue
                 .update(TelegramBotDialogueState::BindRepository(
@@ -91,7 +99,7 @@ async fn handle_select(
 
             bot.send_message(
                 msg.chat().id,
-                "Вы уже привязаны к этому репозиторию. Отвязаться?",
+                t!("telegram_bot.dialogues.bind_repository.already_bound").to_string(),
             )
             .reply_markup(keyboard)
             .await?;
@@ -122,8 +130,16 @@ async fn handle_confirm_unbind(
         None => return Ok(()),
     };
 
-    if data == "cancel" {
-        bot.send_message(msg.chat().id, "Отменено.").await?;
+    let action = match TelegramBotConfirmAction::from_callback_data(data) {
+        Ok(a) => a,
+        Err(_) => {
+            dialogue.exit().await.ok();
+            return Ok(());
+        }
+    };
+
+    if matches!(action, TelegramBotConfirmAction::No) {
+        bot.send_message(msg.chat().id, t!("telegram_bot.common.cancelled").to_string()).await?;
         dialogue.exit().await.ok();
         return Ok(());
     }
@@ -135,8 +151,11 @@ async fn handle_confirm_unbind(
 
     match executors.commands.unbind_repository.execute(&cmd).await {
         Ok(_) => {
-            bot.send_message(msg.chat().id, "✅ Вы успешно отвязались от репозитория.")
-                .await?;
+            bot.send_message(
+                msg.chat().id,
+                t!("telegram_bot.dialogues.bind_repository.unbound_success").to_string(),
+            )
+            .await?;
         }
         Err(e) => {
             tracing::error!(error = %e, "Failed to unbind repository");

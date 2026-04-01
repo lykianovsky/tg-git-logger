@@ -278,6 +278,46 @@ The caller (scheduler, delivery handler, consumer) is responsible for deciding w
 - Use the fluent builder pattern (methods returning `self`) only for value-object assembly like `MessageBuilder`.
 - No `Default` derives unless all fields have meaningful zero values.
 
+### MessageBuilder
+
+All Telegram message text must be assembled with `MessageBuilder` from `utils::builder::message`. Never build message
+strings manually with `format!` or string concatenation.
+
+Available methods:
+
+| Method | Output |
+|---|---|
+| `.line(text)` | `text\n` |
+| `.bold(text)` | `<b>text</b>\n` |
+| `.italic(text)` | `<i>text</i>\n` |
+| `.code(text)` | `<code>text</code>\n` |
+| `.section(title, content)` | `<b>title:</b> content\n` |
+| `.section_bold(title, content)` | `<b>title:</b> <b>content</b>\n` |
+| `.section_code(title, content)` | `<b>title:</b> <code>content</code>\n` |
+| `.link(text, url)` | `<a href="url">text</a>\n` |
+| `.emoji(emoji)` | raw emoji (no newline) |
+| `.empty_line()` | `\n` |
+| `.raw(text)` | raw text, no escaping, no newline |
+| `.with_html_escape(true)` | enable HTML escaping for all subsequent `.line()`/`.section()` calls |
+| `.with_max_length(n)` | truncate result to `n` chars with `...` |
+
+Call `.build()` at the end to get the final `String`.
+
+```rust
+// GOOD
+let text = MessageBuilder::new()
+    .bold("🔔 New PR")
+    .section("Author", &pr.author)
+    .link("Open PR", &pr.url)
+    .build();
+
+// BAD — raw format! for Telegram messages
+let text = format!("<b>🔔 New PR</b>\n<b>Author:</b> {}\n", pr.author);
+```
+
+Use `.with_html_escape(true)` when content comes from external input (user names, commit messages, PR titles) to prevent
+broken HTML in Telegram messages.
+
 ### Config
 
 - New config values go in `src/config/application/mod.rs` as typed fields (not raw strings passed around).
@@ -290,6 +330,42 @@ The caller (scheduler, delivery handler, consumer) is responsible for deciding w
 - **Если не знаешь — скажи прямо.** Не придумывай ответ. Допустимые формулировки: "Не знаю, нужно проверить", "Не уверен — вот моё понимание, поправь если ошибаюсь".
 - **Перед нетривиальной реализацией** — кратко сформулируй своё понимание задачи и спроси подтверждение.
 - **Вопросы задавай списком** — все сразу, не по одному.
+
+## Антициклические правила (предотвращение зацикливания)
+
+Эти правила — жёсткие ограничения. Нарушение любого из них приводит к бесполезной трате контекста и перезапуску.
+
+### Лимиты на попытки
+
+- **Максимум 3 попытки** исправить одну и ту же ошибку компиляции/линтера. После 3-й — остановись, покажи ошибку пользователю, спроси совета.
+- **Максимум 3 запроса поиска** (Grep/Glob) для одной и той же сущности. Если не нашёл — спроси пользователя, где это находится.
+- **Максимум 2 раунда** `cargo check` → fix → `cargo check` подряд. Если после 2-го раунда всё ещё есть ошибки — покажи полный вывод и спроси.
+
+### Запрет на расширение скоупа
+
+- **Делай ТОЛЬКО то, что просят.** Не трогай файлы, которые не относятся к задаче.
+- **Не рефактори** попутно обнаруженный код. Не добавляй "улучшения". Не исправляй предупреждения в чужих файлах.
+- **Если задача требует изменений в >10 файлах** — сначала покажи список файлов и спроси подтверждение.
+
+### Стратегия выполнения
+
+- **Сначала план, потом код.** Для задач с изменением >3 файлов — сформулируй план в 3-5 пунктов, покажи пользователю, дождись подтверждения.
+- **Один проход — один результат.** Не перечитывай файл, который уже прочитал в этом разговоре, если его содержимое не менялось.
+- **Если подход не работает — смени подход, не повторяй.** Два раза попробовал и не получилось = стоп, доложи пользователю.
+- **Не запускай cargo check / cargo clippy "на всякий случай".** Запускай только когда закончил все изменения по задаче или когда пользователь просит.
+
+### Работа с ошибками компиляции
+
+- **Прочитай ВСЕ ошибки разом** перед тем, как начать исправлять. Не исправляй первую ошибку, не посмотрев на остальные — они часто связаны.
+- **Исправляй от корня.** Если ошибка каскадная (одна причина → много ошибок), исправь корневую причину, а не каждый симптом по отдельности.
+- **Не добавляй `#[allow(...)]` или `todo!()` чтобы "заткнуть" ошибку.** Если не можешь исправить — спроси.
+
+### Когда немедленно остановиться
+
+- Ты повторяешь действие, которое уже делал (тот же Grep, тот же Edit).
+- Ты читаешь файл третий раз подряд.
+- Ты откатываешь собственное изменение, чтобы попробовать другой вариант в третий раз.
+- Ты чувствуешь, что "ещё одна маленькая правка" решит всё — это сигнал остановиться и спросить.
 
 ## Commit convention
 

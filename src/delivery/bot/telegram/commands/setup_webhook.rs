@@ -48,7 +48,7 @@ impl TelegramBotSetupWebhookCommandHandler {
                     .bot
                     .send_message(
                         self.context.msg.chat.id,
-                        "⛔ У вас нет доступа к этой команде.",
+                        t!("telegram_bot.commands.access_denied").to_string(),
                     )
                     .await?;
                 return Ok(());
@@ -60,7 +60,7 @@ impl TelegramBotSetupWebhookCommandHandler {
                 .bot
                 .send_message(
                     self.context.msg.chat.id,
-                    "⛔ У вас нет доступа к этой команде.",
+                    t!("telegram_bot.commands.access_denied").to_string(),
                 )
                 .await?;
             return Ok(());
@@ -80,7 +80,7 @@ impl TelegramBotSetupWebhookCommandHandler {
                 .bot
                 .send_message(
                     self.context.msg.chat.id,
-                    "❌ Нет доступных репозиториев. Сначала создайте репозиторий в /admin.",
+                    t!("telegram_bot.commands.setup_webhook.no_repositories").to_string(),
                 )
                 .await?;
             return Ok(());
@@ -108,8 +108,7 @@ impl TelegramBotSetupWebhookCommandHandler {
             .bot
             .send_message(
                 self.context.msg.chat.id,
-                "📣 Выберите репозиторий для привязки этого чата к уведомлениям:\n\
-                 После выбора все вебхук-события будут приходить сюда.",
+                t!("telegram_bot.commands.setup_webhook.select_repository").to_string(),
             )
             .reply_markup(keyboard)
             .parse_mode(ParseMode::Html)

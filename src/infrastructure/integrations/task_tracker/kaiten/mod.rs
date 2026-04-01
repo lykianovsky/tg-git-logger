@@ -2,8 +2,9 @@ use async_trait::async_trait;
 use serde::Deserialize;
 
 use crate::domain::task::ports::task_tracker_client::{
-    TaskTrackerCard, TaskTrackerClient, TaskTrackerClientGetCardError,
-    TaskTrackerClientMoveToColumnError,
+    TaskTrackerBoard, TaskTrackerCard, TaskTrackerClient, TaskTrackerClientGetCardError,
+    TaskTrackerClientListError, TaskTrackerClientMoveToColumnError, TaskTrackerColumn,
+    TaskTrackerSpace,
 };
 use crate::domain::task::value_objects::task_id::TaskId;
 use reqwest::{Client, Method};
@@ -15,6 +16,24 @@ pub struct KaitenCard {
     pub id: u64,
     pub title: String,
     pub column_id: u64,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct KaitenSpace {
+    pub id: i32,
+    pub title: String,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct KaitenBoard {
+    pub id: i32,
+    pub title: String,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct KaitenColumn {
+    pub id: i32,
+    pub title: String,
 }
 
 pub struct KaitenClientBase(pub String);
@@ -139,5 +158,64 @@ impl TaskTrackerClient for KaitenClient {
             title: card.title,
             url,
         })
+    }
+
+    async fn list_spaces(&self) -> Result<Vec<TaskTrackerSpace>, TaskTrackerClientListError> {
+        let spaces: Vec<KaitenSpace> = self
+            .request::<(), Vec<KaitenSpace>>(Method::GET, "/spaces", None)
+            .await
+            .map_err(|e| TaskTrackerClientListError::ClientError(e.to_string()))?;
+
+        Ok(spaces
+            .into_iter()
+            .map(|s| TaskTrackerSpace {
+                id: s.id,
+                title: s.title,
+            })
+            .collect())
+    }
+
+    async fn list_boards(
+        &self,
+        space_id: i32,
+    ) -> Result<Vec<TaskTrackerBoard>, TaskTrackerClientListError> {
+        let boards: Vec<KaitenBoard> = self
+            .request::<(), Vec<KaitenBoard>>(
+                Method::GET,
+                &format!("/spaces/{}/boards", space_id),
+                None,
+            )
+            .await
+            .map_err(|e| TaskTrackerClientListError::ClientError(e.to_string()))?;
+
+        Ok(boards
+            .into_iter()
+            .map(|b| TaskTrackerBoard {
+                id: b.id,
+                title: b.title,
+            })
+            .collect())
+    }
+
+    async fn list_columns(
+        &self,
+        board_id: i32,
+    ) -> Result<Vec<TaskTrackerColumn>, TaskTrackerClientListError> {
+        let columns: Vec<KaitenColumn> = self
+            .request::<(), Vec<KaitenColumn>>(
+                Method::GET,
+                &format!("/boards/{}/columns", board_id),
+                None,
+            )
+            .await
+            .map_err(|e| TaskTrackerClientListError::ClientError(e.to_string()))?;
+
+        Ok(columns
+            .into_iter()
+            .map(|c| TaskTrackerColumn {
+                id: c.id,
+                title: c.title,
+            })
+            .collect())
     }
 }

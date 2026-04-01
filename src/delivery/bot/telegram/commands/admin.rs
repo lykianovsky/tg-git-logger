@@ -47,7 +47,7 @@ impl TelegramBotAdminCommandHandler {
                     .bot
                     .send_message(
                         self.context.msg.chat.id,
-                        "⛔ У вас нет доступа к этой команде.",
+                        t!("telegram_bot.commands.access_denied").to_string(),
                     )
                     .await?;
                 return Ok(());
@@ -59,7 +59,7 @@ impl TelegramBotAdminCommandHandler {
                 .bot
                 .send_message(
                     self.context.msg.chat.id,
-                    "⛔ У вас нет доступа к этой команде.",
+                    t!("telegram_bot.commands.access_denied").to_string(),
                 )
                 .await?;
             return Ok(());
@@ -68,6 +68,9 @@ impl TelegramBotAdminCommandHandler {
         let keyboard = KeyboardBuilder::new()
             .row::<TelegramBotAdminAction>(vec![TelegramBotAdminAction::ConfigureRepository])
             .row::<TelegramBotAdminAction>(vec![TelegramBotAdminAction::ConfigureTaskTracker])
+            .row::<TelegramBotAdminAction>(vec![TelegramBotAdminAction::QueuesStats])
+            .row::<TelegramBotAdminAction>(vec![TelegramBotAdminAction::HealthPings])
+            .row::<TelegramBotAdminAction>(vec![TelegramBotAdminAction::ManageUsers])
             .build();
 
         self.dialogue
@@ -78,7 +81,7 @@ impl TelegramBotAdminCommandHandler {
 
         self.context
             .bot
-            .send_message(self.context.msg.chat.id, "🔧 Панель администратора")
+            .send_message(self.context.msg.chat.id, t!("telegram_bot.commands.admin.panel_title").to_string())
             .reply_markup(keyboard)
             .await?;
 

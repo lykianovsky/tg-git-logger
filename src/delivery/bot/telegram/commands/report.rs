@@ -35,7 +35,10 @@ impl TelegramBotVersionControlReportCommandHandler {
 
         self.context
             .bot
-            .send_message(self.context.msg.chat.id, "🎯  Выберите для кого:")
+            .send_message(
+                self.context.msg.chat.id,
+                t!("telegram_bot.commands.report.choose_for_who").to_string(),
+            )
             .reply_markup(keyboard)
             .await?;
 

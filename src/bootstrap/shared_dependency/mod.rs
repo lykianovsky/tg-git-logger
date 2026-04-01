@@ -1,5 +1,7 @@
 use crate::config::application::ApplicationConfig;
 use crate::domain::auth::ports::oauth_client::OAuthClient;
+use crate::domain::digest::repositories::digest_subscription_repository::DigestSubscriptionRepository;
+use crate::domain::health_ping::repositories::health_ping_repository::HealthPingRepository;
 use crate::domain::repository::repositories::repository_repository::RepositoryRepository;
 use crate::domain::repository::repositories::repository_task_tracker_repository::RepositoryTaskTrackerRepository;
 use crate::domain::role::repositories::role_repository::RoleRepository;
@@ -17,12 +19,16 @@ use crate::infrastructure::drivers::message_broker::contracts::broker::MessageBr
 use crate::infrastructure::drivers::message_broker::contracts::publisher::MessageBrokerPublisher;
 use crate::infrastructure::drivers::message_broker::rabbitmq::broker::MessageBrokerRabbitMQ;
 use crate::infrastructure::drivers::message_broker::rabbitmq::publisher::MessageBrokerRabbitMQPublisher;
+use crate::domain::health_ping::ports::health_check_client::HealthCheckClient;
+use crate::infrastructure::integrations::health_check::ReqwestHealthCheckClient;
 use crate::infrastructure::integrations::oauth::github::GithubOAuthClient;
 use crate::infrastructure::integrations::task_tracker::kaiten::{
     KaitenClient, KaitenClientBase, KaitenClientToken,
 };
 use crate::infrastructure::integrations::version_control::github::client::GithubVersionControlClient;
 use crate::infrastructure::processing::event_bus::EventBus;
+use crate::infrastructure::repositories::mysql::digest_subscription::MySQLDigestSubscriptionRepository;
+use crate::infrastructure::repositories::mysql::health_ping::MySQLHealthPingRepository;
 use crate::infrastructure::repositories::mysql::repository::MySQLRepositoryRepository;
 use crate::infrastructure::repositories::mysql::repository_task_tracker::MySQLRepositoryTaskTrackerRepository;
 use crate::infrastructure::repositories::mysql::role::MySQLRoleRepository;
@@ -49,6 +55,9 @@ pub struct ApplicationSharedDependency {
     pub user_socials_repo: Arc<dyn UserSocialAccountsRepository>,
     pub user_version_controls_repo: Arc<dyn UserVersionControlAccountsRepository>,
     pub user_connection_repositories_repo: Arc<dyn UserConnectionRepositoriesRepository>,
+    pub digest_subscription_repo: Arc<dyn DigestSubscriptionRepository>,
+    pub health_ping_repo: Arc<dyn HealthPingRepository>,
+    pub health_check_client: Arc<dyn HealthCheckClient>,
     pub repository_repo: Arc<dyn RepositoryRepository>,
     pub repository_task_tracker_repo: Arc<dyn RepositoryTaskTrackerRepository>,
     pub notification_service: Arc<CompositionNotificationService>,
@@ -97,6 +106,15 @@ impl ApplicationSharedDependency {
                 mysql_pool.clone(),
             ));
 
+        let digest_subscription_repo: Arc<dyn DigestSubscriptionRepository> =
+            Arc::new(MySQLDigestSubscriptionRepository::new(mysql_pool.clone()));
+
+        let health_ping_repo: Arc<dyn HealthPingRepository> =
+            Arc::new(MySQLHealthPingRepository::new(mysql_pool.clone()));
+
+        let health_check_client: Arc<dyn HealthCheckClient> =
+            Arc::new(ReqwestHealthCheckClient::new());
+
         let repository_repo: Arc<dyn RepositoryRepository> =
             Arc::new(MySQLRepositoryRepository::new(mysql_pool.clone()));
 
@@ -139,6 +157,9 @@ impl ApplicationSharedDependency {
             user_socials_repo,
             user_version_controls_repo,
             user_connection_repositories_repo,
+            digest_subscription_repo,
+            health_ping_repo,
+            health_check_client,
             repository_repo,
             repository_task_tracker_repo,
             notification_service,

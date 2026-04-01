@@ -4,6 +4,7 @@ use crate::domain::user::events::registration_failed::UserRegistrationFailedEven
 use crate::infrastructure::drivers::message_broker::contracts::publisher::MessageBrokerPublisher;
 use crate::utils::builder::message::MessageBuilder;
 use async_trait::async_trait;
+use rust_i18n::t;
 use std::sync::Arc;
 
 pub struct UserRegistrationFailedListener {
@@ -14,13 +15,13 @@ pub struct UserRegistrationFailedListener {
 impl EventListener<UserRegistrationFailedEvent> for UserRegistrationFailedListener {
     async fn handle(&self, payload: &UserRegistrationFailedEvent) {
         let message = MessageBuilder::new()
-            .line("❌ Ошибка регистрации")
+            .line(&t!("notifications.registration.failed_title").to_string())
             .empty_line()
-            .line("Не удалось завершить авторизацию через OAuth.")
+            .line(&t!("notifications.registration.failed_body").to_string())
             .empty_line()
             .empty_line()
-            .line("🔁 Попробуйте ещё раз.")
-            .line("Если проблема повторяется — обратитесь в поддержку.");
+            .line(&t!("notifications.registration.failed_retry").to_string())
+            .line(&t!("notifications.registration.failed_support").to_string());
 
         self.publisher
             .publish(&SendSocialNotifyJob {

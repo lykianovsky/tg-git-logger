@@ -4,6 +4,9 @@ use crate::bootstrap::executors::ApplicationBoostrapExecutors;
 use crate::delivery::bot::telegram::dialogues::{
     TelegramBotDialogueState, TelegramBotDialogueType,
 };
+use crate::delivery::bot::telegram::keyboards::actions::TelegramBotKeyboardAction;
+use crate::delivery::bot::telegram::keyboards::actions::confirm::TelegramBotConfirmAction;
+use crate::delivery::bot::telegram::keyboards::builder::KeyboardBuilder;
 use crate::domain::repository::value_objects::repository_id::RepositoryId;
 use crate::domain::shared::command::CommandExecutor;
 use crate::domain::user::value_objects::social_chat_id::SocialChatId;
@@ -12,7 +15,7 @@ use std::sync::Arc;
 use teloxide::dispatching::DpHandlerDescription;
 use teloxide::dptree::case;
 use teloxide::prelude::*;
-use teloxide::types::{InlineKeyboardButton, InlineKeyboardMarkup, ParseMode};
+use teloxide::types::{InlineKeyboardMarkup, ParseMode};
 use teloxide::{Bot, dptree};
 
 #[derive(Debug, Clone, Default)]
@@ -81,8 +84,12 @@ async fn handle_select(
         Ok(r) => r,
         Err(e) => {
             tracing::error!(error = %e, "Failed to find repository");
-            bot.edit_message_text(chat_id, msg.id(), "❌ Репозиторий не найден.")
-                .await?;
+            bot.edit_message_text(
+                chat_id,
+                msg.id(),
+                t!("telegram_bot.dialogues.setup_webhook.repo_not_found").to_string(),
+            )
+            .await?;
             dialogue.exit().await.ok();
             return Ok(());
         }
@@ -90,10 +97,12 @@ async fn handle_select(
 
     match repository.social_chat_id {
         Some(bound_chat) if bound_chat == SocialChatId(chat_id.0) => {
-            let keyboard = InlineKeyboardMarkup::new(vec![vec![
-                InlineKeyboardButton::callback("✅ Да, отвязать", "confirm"),
-                InlineKeyboardButton::callback("❌ Нет", "cancel"),
-            ]]);
+            let keyboard = KeyboardBuilder::new()
+                .row::<TelegramBotConfirmAction>(vec![
+                    TelegramBotConfirmAction::Yes,
+                    TelegramBotConfirmAction::No,
+                ])
+                .build();
 
             dialogue
                 .update(TelegramBotDialogueState::SetupWebhook(
@@ -103,24 +112,25 @@ async fn handle_select(
                 ))
                 .await?;
 
+            let owner = teloxide::utils::html::escape(&repository.owner);
+            let name = teloxide::utils::html::escape(&repository.name);
             bot.edit_message_text(
                 chat_id,
                 msg.id(),
-                format!(
-                    "Этот чат уже привязан к репозиторию <b>{}/{}</b>.\nОтвязать?",
-                    teloxide::utils::html::escape(&repository.owner),
-                    teloxide::utils::html::escape(&repository.name),
-                ),
+                t!("telegram_bot.dialogues.setup_webhook.already_bound", owner = owner, name = name)
+                    .to_string(),
             )
             .parse_mode(ParseMode::Html)
             .reply_markup(keyboard)
             .await?;
         }
         Some(_) => {
-            let keyboard = InlineKeyboardMarkup::new(vec![vec![
-                InlineKeyboardButton::callback("✅ Да, перепривязать", "confirm"),
-                InlineKeyboardButton::callback("❌ Нет", "cancel"),
-            ]]);
+            let keyboard = KeyboardBuilder::new()
+                .row::<TelegramBotConfirmAction>(vec![
+                    TelegramBotConfirmAction::Yes,
+                    TelegramBotConfirmAction::No,
+                ])
+                .build();
 
             dialogue
                 .update(TelegramBotDialogueState::SetupWebhook(
@@ -130,15 +140,13 @@ async fn handle_select(
                 ))
                 .await?;
 
+            let owner = teloxide::utils::html::escape(&repository.owner);
+            let name = teloxide::utils::html::escape(&repository.name);
             bot.edit_message_text(
                 chat_id,
                 msg.id(),
-                format!(
-                    "Репозиторий <b>{}/{}</b> уже привязан к другому чату.\n\
-                     Перепривязать к этому чату?",
-                    teloxide::utils::html::escape(&repository.owner),
-                    teloxide::utils::html::escape(&repository.name),
-                ),
+                t!("telegram_bot.dialogues.setup_webhook.bound_to_other", owner = owner, name = name)
+                    .to_string(),
             )
             .parse_mode(ParseMode::Html)
             .reply_markup(keyboard)
@@ -166,9 +174,20 @@ async fn handle_confirm_unbind(
         None => return Ok(()),
     };
 
-    if query.data.as_deref() == Some("cancel") {
-        bot.edit_message_text(msg.chat().id, msg.id(), "Отменено.")
-            .await?;
+        let is_cancelled = query
+        .data
+        .as_deref()
+        .and_then(|d| TelegramBotConfirmAction::from_callback_data(d).ok())
+        .map(|a| matches!(a, TelegramBotConfirmAction::No))
+        .unwrap_or(false);
+
+    if is_cancelled {
+        bot.edit_message_text(
+            msg.chat().id,
+            msg.id(),
+            t!("telegram_bot.common.cancelled").to_string(),
+        )
+        .await?;
         dialogue.exit().await.ok();
         return Ok(());
     }
@@ -182,15 +201,13 @@ async fn handle_confirm_unbind(
         .await
     {
         Ok(r) => {
+            let owner = teloxide::utils::html::escape(&r.repository.owner);
+            let name = teloxide::utils::html::escape(&r.repository.name);
             bot.edit_message_text(
                 msg.chat().id,
                 msg.id(),
-                format!(
-                    "✅ Чат отвязан от репозитория <b>{}/{}</b>.\n\
-                     Уведомления будут приходить в чат по умолчанию.",
-                    teloxide::utils::html::escape(&r.repository.owner),
-                    teloxide::utils::html::escape(&r.repository.name),
-                ),
+                t!("telegram_bot.dialogues.setup_webhook.unbound_success", owner = owner, name = name)
+                    .to_string(),
             )
             .parse_mode(ParseMode::Html)
             .await?;
@@ -200,7 +217,7 @@ async fn handle_confirm_unbind(
             bot.edit_message_text(
                 msg.chat().id,
                 msg.id(),
-                "❌ Не удалось отвязать чат. Попробуйте позже.",
+                t!("telegram_bot.dialogues.setup_webhook.unbind_error").to_string(),
             )
             .await?;
         }
@@ -224,9 +241,20 @@ async fn handle_confirm_rebind(
         None => return Ok(()),
     };
 
-    if query.data.as_deref() == Some("cancel") {
-        bot.edit_message_text(msg.chat().id, msg.id(), "Отменено.")
-            .await?;
+        let is_cancelled = query
+        .data
+        .as_deref()
+        .and_then(|d| TelegramBotConfirmAction::from_callback_data(d).ok())
+        .map(|a| matches!(a, TelegramBotConfirmAction::No))
+        .unwrap_or(false);
+
+    if is_cancelled {
+        bot.edit_message_text(
+            msg.chat().id,
+            msg.id(),
+            t!("telegram_bot.common.cancelled").to_string(),
+        )
+        .await?;
         dialogue.exit().await.ok();
         return Ok(());
     }
@@ -260,15 +288,13 @@ async fn bind_chat(
         .await
     {
         Ok(r) => {
+            let owner = teloxide::utils::html::escape(&r.repository.owner);
+            let name = teloxide::utils::html::escape(&r.repository.name);
             bot.edit_message_text(
                 chat_id,
                 message_id,
-                format!(
-                    "✅ Чат привязан к репозиторию <b>{}/{}</b>.\n\
-                     Вебхук-уведомления теперь будут приходить сюда.",
-                    teloxide::utils::html::escape(&r.repository.owner),
-                    teloxide::utils::html::escape(&r.repository.name),
-                ),
+                t!("telegram_bot.dialogues.setup_webhook.bound_success", owner = owner, name = name)
+                    .to_string(),
             )
             .parse_mode(ParseMode::Html)
             .await?;
@@ -278,7 +304,7 @@ async fn bind_chat(
             bot.edit_message_text(
                 chat_id,
                 message_id,
-                "❌ Не удалось привязать чат. Попробуйте позже.",
+                t!("telegram_bot.dialogues.setup_webhook.bind_error").to_string(),
             )
             .await?;
         }

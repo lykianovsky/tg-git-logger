@@ -2,6 +2,7 @@ use crate::application::auth::commands::create_oauth_link::command::{
     CreateOAuthLinkExecutorCommand, CreateOAuthLinkExecutorCommandSocial,
     CreateOAuthLinkExecutorCommandVersionControl,
 };
+use crate::application::auth::commands::create_oauth_link::error::CreateOAuthLinkExecutorError;
 use crate::bootstrap::executors::ApplicationBoostrapExecutors;
 use crate::config::application::ApplicationConfig;
 use crate::delivery::bot::telegram::dialogues::TelegramBotDialogueType;
@@ -102,7 +103,20 @@ impl TelegramBotDialogueRegistrationDispatcher {
                     .await?;
             }
             Err(error) => {
-                bot.edit_message_text(chat_id, message_id, error.to_string())
+                let user_message = match &error {
+                    CreateOAuthLinkExecutorError::ExistRegisteredSocialAccountError(_) => {
+                        t!("telegram_bot.commands.register.already_registered").to_string()
+                    }
+                    CreateOAuthLinkExecutorError::CacheHasExist(_) => {
+                        t!("telegram_bot.commands.register.link_already_sent").to_string()
+                    }
+                    _ => {
+                        tracing::error!(error = %error, "Failed to create OAuth link");
+                        t!("telegram_bot.commands.register.internal_error").to_string()
+                    }
+                };
+
+                bot.edit_message_text(chat_id, message_id, user_message)
                     .await?;
             }
         }

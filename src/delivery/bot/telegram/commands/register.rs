@@ -45,7 +45,10 @@ impl TelegramBotRegisterCommandHandler {
 
         self.context
             .bot
-            .send_message(self.context.msg.chat.id, "💼 Ваша должность?")
+            .send_message(
+                self.context.msg.chat.id,
+                t!("telegram_bot.commands.register.choose_role").to_string(),
+            )
             .reply_markup(keyboard)
             .await?;
 

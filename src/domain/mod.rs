@@ -1,4 +1,7 @@
 pub mod auth;
+pub mod digest;
+pub mod health_ping;
+pub mod monitoring;
 pub mod notification;
 pub mod repository;
 pub mod role;

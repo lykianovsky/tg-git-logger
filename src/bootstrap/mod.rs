@@ -4,6 +4,8 @@ pub mod registry;
 pub mod shared_dependency;
 pub mod workers;
 
+use crate::application::notification::commands::send_social_notify::executor::SendSocialNotifyExecutor;
+use crate::application::task::commands::move_task_to_test::executor::MoveTaskToTestExecutor;
 use crate::bootstrap::executors::ApplicationBoostrapExecutors;
 use crate::bootstrap::queues::ApplicationQueues;
 use crate::bootstrap::registry::jobs::JobConsumersRegistry;
@@ -53,23 +55,40 @@ impl ApplicationBootstrap {
             .await
             .expect("Failed to setup RabbitMQ scheme");
 
-        let executors = Arc::new(ApplicationBoostrapExecutors::new(
-            config.clone(),
-            mysql_pool.clone(),
-            shared_dependency.clone(),
+        let send_social_notify_executor = Arc::new(SendSocialNotifyExecutor::new(
+            shared_dependency.notification_service.clone(),
+        ));
+        let move_task_to_test_executor = Arc::new(MoveTaskToTestExecutor::new(
+            shared_dependency.task_tracker_client.clone(),
+            shared_dependency.task_tracker_service.clone(),
+            config.task_tracker.test_column_id,
         ));
 
         let job_consumers_registry = Arc::new(
             JobConsumersRegistry::new()
                 .register(Arc::new(SendSocialNotifyJobConsumer {
-                    executor: executors.commands.send_social_notify.clone(),
+                    executor: send_social_notify_executor,
                 }))
                 .await
                 .register(Arc::new(MoveTaskToTestJobConsumer {
-                    executor: executors.commands.move_task_to_test.clone(),
+                    executor: move_task_to_test_executor,
                 }))
                 .await,
         );
+
+        let workers_manager = ApplicationBoostrapWorkersManager::new(
+            queues.clone(),
+            shared_dependency.message_broker.clone(),
+            shared_dependency.event_bus.clone(),
+            job_consumers_registry.clone(),
+        );
+
+        let executors = Arc::new(ApplicationBoostrapExecutors::new(
+            config.clone(),
+            mysql_pool.clone(),
+            shared_dependency.clone(),
+            workers_manager.stats_provider(),
+        ));
 
         let http_server_delivery = DeliveryHttpServerAxum::new(
             executors.clone(),
@@ -81,7 +100,11 @@ impl ApplicationBootstrap {
             http_server_delivery.serve().await.ok();
         });
 
-        let bot_delivery = DeliveryBotMessengerTelegram::new(executors.clone(), config.clone());
+        let bot_delivery = DeliveryBotMessengerTelegram::new(
+            executors.clone(),
+            config.clone(),
+            shared_dependency.clone(),
+        );
 
         let bot_handle = tokio::spawn(async move {
             bot_delivery.serve().await.ok();
@@ -96,13 +119,6 @@ impl ApplicationBootstrap {
         let event_listeners_handle = tokio::spawn(async move {
             event_listeners_delivery.serve().await.ok();
         });
-
-        let workers_manager = ApplicationBoostrapWorkersManager::new(
-            queues.clone(),
-            shared_dependency.message_broker.clone(),
-            shared_dependency.event_bus.clone(),
-            job_consumers_registry.clone(),
-        );
 
         let workers_handle = tokio::spawn(async move {
             workers_manager.run().await;

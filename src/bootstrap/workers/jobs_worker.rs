@@ -8,6 +8,7 @@ use crate::infrastructure::processing::worker::{
 use async_trait::async_trait;
 use futures::StreamExt;
 use std::sync::Arc;
+use tokio_util::sync::CancellationToken;
 
 pub struct MessageBrokerJobsWorker {
     name: String,
@@ -38,7 +39,10 @@ impl MessageBrokerWorker for MessageBrokerJobsWorker {
         self.name.as_str()
     }
 
-    async fn start(self: Box<Self>) -> Result<(), MessageBrokerWorkerStartError> {
+    async fn start(
+        self: Box<Self>,
+        cancel: CancellationToken,
+    ) -> Result<(), MessageBrokerWorkerStartError> {
         let queue = &*self.queue.clone();
 
         let mut stream = self
@@ -49,77 +53,89 @@ impl MessageBrokerWorker for MessageBrokerJobsWorker {
                 MessageBrokerWorkerStartError::FailedToCreateConsumerStream(e.to_string())
             })?;
 
-        while let Some(delivery) = stream.next().await {
-            tracing::debug!(
-                "MessageBrokerCommandWorker, FROM_WORKER {}: {}",
-                self.name,
-                delivery.envelope.name
-            );
-
-            let handler = match self.jobs_registry.get(&delivery.envelope.name).await {
-                Some(v) => v,
-                None => {
-                    let error = format!(
-                        "Failed get registry job from name: {}",
-                        &delivery.envelope.name
-                    );
-                    tracing::error!(error);
-                    delivery.reject(error.as_str()).await;
-                    continue;
+        loop {
+            tokio::select! {
+                _ = cancel.cancelled() => {
+                    tracing::info!(worker = %self.name, "Worker cancelled, shutting down");
+                    break;
                 }
-            };
+                delivery = stream.next() => {
+                    let delivery = match delivery {
+                        Some(d) => d,
+                        None => {
+                            tracing::warn!(worker = %self.name, "Stream closed");
+                            break;
+                        }
+                    };
 
-            match handler.run(&delivery.envelope.payload).await {
-                Ok(response) => match response {
-                    JobConsumerResponse::Ok => {
-                        tracing::info!(
-                            worker = %self.name,
-                            queue_name = %self.queue.name,
-                            queue_routing_key = %self.queue.routing_key,
-                            job = %delivery.envelope.name,
-                            "Job processed successfully"
-                        );
-                        delivery.ack().await
-                    }
-                    JobConsumerResponse::Reject(reason) => {
-                        tracing::warn!(
-                            worker = %self.name,
-                            queue_name = %self.queue.name,
-                            queue_routing_key = %self.queue.routing_key,
-                            job = %delivery.envelope.name,
-                            reason = reason,
-                            "Job rejected"
-                        );
-                        delivery.reject(reason.as_str()).await
-                    }
-                    JobConsumerResponse::Requeue => {
-                        tracing::warn!(
-                            worker = %self.name,
-                            queue_name = %self.queue.name,
-                            queue_routing_key = %self.queue.routing_key,
-                            job = %delivery.envelope.name,
-                            "Job requeued"
-                        );
-                        delivery.requeue().await
-                    }
-                    JobConsumerResponse::Retry(reason) => {
-                        tracing::warn!(
-                            worker = %self.name,
-                            queue_name = %self.queue.name,
-                            queue_routing_key = %self.queue.routing_key,
-                            job = %delivery.envelope.name,
-                            reason = reason,
-                            "Job scheduled for retry"
-                        );
-                        delivery.retry(reason.as_str()).await
-                    }
-                },
-                Err(error) => {
-                    tracing::error!(error = %error, "Failed handle run from job");
+                    tracing::debug!(
+                        worker = %self.name,
+                        job = %delivery.envelope.name,
+                        "Received job"
+                    );
 
-                    match error {
-                        JobConsumerError::DeserializationError(e) => {
-                            delivery.reject(e.as_str()).await
+                    let handler = match self.jobs_registry.get(&delivery.envelope.name).await {
+                        Some(v) => v,
+                        None => {
+                            let error = format!(
+                                "Failed get registry job from name: {}",
+                                &delivery.envelope.name
+                            );
+                            tracing::error!(error);
+                            delivery.reject(error.as_str()).await;
+                            continue;
+                        }
+                    };
+
+                    match handler.run(&delivery.envelope.payload).await {
+                        Ok(response) => match response {
+                            JobConsumerResponse::Ok => {
+                                tracing::info!(
+                                    worker = %self.name,
+                                    queue = %self.queue.name,
+                                    job = %delivery.envelope.name,
+                                    "Job processed successfully"
+                                );
+                                delivery.ack().await
+                            }
+                            JobConsumerResponse::Reject(reason) => {
+                                tracing::warn!(
+                                    worker = %self.name,
+                                    queue = %self.queue.name,
+                                    job = %delivery.envelope.name,
+                                    reason = reason,
+                                    "Job rejected"
+                                );
+                                delivery.reject(reason.as_str()).await
+                            }
+                            JobConsumerResponse::Requeue => {
+                                tracing::warn!(
+                                    worker = %self.name,
+                                    queue = %self.queue.name,
+                                    job = %delivery.envelope.name,
+                                    "Job requeued"
+                                );
+                                delivery.requeue().await
+                            }
+                            JobConsumerResponse::Retry(reason) => {
+                                tracing::warn!(
+                                    worker = %self.name,
+                                    queue = %self.queue.name,
+                                    job = %delivery.envelope.name,
+                                    reason = reason,
+                                    "Job scheduled for retry"
+                                );
+                                delivery.retry(reason.as_str()).await
+                            }
+                        },
+                        Err(error) => {
+                            tracing::error!(error = %error, "Failed handle run from job");
+
+                            match error {
+                                JobConsumerError::DeserializationError(e) => {
+                                    delivery.reject(e.as_str()).await
+                                }
+                            }
                         }
                     }
                 }

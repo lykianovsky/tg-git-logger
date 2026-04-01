@@ -5,6 +5,7 @@ use crate::domain::user::value_objects::social_user_id::SocialUserId;
 use crate::infrastructure::drivers::message_broker::contracts::publisher::MessageBrokerPublisher;
 use crate::utils::builder::message::MessageBuilder;
 use async_trait::async_trait;
+use rust_i18n::t;
 use std::sync::Arc;
 
 pub struct UserRegistrationSuccessListener {
@@ -16,17 +17,26 @@ pub struct UserRegistrationSuccessListener {
 impl EventListener<UserRegistrationSuccessEvent> for UserRegistrationSuccessListener {
     async fn handle(&self, payload: &UserRegistrationSuccessEvent) {
         let mut message = MessageBuilder::new()
-            .line("✅ Регистрация успешно завершена!")
+            .line(&t!("notifications.registration.success_title").to_string())
             .empty_line()
-            .line(&format!("👤 Пользователь (user_id): {}", payload.user.id.0))
-            .line(&format!(
-                "🔗 GitHub: {}",
-                payload.user_version_control_account.version_control_login
-            ))
-            .line(&format!("📱 Соц. сеть: {:?}", payload.social_type))
-            .line(&format!("🆔 Chat ID: {}", payload.chat_id.0))
+            .line(&t!(
+                "notifications.registration.success_user_id",
+                id = payload.user.id.0
+            ).to_string())
+            .line(&t!(
+                "notifications.registration.success_github",
+                login = payload.user_version_control_account.version_control_login
+            ).to_string())
+            .line(&t!(
+                "notifications.registration.success_social",
+                social_type = format!("{:?}", payload.social_type)
+            ).to_string())
+            .line(&t!(
+                "notifications.registration.success_chat_id",
+                chat_id = payload.chat_id.0
+            ).to_string())
             .empty_line()
-            .line("🚀 Теперь можно пользоваться ботом!");
+            .line(&t!("notifications.registration.success_ready").to_string());
 
         tracing::debug!(
             "{}, {}",
@@ -35,7 +45,7 @@ impl EventListener<UserRegistrationSuccessEvent> for UserRegistrationSuccessList
         );
         if payload.user_social_account.social_user_id == self.telegram_admin_user_id {
             message = message.empty_line().line(
-                "🎉 Приветствуем, Великий Админ! Добро пожаловать в командный зал управления!",
+                &t!("notifications.registration.success_admin_greeting").to_string(),
             )
         }
 

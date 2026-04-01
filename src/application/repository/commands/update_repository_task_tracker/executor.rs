@@ -11,8 +11,8 @@ use sea_orm::{DatabaseConnection, TransactionTrait};
 use std::sync::Arc;
 
 pub struct UpdateRepositoryTaskTrackerExecutor {
-    db: Arc<DatabaseConnection>,
-    task_tracker_repo: Arc<dyn RepositoryTaskTrackerRepository>,
+    pub db: Arc<DatabaseConnection>,
+    pub task_tracker_repo: Arc<dyn RepositoryTaskTrackerRepository>,
 }
 
 impl UpdateRepositoryTaskTrackerExecutor {
