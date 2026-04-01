@@ -38,21 +38,40 @@ impl CommandExecutor for SendDueDigestsExecutor {
     type Error = SendDueDigestsExecutorError;
 
     async fn execute(&self, cmd: &Self::Command) -> Result<Self::Response, Self::Error> {
+        tracing::debug!(hour = cmd.hour, minute = cmd.minute, "Looking for due digests");
+
         let subscriptions = self
             .digest_subscription_repo
             .find_due(cmd.hour, cmd.minute)
             .await
             .map_err(|e| SendDueDigestsExecutorError::DbError(e.to_string()))?;
 
+        tracing::debug!(count = subscriptions.len(), "Found due subscriptions");
+
         let now = Utc::now();
         let today_weekday = now.weekday().num_days_from_monday() as i8;
         let mut sent_count = 0;
 
         for sub in &subscriptions {
+            tracing::debug!(
+                subscription_id = sub.id.0,
+                user_id = sub.user_id.0,
+                digest_type = sub.digest_type.as_str(),
+                day_of_week = ?sub.day_of_week,
+                last_sent_at = ?sub.last_sent_at,
+                "Processing subscription"
+            );
+
             // Skip weekly digests if it's not the right day
             if sub.digest_type == DigestType::Weekly {
                 if let Some(day) = sub.day_of_week {
                     if day != today_weekday {
+                        tracing::debug!(
+                            subscription_id = sub.id.0,
+                            expected_day = day,
+                            today = today_weekday,
+                            "Skipping weekly digest — wrong day"
+                        );
                         continue;
                     }
                 }
@@ -62,6 +81,10 @@ impl CommandExecutor for SendDueDigestsExecutor {
             if let Some(last_sent) = sub.last_sent_at {
                 let diff = now.signed_duration_since(last_sent);
                 if diff.num_minutes() < 1 {
+                    tracing::debug!(
+                        subscription_id = sub.id.0,
+                        "Skipping — already sent this minute"
+                    );
                     continue;
                 }
             }
@@ -72,7 +95,14 @@ impl CommandExecutor for SendDueDigestsExecutor {
                 .find_by_user_id(&sub.user_id)
                 .await
             {
-                Ok(s) => s,
+                Ok(s) => {
+                    tracing::debug!(
+                        user_id = sub.user_id.0,
+                        social_user_id = s.social_user_id.0,
+                        "Found social account"
+                    );
+                    s
+                }
                 Err(e) => {
                     tracing::error!(
                         error = %e,
@@ -98,6 +128,12 @@ impl CommandExecutor for SendDueDigestsExecutor {
 
             let chat_id = SocialChatId(social.social_user_id.0 as i64);
 
+            tracing::debug!(
+                chat_id = chat_id.0,
+                subscription_id = sub.id.0,
+                "Sending digest notification"
+            );
+
             if let Err(e) = self
                 .notification_service
                 .send_message(&SocialType::Telegram, &chat_id, &message)
@@ -106,10 +142,13 @@ impl CommandExecutor for SendDueDigestsExecutor {
                 tracing::error!(
                     error = %e,
                     user_id = sub.user_id.0,
+                    chat_id = chat_id.0,
                     "Failed to send digest notification"
                 );
                 continue;
             }
+
+            tracing::debug!(subscription_id = sub.id.0, "Digest sent, updating last_sent_at");
 
             // Update last_sent_at
             let mut updated_sub = sub.clone();

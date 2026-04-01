@@ -87,7 +87,12 @@ impl ApplicationDelivery for DeliveryScheduler {
 
         scheduler.start().await.expect("JobScheduler start failed");
 
-        Ok(())
+        tracing::info!("Scheduler started");
+
+        // Keep the scheduler alive — dropping it stops all cron jobs
+        loop {
+            tokio::time::sleep(std::time::Duration::from_secs(3600)).await;
+        }
     }
 }
 
