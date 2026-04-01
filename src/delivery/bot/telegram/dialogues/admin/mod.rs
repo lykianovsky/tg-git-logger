@@ -1,12 +1,13 @@
 pub mod helpers;
 pub mod modules;
 
-use crate::application::monitoring::queries::get_queues_stats::executor::GetQueuesStatsExecutor;
 use crate::application::monitoring::queries::get_queues_stats::query::GetQueuesStatsQuery;
 use crate::domain::shared::command::CommandExecutor as _;
 use crate::bootstrap::executors::ApplicationBoostrapExecutors;
+use crate::delivery::bot::telegram::dialogues::admin::modules::health_ping::TelegramBotDialogueAdminHealthPingDispatcher;
 use crate::delivery::bot::telegram::dialogues::admin::modules::repository::TelegramBotDialogueAdminRepositoryDispatcher;
 use crate::delivery::bot::telegram::dialogues::admin::modules::task_tracker::TelegramBotDialogueAdminTaskTrackerDispatcher;
+use crate::delivery::bot::telegram::dialogues::admin::modules::users::TelegramBotDialogueAdminUsersDispatcher;
 use crate::delivery::bot::telegram::dialogues::{
     TelegramBotDialogueState, TelegramBotDialogueType,
 };
@@ -110,6 +111,51 @@ pub enum TelegramBotDialogueAdminState {
         space_id: i32,
         qa_column_id: i32,
     },
+
+    // ── Пинги ──────────────────────────────────────────────────────────────
+    HealthPingList,
+
+    HealthPingCreateName,
+    HealthPingCreateUrl {
+        name: String,
+    },
+    HealthPingCreateInterval {
+        name: String,
+        url: String,
+    },
+
+    HealthPingEditSelect,
+    HealthPingEditMenu {
+        ping_id: i32,
+    },
+    HealthPingEditName {
+        ping_id: i32,
+    },
+    HealthPingEditUrl {
+        ping_id: i32,
+    },
+    HealthPingEditInterval {
+        ping_id: i32,
+    },
+
+    HealthPingDeleteConfirm {
+        ping_id: i32,
+    },
+
+    // ── Пользователи ──────────────────────────────────────────────────────
+    UserList,
+
+    UserMenu {
+        user_id: i32,
+    },
+
+    UserAssignRole {
+        user_id: i32,
+    },
+
+    UserRemoveRole {
+        user_id: i32,
+    },
 }
 
 pub struct TelegramBotDialogueAdminDispatcher {}
@@ -124,11 +170,14 @@ impl TelegramBotDialogueAdminDispatcher {
             )
             .branch(TelegramBotDialogueAdminRepositoryDispatcher::query_branches())
             .branch(TelegramBotDialogueAdminTaskTrackerDispatcher::query_branches())
-            .branch(TelegramBotDialogueAdminTaskTrackerDispatcher::menu_query_branches());
+            .branch(TelegramBotDialogueAdminTaskTrackerDispatcher::menu_query_branches())
+            .branch(TelegramBotDialogueAdminHealthPingDispatcher::query_branches())
+            .branch(TelegramBotDialogueAdminUsersDispatcher::query_branches());
 
         let messages = Update::filter_message()
             .branch(TelegramBotDialogueAdminRepositoryDispatcher::message_branches())
-            .branch(TelegramBotDialogueAdminTaskTrackerDispatcher::message_branches());
+            .branch(TelegramBotDialogueAdminTaskTrackerDispatcher::message_branches())
+            .branch(TelegramBotDialogueAdminHealthPingDispatcher::message_branches());
 
         dptree::entry().branch(callback_queries).branch(messages)
     }
@@ -137,7 +186,6 @@ impl TelegramBotDialogueAdminDispatcher {
         bot: Bot,
         dialogue: TelegramBotDialogueType,
         executors: Arc<ApplicationBoostrapExecutors>,
-        get_queues_stats: Arc<GetQueuesStatsExecutor>,
         query: CallbackQuery,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         bot.answer_callback_query(query.id.clone()).await?;
@@ -190,7 +238,12 @@ impl TelegramBotDialogueAdminDispatcher {
                     .await?;
             }
             TelegramBotAdminAction::QueuesStats => {
-                let response = match get_queues_stats.execute(&GetQueuesStatsQuery).await {
+                let response = match executors
+                    .queries
+                    .get_queues_stats
+                    .execute(&GetQueuesStatsQuery)
+                    .await
+                {
                     Ok(r) => r,
                     Err(e) => {
                         tracing::error!(error = %e, "Failed to get queues stats");
@@ -237,6 +290,38 @@ impl TelegramBotDialogueAdminDispatcher {
 
                 dialogue.exit().await.ok();
             }
+            TelegramBotAdminAction::HealthPings => {
+                dialogue
+                    .update(TelegramBotDialogueState::Admin(
+                        TelegramBotDialogueAdminState::HealthPingList,
+                    ))
+                    .await?;
+
+                TelegramBotDialogueAdminHealthPingDispatcher::show_list(
+                    &bot,
+                    chat_id,
+                    message_id,
+                    &executors,
+                )
+                .await?;
+            }
+
+            TelegramBotAdminAction::ManageUsers => {
+                dialogue
+                    .update(TelegramBotDialogueState::Admin(
+                        TelegramBotDialogueAdminState::UserList,
+                    ))
+                    .await?;
+
+                TelegramBotDialogueAdminUsersDispatcher::show_list(
+                    &bot,
+                    chat_id,
+                    message_id,
+                    &executors,
+                )
+                .await?;
+            }
+
             TelegramBotAdminAction::ConfigureTaskTracker => {
                 let repositories = executors
                     .commands

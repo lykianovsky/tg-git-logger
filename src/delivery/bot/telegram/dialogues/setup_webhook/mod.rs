@@ -4,6 +4,9 @@ use crate::bootstrap::executors::ApplicationBoostrapExecutors;
 use crate::delivery::bot::telegram::dialogues::{
     TelegramBotDialogueState, TelegramBotDialogueType,
 };
+use crate::delivery::bot::telegram::keyboards::actions::TelegramBotKeyboardAction;
+use crate::delivery::bot::telegram::keyboards::actions::confirm::TelegramBotConfirmAction;
+use crate::delivery::bot::telegram::keyboards::builder::KeyboardBuilder;
 use crate::domain::repository::value_objects::repository_id::RepositoryId;
 use crate::domain::shared::command::CommandExecutor;
 use crate::domain::user::value_objects::social_chat_id::SocialChatId;
@@ -12,7 +15,7 @@ use std::sync::Arc;
 use teloxide::dispatching::DpHandlerDescription;
 use teloxide::dptree::case;
 use teloxide::prelude::*;
-use teloxide::types::{InlineKeyboardButton, InlineKeyboardMarkup, ParseMode};
+use teloxide::types::{InlineKeyboardMarkup, ParseMode};
 use teloxide::{Bot, dptree};
 
 #[derive(Debug, Clone, Default)]
@@ -94,16 +97,12 @@ async fn handle_select(
 
     match repository.social_chat_id {
         Some(bound_chat) if bound_chat == SocialChatId(chat_id.0) => {
-            let keyboard = InlineKeyboardMarkup::new(vec![vec![
-                InlineKeyboardButton::callback(
-                    t!("telegram_bot.dialogues.setup_webhook.confirm_unbind").to_string(),
-                    "confirm",
-                ),
-                InlineKeyboardButton::callback(
-                    t!("telegram_bot.common.no").to_string(),
-                    "cancel",
-                ),
-            ]]);
+            let keyboard = KeyboardBuilder::new()
+                .row::<TelegramBotConfirmAction>(vec![
+                    TelegramBotConfirmAction::Yes,
+                    TelegramBotConfirmAction::No,
+                ])
+                .build();
 
             dialogue
                 .update(TelegramBotDialogueState::SetupWebhook(
@@ -126,16 +125,12 @@ async fn handle_select(
             .await?;
         }
         Some(_) => {
-            let keyboard = InlineKeyboardMarkup::new(vec![vec![
-                InlineKeyboardButton::callback(
-                    t!("telegram_bot.dialogues.setup_webhook.confirm_rebind").to_string(),
-                    "confirm",
-                ),
-                InlineKeyboardButton::callback(
-                    t!("telegram_bot.common.no").to_string(),
-                    "cancel",
-                ),
-            ]]);
+            let keyboard = KeyboardBuilder::new()
+                .row::<TelegramBotConfirmAction>(vec![
+                    TelegramBotConfirmAction::Yes,
+                    TelegramBotConfirmAction::No,
+                ])
+                .build();
 
             dialogue
                 .update(TelegramBotDialogueState::SetupWebhook(
@@ -179,7 +174,14 @@ async fn handle_confirm_unbind(
         None => return Ok(()),
     };
 
-    if query.data.as_deref() == Some("cancel") {
+        let is_cancelled = query
+        .data
+        .as_deref()
+        .and_then(|d| TelegramBotConfirmAction::from_callback_data(d).ok())
+        .map(|a| matches!(a, TelegramBotConfirmAction::No))
+        .unwrap_or(false);
+
+    if is_cancelled {
         bot.edit_message_text(
             msg.chat().id,
             msg.id(),
@@ -239,7 +241,14 @@ async fn handle_confirm_rebind(
         None => return Ok(()),
     };
 
-    if query.data.as_deref() == Some("cancel") {
+        let is_cancelled = query
+        .data
+        .as_deref()
+        .and_then(|d| TelegramBotConfirmAction::from_callback_data(d).ok())
+        .map(|a| matches!(a, TelegramBotConfirmAction::No))
+        .unwrap_or(false);
+
+    if is_cancelled {
         bot.edit_message_text(
             msg.chat().id,
             msg.id(),

@@ -6,6 +6,7 @@ use crate::delivery::bot::telegram::dialogues::{
     TelegramBotDialogueState, TelegramBotDialogueType,
 };
 use crate::delivery::bot::telegram::keyboards::actions::TelegramBotKeyboardAction;
+use crate::delivery::bot::telegram::keyboards::actions::admin_repository::REPO_SELECT_PREFIX;
 use crate::delivery::bot::telegram::keyboards::actions::admin_repository_edit_field::TelegramBotAdminRepositoryEditField;
 use crate::delivery::bot::telegram::keyboards::builder::KeyboardBuilder;
 use crate::domain::repository::value_objects::repository_id::RepositoryId;
@@ -66,7 +67,7 @@ impl TelegramBotDialogueAdminRepositoryEditDispatcher {
 
         let data = query.data.as_deref().unwrap_or("");
         let repository_id: i32 = match data
-            .strip_prefix("repo_select_")
+            .strip_prefix(REPO_SELECT_PREFIX)
             .and_then(|s| s.parse().ok())
         {
             Some(id) => id,

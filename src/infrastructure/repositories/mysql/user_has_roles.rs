@@ -2,11 +2,11 @@ use crate::domain::role::entities::role_entity::Role;
 use crate::domain::role::value_objects::role_id::RoleId;
 use crate::domain::role::value_objects::role_name::RoleName;
 use crate::domain::user::repositories::user_has_roles_repository::{
-    AssignRoleToUserError, GetAllUserRolesError, UserHasRolesRepository,
+    AssignRoleToUserError, GetAllUserRolesError, RemoveRoleFromUserError, UserHasRolesRepository,
 };
 use crate::domain::user::value_objects::user_id::UserId;
 use crate::infrastructure::database::mysql::entities::{roles, user_has_roles};
-use sea_orm::{ActiveModelTrait, DatabaseConnection};
+use sea_orm::{ActiveModelTrait, DatabaseConnection, ModelTrait};
 use sea_orm::{ColumnTrait, QuerySelect, RelationTrait};
 use sea_orm::{DatabaseTransaction, QueryFilter};
 use sea_orm::{EntityTrait, Set};
@@ -47,6 +47,39 @@ impl UserHasRolesRepository for MySQLUserHasRolesRepository {
             .insert(txn)
             .await
             .map_err(|e| AssignRoleToUserError::DbError(e.to_string()))?;
+
+        Ok(())
+    }
+
+    async fn remove(
+        &self,
+        user_id: UserId,
+        role_name: RoleName,
+    ) -> Result<(), RemoveRoleFromUserError> {
+        let role = roles::Entity::find()
+            .filter(roles::Column::Name.eq(role_name.to_string()))
+            .one(self.db.as_ref())
+            .await
+            .map_err(|e| RemoveRoleFromUserError::DbError(e.to_string()))?;
+
+        let role = match role {
+            Some(r) => r,
+            None => return Ok(()),
+        };
+
+        let record = user_has_roles::Entity::find()
+            .filter(user_has_roles::Column::UserId.eq(user_id.0))
+            .filter(user_has_roles::Column::RoleId.eq(role.id))
+            .one(self.db.as_ref())
+            .await
+            .map_err(|e| RemoveRoleFromUserError::DbError(e.to_string()))?;
+
+        if let Some(record) = record {
+            record
+                .delete(self.db.as_ref())
+                .await
+                .map_err(|e| RemoveRoleFromUserError::DbError(e.to_string()))?;
+        }
 
         Ok(())
     }

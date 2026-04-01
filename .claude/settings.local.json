@@ -25,7 +25,9 @@
       "Bash(findstr /V \"migration\")",
       "Bash(findstr \"^warning\")",
       "Bash(del:*)",
-      "Bash(findstr \"^error\")"
+      "Bash(findstr \"^error\")",
+      "Bash(grep -E '\\(InlineKeyboardButton::callback.*\"\"\"\"[^\"\"\"\"]+\"\"\"\"$|if data ==|if.*data\\)')",
+      "Bash(git add:*)"
     ]
   }
 }

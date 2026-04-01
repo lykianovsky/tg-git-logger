@@ -10,6 +10,12 @@ pub enum TelegramBotAdminAction {
     ConfigureTaskTracker,
     #[strum(serialize = "admin_queues_stats")]
     QueuesStats,
+
+    #[strum(serialize = "admin_health_pings")]
+    HealthPings,
+
+    #[strum(serialize = "admin_manage_users")]
+    ManageUsers,
 }
 
 impl TelegramBotKeyboardAction for TelegramBotAdminAction {
@@ -26,6 +32,8 @@ impl TelegramBotKeyboardAction for TelegramBotAdminAction {
             TelegramBotAdminAction::ConfigureRepository => "📦 Репозитории",
             TelegramBotAdminAction::ConfigureTaskTracker => "⚙️ Настроить таск-трекер",
             TelegramBotAdminAction::QueuesStats => "📊 Очереди и воркеры",
+            TelegramBotAdminAction::HealthPings => "🏓 Пинги",
+            TelegramBotAdminAction::ManageUsers => "👥 Пользователи",
         }
     }
 }

@@ -13,6 +13,8 @@ mod m20260326_144331_create_repository_task_trackers;
 mod m20260327_000001_add_telegram_chat_id_to_repositories;
 mod m20260328_000001_rename_telegram_chat_id_to_social_chat_id_in_repositories;
 mod m20260328_000002_add_unique_user_connection_repositories;
+mod m20260401_000001_create_digest_subscriptions;
+mod m20260401_000002_create_health_pings;
 
 pub struct Migrator;
 
@@ -37,6 +39,8 @@ impl MigratorTrait for Migrator {
             Box::new(
                 m20260328_000002_add_unique_user_connection_repositories::Migration,
             ),
+            Box::new(m20260401_000001_create_digest_subscriptions::Migration),
+            Box::new(m20260401_000002_create_health_pings::Migration),
         ]
     }
 }

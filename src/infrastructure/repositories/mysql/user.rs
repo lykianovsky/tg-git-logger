@@ -1,6 +1,6 @@
 use crate::domain::user::entities::user::User;
 use crate::domain::user::repositories::user_repository::{
-    CreateUserError, FindUserByIdError, UserRepository,
+    CreateUserError, FindAllUsersError, FindUserByIdError, SetUserActiveError, UserRepository,
 };
 use crate::domain::user::value_objects::user_id::UserId;
 use crate::infrastructure::database::mysql::entities::users;
@@ -41,6 +41,15 @@ impl UserRepository for MySQLUserRepository {
         Ok(User::from_mysql(user))
     }
 
+    async fn find_all(&self) -> Result<Vec<User>, FindAllUsersError> {
+        let users = users::Entity::find()
+            .all(self.db.as_ref())
+            .await
+            .map_err(|e| FindAllUsersError::DbError(e.to_string()))?;
+
+        Ok(users.into_iter().map(User::from_mysql).collect())
+    }
+
     async fn find_by_id(&self, id: UserId) -> Result<User, FindUserByIdError> {
         let user = users::Entity::find()
             .filter(users::Column::Id.eq(id.0))
@@ -50,6 +59,24 @@ impl UserRepository for MySQLUserRepository {
             .ok_or(FindUserByIdError::NotFound)?;
 
         Ok(User::from_mysql(user))
+    }
+
+    async fn set_active(&self, id: UserId, is_active: bool) -> Result<(), SetUserActiveError> {
+        let user = users::Entity::find()
+            .filter(users::Column::Id.eq(id.0))
+            .one(self.db.as_ref())
+            .await
+            .map_err(|e| SetUserActiveError::DbError(e.to_string()))?
+            .ok_or(SetUserActiveError::NotFound)?;
+
+        let mut active_model: users::ActiveModel = user.into();
+        active_model.is_active = Set(is_active as i8);
+        active_model
+            .update(self.db.as_ref())
+            .await
+            .map_err(|e| SetUserActiveError::DbError(e.to_string()))?;
+
+        Ok(())
     }
 }
 

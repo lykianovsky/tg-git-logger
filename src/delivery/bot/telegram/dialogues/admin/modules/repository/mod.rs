@@ -10,7 +10,12 @@ use crate::delivery::bot::telegram::dialogues::{
     TelegramBotDialogueState, TelegramBotDialogueType,
 };
 use crate::delivery::bot::telegram::keyboards::actions::TelegramBotKeyboardAction;
-use crate::delivery::bot::telegram::keyboards::actions::admin_repository::TelegramBotAdminRepositoryAction;
+use crate::delivery::bot::telegram::keyboards::actions::admin_repository::{
+    TelegramBotAdminRepositoryAction, REPO_DELETE_SELECT_PREFIX, REPO_VIEW_SELECT_PREFIX,
+    repo_delete_select_callback, repo_select_callback, repo_view_select_callback,
+};
+use crate::delivery::bot::telegram::keyboards::actions::admin_repository_delete::TelegramBotAdminRepositoryDeleteAction;
+use crate::delivery::bot::telegram::keyboards::builder::KeyboardBuilder;
 use crate::domain::repository::entities::repository::Repository;
 use crate::domain::repository::value_objects::repository_id::RepositoryId;
 use crate::domain::shared::command::CommandExecutor;
@@ -110,7 +115,7 @@ impl TelegramBotDialogueAdminRepositoryDispatcher {
                     .map(|r| {
                         vec![InlineKeyboardButton::callback(
                             format!("{}/{}", r.owner, r.name),
-                            format!("repo_view_select_{}", r.id.0),
+                            repo_view_select_callback(r.id.0),
                         )]
                     })
                     .collect();
@@ -168,7 +173,7 @@ impl TelegramBotDialogueAdminRepositoryDispatcher {
                     .map(|r| {
                         vec![InlineKeyboardButton::callback(
                             format!("{}/{}", r.owner, r.name),
-                            format!("repo_select_{}", r.id.0),
+                            repo_select_callback(r.id.0),
                         )]
                     })
                     .collect();
@@ -213,7 +218,7 @@ impl TelegramBotDialogueAdminRepositoryDispatcher {
                     .map(|r| {
                         vec![InlineKeyboardButton::callback(
                             format!("{}/{}", r.owner, r.name),
-                            format!("repo_delete_select_{}", r.id.0),
+                            repo_delete_select_callback(r.id.0),
                         )]
                     })
                     .collect();
@@ -247,7 +252,7 @@ impl TelegramBotDialogueAdminRepositoryDispatcher {
 
         let data = query.data.as_deref().unwrap_or("");
         let repository_id: i32 = match data
-            .strip_prefix("repo_view_select_")
+            .strip_prefix(REPO_VIEW_SELECT_PREFIX)
             .and_then(|s| s.parse().ok())
         {
             Some(id) => id,
@@ -325,7 +330,7 @@ impl TelegramBotDialogueAdminRepositoryDispatcher {
 
         let data = query.data.as_deref().unwrap_or("");
         let repository_id: i32 = match data
-            .strip_prefix("repo_delete_select_")
+            .strip_prefix(REPO_DELETE_SELECT_PREFIX)
             .and_then(|s| s.parse().ok())
         {
             Some(id) => id,
@@ -349,16 +354,12 @@ impl TelegramBotDialogueAdminRepositoryDispatcher {
             .map(|r| format!("{}/{}", r.owner, r.name))
             .unwrap_or_else(|_| format!("ID {}", repository_id));
 
-        let keyboard = InlineKeyboardMarkup::new(vec![vec![
-            InlineKeyboardButton::callback(
-                t!("telegram_bot.dialogues.admin.repository.confirm_delete").to_string(),
-                "repo_delete_yes",
-            ),
-            InlineKeyboardButton::callback(
-                t!("telegram_bot.common.cancel").to_string(),
-                "repo_delete_cancel",
-            ),
-        ]]);
+        let keyboard = KeyboardBuilder::new()
+            .row::<TelegramBotAdminRepositoryDeleteAction>(vec![
+                TelegramBotAdminRepositoryDeleteAction::Confirm,
+                TelegramBotAdminRepositoryDeleteAction::Cancel,
+            ])
+            .build();
 
         dialogue
             .update(TelegramBotDialogueState::Admin(
@@ -395,20 +396,24 @@ impl TelegramBotDialogueAdminRepositoryDispatcher {
             None => return Ok(()),
         };
 
-        if data == "repo_delete_cancel" {
-            bot.edit_message_text(
-                msg.chat().id,
-                msg.id(),
-                t!("telegram_bot.dialogues.admin.repository.delete_cancelled").to_string(),
-            )
-                .reply_markup(InlineKeyboardMarkup::default())
-                .await?;
-            dialogue.exit().await.ok();
-            return Ok(());
-        }
+        let action = match TelegramBotAdminRepositoryDeleteAction::from_callback_data(data) {
+            Ok(a) => a,
+            Err(_) => return Ok(()),
+        };
 
-        if data != "repo_delete_yes" {
-            return Ok(());
+        match action {
+            TelegramBotAdminRepositoryDeleteAction::Cancel => {
+                bot.edit_message_text(
+                    msg.chat().id,
+                    msg.id(),
+                    t!("telegram_bot.dialogues.admin.repository.delete_cancelled").to_string(),
+                )
+                    .reply_markup(InlineKeyboardMarkup::default())
+                    .await?;
+                dialogue.exit().await.ok();
+                return Ok(());
+            }
+            TelegramBotAdminRepositoryDeleteAction::Confirm => {}
         }
 
         let cmd = DeleteRepositoryCommand {

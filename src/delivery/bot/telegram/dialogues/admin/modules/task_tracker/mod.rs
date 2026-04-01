@@ -1,5 +1,6 @@
 use crate::application::repository::commands::update_repository_task_tracker::command::UpdateRepositoryTaskTrackerCommand;
 use crate::bootstrap::executors::ApplicationBoostrapExecutors;
+use crate::bootstrap::shared_dependency::ApplicationSharedDependency;
 use crate::delivery::bot::telegram::dialogues::admin::TelegramBotDialogueAdminState;
 use crate::delivery::bot::telegram::dialogues::admin::helpers::extract_text;
 use crate::delivery::bot::telegram::dialogues::{
@@ -96,7 +97,7 @@ impl TelegramBotDialogueAdminTaskTrackerDispatcher {
         bot: Bot,
         dialogue: TelegramBotDialogueType,
         executors: Arc<ApplicationBoostrapExecutors>,
-        task_tracker_client: Arc<dyn TaskTrackerClient>,
+        shared_dependency: Arc<ApplicationSharedDependency>,
         query: CallbackQuery,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         bot.answer_callback_query(query.id.clone()).await?;
@@ -152,7 +153,7 @@ impl TelegramBotDialogueAdminTaskTrackerDispatcher {
                 Self::start_space_selection(
                     &bot,
                     &dialogue,
-                    &task_tracker_client,
+                    &shared_dependency.task_tracker_client,
                     msg.chat().id,
                     msg.id(),
                     repository_id,
@@ -170,7 +171,7 @@ impl TelegramBotDialogueAdminTaskTrackerDispatcher {
         bot: Bot,
         dialogue: TelegramBotDialogueType,
         executors: Arc<ApplicationBoostrapExecutors>,
-        task_tracker_client: Arc<dyn TaskTrackerClient>,
+        shared_dependency: Arc<ApplicationSharedDependency>,
         query: CallbackQuery,
         repository_id: i32,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -273,7 +274,7 @@ impl TelegramBotDialogueAdminTaskTrackerDispatcher {
                 Self::start_space_selection(
                     &bot,
                     &dialogue,
-                    &task_tracker_client,
+                    &shared_dependency.task_tracker_client,
                     msg.chat().id,
                     msg.id(),
                     repository_id,
@@ -290,7 +291,7 @@ impl TelegramBotDialogueAdminTaskTrackerDispatcher {
     async fn handle_edit_select_field(
         bot: Bot,
         dialogue: TelegramBotDialogueType,
-        task_tracker_client: Arc<dyn TaskTrackerClient>,
+        shared_dependency: Arc<ApplicationSharedDependency>,
         query: CallbackQuery,
         repository_id: i32,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -332,7 +333,7 @@ impl TelegramBotDialogueAdminTaskTrackerDispatcher {
                 Self::start_space_selection(
                     &bot,
                     &dialogue,
-                    &task_tracker_client,
+                    &shared_dependency.task_tracker_client,
                     msg.chat().id,
                     msg.id(),
                     repository_id,
@@ -499,7 +500,7 @@ impl TelegramBotDialogueAdminTaskTrackerDispatcher {
     async fn handle_select_space(
         bot: Bot,
         dialogue: TelegramBotDialogueType,
-        task_tracker_client: Arc<dyn TaskTrackerClient>,
+        shared_dependency: Arc<ApplicationSharedDependency>,
         query: CallbackQuery,
         repository_id: i32,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -528,7 +529,7 @@ impl TelegramBotDialogueAdminTaskTrackerDispatcher {
             .reply_markup(InlineKeyboardMarkup::default())
             .await?;
 
-        let boards = match task_tracker_client.list_boards(space_id).await {
+        let boards = match shared_dependency.task_tracker_client.list_boards(space_id).await {
             Ok(b) => b,
             Err(e) => {
                 tracing::error!(error = %e, space_id = space_id, "Failed to load boards");
@@ -582,7 +583,7 @@ impl TelegramBotDialogueAdminTaskTrackerDispatcher {
     async fn handle_select_board(
         bot: Bot,
         dialogue: TelegramBotDialogueType,
-        task_tracker_client: Arc<dyn TaskTrackerClient>,
+        shared_dependency: Arc<ApplicationSharedDependency>,
         query: CallbackQuery,
         (repository_id, space_id): (i32, i32),
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -611,7 +612,7 @@ impl TelegramBotDialogueAdminTaskTrackerDispatcher {
             .reply_markup(InlineKeyboardMarkup::default())
             .await?;
 
-        let columns = match task_tracker_client.list_columns(board_id).await {
+        let columns = match shared_dependency.task_tracker_client.list_columns(board_id).await {
             Ok(c) => c,
             Err(e) => {
                 tracing::error!(error = %e, board_id = board_id, "Failed to load columns");

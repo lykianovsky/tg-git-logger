@@ -21,6 +21,16 @@ impl From<TelegramBotChooseRoleAction> for RoleName {
     }
 }
 
+impl TelegramBotChooseRoleAction {
+    pub fn try_from_role(role: &RoleName) -> Option<Self> {
+        match role {
+            RoleName::Developer => Some(Self::Developer),
+            RoleName::QualityAssurance => Some(Self::QualityAssurance),
+            _ => None,
+        }
+    }
+}
+
 impl TelegramBotKeyboardAction for TelegramBotChooseRoleAction {
     fn to_callback_data(&self) -> &str {
         self.as_ref()

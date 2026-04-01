@@ -1,12 +1,14 @@
 use crate::bootstrap::executors::ApplicationBoostrapExecutors;
 use crate::config::application::ApplicationConfig;
 use crate::delivery::bot::telegram::commands::admin::TelegramBotAdminCommandHandler;
+use crate::delivery::bot::telegram::commands::digest::TelegramBotDigestCommandHandler;
 use crate::delivery::bot::telegram::commands::bind_repository::TelegramBotBindRepositoryCommandHandler;
 use crate::delivery::bot::telegram::commands::register::TelegramBotRegisterCommandHandler;
 use crate::delivery::bot::telegram::commands::report::TelegramBotVersionControlReportCommandHandler;
 use crate::delivery::bot::telegram::commands::setup_webhook::TelegramBotSetupWebhookCommandHandler;
 use crate::delivery::bot::telegram::commands::start::TelegramBotStartCommandHandler;
 use crate::delivery::bot::telegram::commands::task::TelegramBotTaskCommandHandler;
+use crate::delivery::bot::telegram::commands::unregister::TelegramBotUnregisterCommandHandler;
 use crate::delivery::bot::telegram::context::TelegramBotCommandContext;
 use crate::delivery::bot::telegram::dialogues::TelegramBotDialogueType;
 use std::sync::Arc;
@@ -38,6 +40,12 @@ pub enum TelegramBotCommand {
         description = "Привязать чат к уведомлениям репозитория"
     )]
     SetupWebhook,
+
+    #[command(description = "Деактивировать аккаунт")]
+    Unregister,
+
+    #[command(description = "Настройка дайджест-уведомлений")]
+    Digest,
 }
 
 pub async fn handle(
@@ -135,6 +143,26 @@ pub async fn handle(
             .execute()
             .await?;
         }
+
+        TelegramBotCommand::Unregister => {
+            TelegramBotUnregisterCommandHandler::new(
+                context,
+                executors.commands.deactivate_user.clone(),
+            )
+            .execute()
+            .await?;
+        }
+
+        TelegramBotCommand::Digest => {
+            TelegramBotDigestCommandHandler::new(
+                context,
+                executors.clone(),
+                Arc::new(dialogue),
+            )
+            .execute()
+            .await?;
+        }
+
         // Handled above before private-chat guard
         TelegramBotCommand::SetupWebhook => {}
     }

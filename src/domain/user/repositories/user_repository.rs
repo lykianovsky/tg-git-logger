@@ -18,10 +18,29 @@ pub enum FindUserByIdError {
     NotFound,
 }
 
+#[derive(Debug, Error)]
+pub enum SetUserActiveError {
+    #[error("Database error: {0}")]
+    DbError(String),
+
+    #[error("User not found")]
+    NotFound,
+}
+
+#[derive(Debug, Error)]
+pub enum FindAllUsersError {
+    #[error("Database error: {0}")]
+    DbError(String),
+}
+
 #[async_trait::async_trait]
 pub trait UserRepository: Send + Sync {
     async fn create(&self, txn: &DatabaseTransaction, user: &User)
     -> Result<User, CreateUserError>;
 
     async fn find_by_id(&self, id: UserId) -> Result<User, FindUserByIdError>;
+
+    async fn find_all(&self) -> Result<Vec<User>, FindAllUsersError>;
+
+    async fn set_active(&self, id: UserId, is_active: bool) -> Result<(), SetUserActiveError>;
 }

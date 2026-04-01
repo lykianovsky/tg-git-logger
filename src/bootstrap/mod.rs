@@ -103,7 +103,7 @@ impl ApplicationBootstrap {
         let bot_delivery = DeliveryBotMessengerTelegram::new(
             executors.clone(),
             config.clone(),
-            shared_dependency.task_tracker_client.clone(),
+            shared_dependency.clone(),
         );
 
         let bot_handle = tokio::spawn(async move {

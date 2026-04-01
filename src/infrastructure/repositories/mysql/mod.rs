@@ -1,3 +1,5 @@
+pub mod digest_subscription;
+pub mod health_ping;
 pub mod repository;
 pub mod repository_pull_request;
 pub mod repository_task_tracker;

@@ -1,4 +1,15 @@
 use crate::application::auth::commands::create_oauth_link::executor::CreateOAuthLinkExecutor;
+use crate::application::digest::commands::create_digest_subscription::executor::CreateDigestSubscriptionExecutor;
+use crate::application::digest::commands::send_due_digests::executor::SendDueDigestsExecutor;
+use crate::application::health_ping::commands::create_health_ping::executor::CreateHealthPingExecutor;
+use crate::application::health_ping::commands::delete_health_ping::executor::DeleteHealthPingExecutor;
+use crate::application::health_ping::commands::update_health_ping::executor::UpdateHealthPingExecutor;
+use crate::application::health_ping::commands::update_health_ping_status::executor::UpdateHealthPingStatusExecutor;
+use crate::application::health_ping::queries::get_all_health_pings::executor::GetAllHealthPingsExecutor;
+use crate::application::digest::commands::delete_digest_subscription::executor::DeleteDigestSubscriptionExecutor;
+use crate::application::digest::commands::toggle_digest_subscription::executor::ToggleDigestSubscriptionExecutor;
+use crate::application::digest::commands::update_digest_subscription::executor::UpdateDigestSubscriptionExecutor;
+use crate::application::digest::queries::get_user_digest_subscriptions::executor::GetUserDigestSubscriptionsExecutor;
 use crate::application::monitoring::queries::get_queues_stats::executor::GetQueuesStatsExecutor;
 use crate::domain::monitoring::ports::workers_stats_provider::WorkersStatsProvider;
 use crate::application::notification::commands::send_social_notify::executor::SendSocialNotifyExecutor;
@@ -13,8 +24,13 @@ use crate::application::repository::queries::get_all_repositories::executor::Get
 use crate::application::task::commands::move_task_to_test::executor::MoveTaskToTestExecutor;
 use crate::application::task::queries::get_task_card::executor::GetTaskCardExecutor;
 use crate::application::user::commands::bind_repository::executor::BindRepositoryExecutor;
+use crate::application::user::commands::assign_user_role::executor::AssignUserRoleExecutor;
+use crate::application::user::commands::deactivate_user::executor::DeactivateUserExecutor;
+use crate::application::user::commands::remove_user_role::executor::RemoveUserRoleExecutor;
+use crate::application::user::commands::toggle_user_active::executor::ToggleUserActiveExecutor;
 use crate::application::user::commands::register_via_oauth::executor::RegisterUserViaOAuthExecutor;
 use crate::application::user::commands::unbind_repository::executor::UnbindRepositoryExecutor;
+use crate::application::user::queries::get_all_users::executor::GetAllUsersExecutor;
 use crate::application::user::queries::get_user_bound_repositories::executor::GetUserBoundRepositoriesExecutor;
 use crate::application::user::queries::get_user_roles_by_telegram_id::executor::GetUserRolesByTelegramIdExecutor;
 use crate::application::version_control::queries::build_report::executor::BuildVersionControlDateRangeReportExecutor;
@@ -33,6 +49,9 @@ pub struct ApplicationBoostrapExecutorsQueries {
     pub get_all_repositories: Arc<GetAllRepositoriesExecutor>,
     pub get_task_card: Arc<GetTaskCardExecutor>,
     pub get_queues_stats: Arc<GetQueuesStatsExecutor>,
+    pub get_user_digest_subscriptions: Arc<GetUserDigestSubscriptionsExecutor>,
+    pub get_all_health_pings: Arc<GetAllHealthPingsExecutor>,
+    pub get_all_users: Arc<GetAllUsersExecutor>,
 }
 
 pub struct ApplicationBoostrapExecutorsCommands {
@@ -50,7 +69,24 @@ pub struct ApplicationBoostrapExecutorsCommands {
     pub bind_repository: Arc<BindRepositoryExecutor>,
     pub unbind_repository: Arc<UnbindRepositoryExecutor>,
     pub delete_repository: Arc<DeleteRepositoryExecutor>,
+    pub deactivate_user: Arc<DeactivateUserExecutor>,
+    pub create_digest_subscription: Arc<CreateDigestSubscriptionExecutor>,
+    pub update_digest_subscription: Arc<UpdateDigestSubscriptionExecutor>,
+    pub toggle_digest_subscription: Arc<ToggleDigestSubscriptionExecutor>,
+    pub delete_digest_subscription: Arc<DeleteDigestSubscriptionExecutor>,
+    pub create_health_ping: Arc<CreateHealthPingExecutor>,
+    pub update_health_ping: Arc<UpdateHealthPingExecutor>,
+    pub update_health_ping_status: Arc<UpdateHealthPingStatusExecutor>,
+    pub delete_health_ping: Arc<DeleteHealthPingExecutor>,
+
+    pub send_due_digests: Arc<SendDueDigestsExecutor>,
+
+    pub toggle_user_active: Arc<ToggleUserActiveExecutor>,
+    pub assign_user_role: Arc<AssignUserRoleExecutor>,
+    pub remove_user_role: Arc<RemoveUserRoleExecutor>,
 }
+
+
 
 pub struct ApplicationBoostrapExecutors {
     pub queries: ApplicationBoostrapExecutorsQueries,
@@ -93,6 +129,21 @@ impl ApplicationBoostrapExecutors {
                 shared_dependency.task_tracker_client.clone(),
             )),
             get_queues_stats: Arc::new(GetQueuesStatsExecutor { stats_provider }),
+
+            get_user_digest_subscriptions: Arc::new(GetUserDigestSubscriptionsExecutor::new(
+                shared_dependency.user_socials_repo.clone(),
+                shared_dependency.digest_subscription_repo.clone(),
+            )),
+
+            get_all_health_pings: Arc::new(GetAllHealthPingsExecutor::new(
+                shared_dependency.health_ping_repo.clone(),
+            )),
+
+            get_all_users: Arc::new(GetAllUsersExecutor::new(
+                shared_dependency.user_repo.clone(),
+                shared_dependency.user_socials_repo.clone(),
+                shared_dependency.user_has_roles_repo.clone(),
+            )),
         };
 
         let commands = ApplicationBoostrapExecutorsCommands {
@@ -167,6 +218,63 @@ impl ApplicationBoostrapExecutors {
             delete_repository: Arc::new(DeleteRepositoryExecutor::new(
                 mysql_pool.clone(),
                 shared_dependency.repository_repo.clone(),
+            )),
+
+            deactivate_user: Arc::new(DeactivateUserExecutor::new(
+                shared_dependency.user_repo.clone(),
+                shared_dependency.user_socials_repo.clone(),
+            )),
+
+            create_digest_subscription: Arc::new(CreateDigestSubscriptionExecutor::new(
+                shared_dependency.user_socials_repo.clone(),
+                shared_dependency.digest_subscription_repo.clone(),
+            )),
+
+            update_digest_subscription: Arc::new(UpdateDigestSubscriptionExecutor::new(
+                shared_dependency.digest_subscription_repo.clone(),
+            )),
+
+            toggle_digest_subscription: Arc::new(ToggleDigestSubscriptionExecutor::new(
+                shared_dependency.digest_subscription_repo.clone(),
+            )),
+
+            delete_digest_subscription: Arc::new(DeleteDigestSubscriptionExecutor::new(
+                shared_dependency.digest_subscription_repo.clone(),
+            )),
+
+            create_health_ping: Arc::new(CreateHealthPingExecutor::new(
+                shared_dependency.health_ping_repo.clone(),
+            )),
+
+            update_health_ping: Arc::new(UpdateHealthPingExecutor::new(
+                shared_dependency.health_ping_repo.clone(),
+            )),
+
+            update_health_ping_status: Arc::new(UpdateHealthPingStatusExecutor::new(
+                shared_dependency.health_ping_repo.clone(),
+            )),
+
+            delete_health_ping: Arc::new(DeleteHealthPingExecutor::new(
+                shared_dependency.health_ping_repo.clone(),
+            )),
+
+            send_due_digests: Arc::new(SendDueDigestsExecutor::new(
+                shared_dependency.digest_subscription_repo.clone(),
+                shared_dependency.user_socials_repo.clone(),
+                shared_dependency.notification_service.clone(),
+            )),
+
+            toggle_user_active: Arc::new(ToggleUserActiveExecutor::new(
+                shared_dependency.user_repo.clone(),
+            )),
+
+            assign_user_role: Arc::new(AssignUserRoleExecutor::new(
+                mysql_pool.clone(),
+                shared_dependency.user_has_roles_repo.clone(),
+            )),
+
+            remove_user_role: Arc::new(RemoveUserRoleExecutor::new(
+                shared_dependency.user_has_roles_repo.clone(),
             )),
         };
 

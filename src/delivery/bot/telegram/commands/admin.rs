@@ -69,6 +69,8 @@ impl TelegramBotAdminCommandHandler {
             .row::<TelegramBotAdminAction>(vec![TelegramBotAdminAction::ConfigureRepository])
             .row::<TelegramBotAdminAction>(vec![TelegramBotAdminAction::ConfigureTaskTracker])
             .row::<TelegramBotAdminAction>(vec![TelegramBotAdminAction::QueuesStats])
+            .row::<TelegramBotAdminAction>(vec![TelegramBotAdminAction::HealthPings])
+            .row::<TelegramBotAdminAction>(vec![TelegramBotAdminAction::ManageUsers])
             .build();
 
         self.dialogue
