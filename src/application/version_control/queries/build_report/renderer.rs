@@ -25,6 +25,8 @@ pub struct DayActivity {
     /// Display label, e.g. "12 Jan"
     pub day: String,
     pub commits: usize,
+    /// Pluralized word matching `commits`, e.g. "коммит", "коммита", "коммитов".
+    pub commits_word: String,
     /// Bar height in pixels (0–60), proportional to the busiest day.
     pub bar_px: usize,
 }
@@ -40,12 +42,16 @@ pub struct ContributorRow {
     /// HTML-escaped author login / name.
     pub name: String,
     pub commits: usize,
+    /// Pluralized word matching `commits`.
+    pub commits_word: String,
     pub additions: i64,
     pub deletions: i64,
     /// Bar width in percent (0–100), relative to the top contributor.
     pub pct: usize,
     /// Deduplicated tasks extracted from this contributor's commits and PRs.
     pub tasks: Vec<TaskItem>,
+    /// Pluralized word matching `tasks.len()`.
+    pub tasks_word: String,
 }
 
 pub struct PrRow {
@@ -54,7 +60,7 @@ pub struct PrRow {
     pub title_html: String,
     pub state_icon: &'static str,
     pub state_class: &'static str,
-    pub state_label: &'static str,
+    pub state_label: String,
     /// HTML-escaped author name.
     pub author: String,
     pub additions: i64,
@@ -85,6 +91,8 @@ pub struct CommitRow {
 pub struct DowBar {
     pub day: String,
     pub commits: usize,
+    /// Pluralized word matching `commits`.
+    pub commits_word: String,
     /// Bar height in percent (0–100), relative to the busiest day.
     pub pct: usize,
 }
@@ -517,6 +525,7 @@ fn build_activity(commits: &[VersionControlDateRangeReportCommit]) -> Vec<DayAct
         .map(|(_, label, count)| DayActivity {
             day: label,
             commits: count,
+            commits_word: plural_commits(count),
             bar_px: (count * BAR_MAX_PX / max).max(4),
         })
         .collect()
@@ -548,6 +557,7 @@ fn build_dow_activity(commits: &[VersionControlDateRangeReportCommit]) -> Vec<Do
         .map(|(i, day)| DowBar {
             day,
             commits: counts[i],
+            commits_word: plural_commits(counts[i]),
             pct: counts[i] * 100 / max,
         })
         .collect()
@@ -630,7 +640,8 @@ fn compute_best_day(commits: &[VersionControlDateRangeReportCommit]) -> String {
         .into_iter()
         .max_by_key(|(_, (_, n))| *n)
         .map(|(_, (label, n))| {
-            t!("report.renderer.best_day", label = label, count = n).to_string()
+            let word = plural_commits(n);
+            t!("report.renderer.best_day", label = label, count = n, word = word).to_string()
         })
         .unwrap_or_else(|| "—".into())
 }
@@ -712,13 +723,16 @@ fn build_contributors(
                 extract_pattern,
                 task_tracker_service,
             );
+            let tasks_word = plural_tasks(tasks.len());
             ContributorRow {
                 name: html_escape(&name),
                 pct: stats.commits * 100 / max_commits,
                 commits: stats.commits,
+                commits_word: plural_commits(stats.commits),
                 additions: stats.additions,
                 deletions: stats.deletions,
                 tasks,
+                tasks_word,
             }
         })
         .collect()
@@ -782,11 +796,23 @@ fn build_pr_rows(
     sorted
         .iter()
         .map(|pr| {
-            let (state_icon, state_class, state_label) =
+            let (state_icon, state_class, state_label): (&'static str, &'static str, String) =
                 match (pr.merged_at.is_some(), pr.state.as_str()) {
-                    (true, _) => ("✅", "merged", "Merged"),
-                    (_, "open") => ("🟢", "open", "Open"),
-                    _ => ("🔴", "closed", "Closed"),
+                    (true, _) => (
+                        "✅",
+                        "merged",
+                        t!("report.renderer.pr_state.merged").to_string(),
+                    ),
+                    (_, "open") => (
+                        "🟢",
+                        "open",
+                        t!("report.renderer.pr_state.open").to_string(),
+                    ),
+                    _ => (
+                        "🔴",
+                        "closed",
+                        t!("report.renderer.pr_state.closed").to_string(),
+                    ),
                 };
 
             PrRow {
@@ -914,6 +940,35 @@ fn html_escape(s: &str) -> String {
         .replace('<', "&lt;")
         .replace('>', "&gt;")
         .replace('"', "&quot;")
+}
+
+/// Returns "one" / "few" / "many" according to Russian noun pluralization rules.
+fn plural_form(n: usize) -> &'static str {
+    let mod10 = n % 10;
+    let mod100 = n % 100;
+    if mod10 == 1 && mod100 != 11 {
+        "one"
+    } else if (2..=4).contains(&mod10) && !(12..=14).contains(&mod100) {
+        "few"
+    } else {
+        "many"
+    }
+}
+
+fn plural_commits(n: usize) -> String {
+    match plural_form(n) {
+        "one" => t!("report.renderer.plural_commits.one").to_string(),
+        "few" => t!("report.renderer.plural_commits.few").to_string(),
+        _ => t!("report.renderer.plural_commits.many").to_string(),
+    }
+}
+
+fn plural_tasks(n: usize) -> String {
+    match plural_form(n) {
+        "one" => t!("report.renderer.plural_tasks.one").to_string(),
+        "few" => t!("report.renderer.plural_tasks.few").to_string(),
+        _ => t!("report.renderer.plural_tasks.many").to_string(),
+    }
 }
 
 // chrono traits needed for .hour() and .weekday()

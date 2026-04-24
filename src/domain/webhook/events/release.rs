@@ -79,8 +79,10 @@ impl WebhookEvent for WebhookReleaseEvent {
         if let Some(body) = &self.body
             && !body.trim().is_empty()
         {
-            let truncated = if body.len() > 500 {
-                format!("{}…", &body[..500])
+            const MAX_CHARS: usize = 500;
+            let truncated = if body.chars().count() > MAX_CHARS {
+                let cut: String = body.chars().take(MAX_CHARS).collect();
+                format!("{}…", cut)
             } else {
                 body.clone()
             };

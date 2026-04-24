@@ -325,7 +325,7 @@ footer {
   <div class="activity-wrap">
     <div class="activity-chart">
       {% for day in activity %}
-      <div class="activity-col" title="{{ day.day }}: {{ day.commits }} коммитов">
+      <div class="activity-col" title="{{ day.day }}: {{ day.commits }} {{ day.commits_word }}">
         <div class="activity-bar" style="height:{{ day.bar_px }}px"></div>
         <div class="activity-label">{{ day.day }}</div>
       </div>
@@ -342,7 +342,7 @@ footer {
     <h2>📆 По дням недели</h2>
     <div class="dow-grid">
       {% for d in dow_activity %}
-      <div class="dow-col" title="{{ d.day }}: {{ d.commits }} коммитов">
+      <div class="dow-col" title="{{ d.day }}: {{ d.commits }} {{ d.commits_word }}">
         <div class="dow-count">{{ d.commits }}</div>
         <div class="dow-bar-wrap">
           <div class="dow-bar" style="height:{{ d.pct }}%"></div>

@@ -32,16 +32,39 @@
       "unknown": "❌ Неизвестная ошибка"
     },
     "renderer": {
-      "days": ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"],
+      "days": {
+        "0": "Пн",
+        "1": "Вт",
+        "2": "Ср",
+        "3": "Чт",
+        "4": "Пт",
+        "5": "Сб",
+        "6": "Вс"
+      },
       "time_night": "Ночь (0–6)",
       "time_morning": "Утро (6–12)",
       "time_day": "День (12–18)",
       "time_evening": "Вечер (18–24)",
-      "best_day": "%{label} — %{count} коммитов",
+      "best_day": "%{label} — %{count} %{word}",
       "duration_seconds": "%{value} сек",
       "duration_minutes": "%{value} мин",
       "duration_hours": "%{value} ч",
-      "duration_days": "%{value} дн"
+      "duration_days": "%{value} дн",
+      "plural_commits": {
+        "one": "коммит",
+        "few": "коммита",
+        "many": "коммитов"
+      },
+      "plural_tasks": {
+        "one": "задача",
+        "few": "задачи",
+        "many": "задач"
+      },
+      "pr_state": {
+        "merged": "Смёржен",
+        "open": "Открыт",
+        "closed": "Закрыт"
+      }
     }
   },
   "telegram_bot": {

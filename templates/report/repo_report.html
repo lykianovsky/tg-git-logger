@@ -336,7 +336,7 @@ footer {
   <div class="activity-wrap">
     <div class="activity-chart">
       {% for day in activity %}
-      <div class="activity-col" title="{{ day.day }}: {{ day.commits }} коммитов">
+      <div class="activity-col" title="{{ day.day }}: {{ day.commits }} {{ day.commits_word }}">
         <div class="activity-bar" style="height:{{ day.bar_px }}px"></div>
         <div class="activity-label">{{ day.day }}</div>
       </div>
@@ -377,11 +377,11 @@ footer {
         <span class="contributor-name">{{ c.name }}</span>
       </div>
       <div class="contributor-stats">
-        <span>{{ c.commits }} коммитов</span>
+        <span>{{ c.commits }} {{ c.commits_word }}</span>
         <span class="green">+{{ c.additions }}</span>
         <span class="red">-{{ c.deletions }}</span>
         {% if !c.tasks.is_empty() %}
-        <span class="contributor-tasks-count">· {{ c.tasks.len() }} задач</span>
+        <span class="contributor-tasks-count">· {{ c.tasks.len() }} {{ c.tasks_word }}</span>
         {% endif %}
       </div>
     </div>
