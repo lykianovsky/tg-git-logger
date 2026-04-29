@@ -2,27 +2,27 @@ pub mod helpers;
 pub mod modules;
 
 use crate::application::monitoring::queries::get_queues_stats::query::GetQueuesStatsQuery;
-use crate::domain::shared::command::CommandExecutor as _;
 use crate::bootstrap::executors::ApplicationBoostrapExecutors;
 use crate::delivery::bot::telegram::dialogues::admin::modules::health_ping::TelegramBotDialogueAdminHealthPingDispatcher;
 use crate::delivery::bot::telegram::dialogues::admin::modules::repository::TelegramBotDialogueAdminRepositoryDispatcher;
 use crate::delivery::bot::telegram::dialogues::admin::modules::task_tracker::TelegramBotDialogueAdminTaskTrackerDispatcher;
 use crate::delivery::bot::telegram::dialogues::admin::modules::users::TelegramBotDialogueAdminUsersDispatcher;
+use crate::delivery::bot::telegram::dialogues::helpers::parse_callback;
 use crate::delivery::bot::telegram::dialogues::{
     TelegramBotDialogueState, TelegramBotDialogueType,
 };
-use crate::delivery::bot::telegram::dialogues::helpers::parse_callback;
 use crate::delivery::bot::telegram::keyboards::actions::admin::TelegramBotAdminAction;
 use crate::delivery::bot::telegram::keyboards::builder::KeyboardBuilder;
+use crate::domain::shared::command::CommandExecutor as _;
 use crate::utils::builder::message::MessageBuilder;
 use std::error::Error;
 use std::sync::Arc;
 use teloxide::dispatching::DpHandlerDescription;
-use teloxide::types::ParseMode;
 use teloxide::dptree::case;
 use teloxide::prelude::*;
 use teloxide::types::InlineKeyboardButton;
 use teloxide::types::InlineKeyboardMarkup;
+use teloxide::types::ParseMode;
 use teloxide::{Bot, dptree};
 
 use crate::delivery::bot::telegram::keyboards::actions::admin_repository::TelegramBotAdminRepositoryAction;
@@ -188,9 +188,7 @@ impl TelegramBotDialogueAdminDispatcher {
         executors: Arc<ApplicationBoostrapExecutors>,
         query: CallbackQuery,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        let ctx = match parse_callback::<TelegramBotAdminAction>(&bot, &query)
-            .await?
-        {
+        let ctx = match parse_callback::<TelegramBotAdminAction>(&bot, &query).await? {
             Some(c) => c,
             None => return Ok(()),
         };
@@ -224,8 +222,8 @@ impl TelegramBotDialogueAdminDispatcher {
                     message_id,
                     t!("telegram_bot.dialogues.admin.repositories_title").to_string(),
                 )
-                    .reply_markup(keyboard)
-                    .await?;
+                .reply_markup(keyboard)
+                .await?;
             }
             TelegramBotAdminAction::QueuesStats => {
                 let response = match executors
@@ -242,7 +240,7 @@ impl TelegramBotDialogueAdminDispatcher {
                             message_id,
                             t!("telegram_bot.dialogues.admin.queues_stats_error").to_string(),
                         )
-                            .await?;
+                        .await?;
                         dialogue.exit().await.ok();
                         return Ok(());
                     }
@@ -288,10 +286,7 @@ impl TelegramBotDialogueAdminDispatcher {
                     .await?;
 
                 TelegramBotDialogueAdminHealthPingDispatcher::show_list(
-                    &bot,
-                    chat_id,
-                    message_id,
-                    &executors,
+                    &bot, chat_id, message_id, &executors,
                 )
                 .await?;
             }
@@ -304,10 +299,7 @@ impl TelegramBotDialogueAdminDispatcher {
                     .await?;
 
                 TelegramBotDialogueAdminUsersDispatcher::show_list(
-                    &bot,
-                    chat_id,
-                    message_id,
-                    &executors,
+                    &bot, chat_id, message_id, &executors,
                 )
                 .await?;
             }

@@ -36,6 +36,7 @@ impl RepositoryRepository for MySQLRepositoryRepository {
             owner: Set(repository.owner.clone()),
             url: Set(repository.url.clone()),
             social_chat_id: Set(repository.social_chat_id.map(|id| id.0)),
+            notifications_chat_id: Set(repository.notifications_chat_id.map(|id| id.0)),
             ..Default::default()
         };
 
@@ -58,6 +59,7 @@ impl RepositoryRepository for MySQLRepositoryRepository {
             owner: Set(repository.owner.clone()),
             url: Set(repository.url.clone()),
             social_chat_id: Set(repository.social_chat_id.map(|id| id.0)),
+            notifications_chat_id: Set(repository.notifications_chat_id.map(|id| id.0)),
             ..Default::default()
         };
 
@@ -134,6 +136,7 @@ impl Repository {
             owner: model.owner,
             url: model.url,
             social_chat_id: model.social_chat_id.map(SocialChatId),
+            notifications_chat_id: model.notifications_chat_id.map(SocialChatId),
             created_at: model.created_at,
             updated_at: model.updated_at,
         }

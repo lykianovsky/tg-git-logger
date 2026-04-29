@@ -7,6 +7,7 @@ pub enum RoleName {
     Admin,
     Developer,
     QualityAssurance,
+    ProductManager,
 }
 
 impl RoleName {
@@ -15,17 +16,14 @@ impl RoleName {
             RoleName::Admin => "admin",
             RoleName::Developer => "developer",
             RoleName::QualityAssurance => "quality_assurance",
+            RoleName::ProductManager => "product_manager",
         }
     }
 }
 
 impl fmt::Display for RoleName {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            RoleName::Admin => write!(f, "{}", self.to_str()),
-            RoleName::Developer => write!(f, "{}", self.to_str()),
-            RoleName::QualityAssurance => write!(f, "{}", self.to_str()),
-        }
+        write!(f, "{}", self.to_str())
     }
 }
 
@@ -37,6 +35,7 @@ impl FromStr for RoleName {
             "admin" => Ok(RoleName::Admin),
             "developer" => Ok(RoleName::Developer),
             "quality_assurance" => Ok(RoleName::QualityAssurance),
+            "product_manager" => Ok(RoleName::ProductManager),
             _ => Err(format!("Unknown role name: {}", s)),
         }
     }

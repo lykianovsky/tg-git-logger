@@ -15,6 +15,12 @@ pub mod digest_list;
 pub mod digest_repository;
 pub mod digest_type;
 pub mod for_who;
+pub mod notifications_events;
+pub mod notifications_menu;
+pub mod notifications_snooze;
+pub mod notifications_vacation;
+pub mod onboarding;
+pub mod release_plan;
 
 pub trait TelegramBotKeyboardAction {
     fn to_callback_data(&self) -> &str;

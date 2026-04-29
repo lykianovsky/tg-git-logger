@@ -47,6 +47,7 @@ impl CommandExecutor for CreateRepositoryExecutor {
             owner: cmd.owner.clone(),
             url: cmd.url.clone(),
             social_chat_id: None,
+            notifications_chat_id: None,
             created_at: Utc::now(),
             updated_at: Utc::now(),
         };

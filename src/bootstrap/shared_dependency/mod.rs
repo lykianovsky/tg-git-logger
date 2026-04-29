@@ -1,7 +1,12 @@
 use crate::config::application::ApplicationConfig;
 use crate::domain::auth::ports::oauth_client::OAuthClient;
 use crate::domain::digest::repositories::digest_subscription_repository::DigestSubscriptionRepository;
+use crate::domain::health_ping::ports::health_check_client::HealthCheckClient;
 use crate::domain::health_ping::repositories::health_ping_repository::HealthPingRepository;
+use crate::domain::notification_log::repositories::notification_log_repository::NotificationLogRepository;
+use crate::domain::pending_notification::repositories::pending_notification_repository::PendingNotificationsRepository;
+use crate::domain::pr_review::repositories::pr_review_repository::PrReviewRepository;
+use crate::domain::release_plan::repositories::release_plan_repository::ReleasePlanRepository;
 use crate::domain::repository::repositories::repository_repository::RepositoryRepository;
 use crate::domain::repository::repositories::repository_task_tracker_repository::RepositoryTaskTrackerRepository;
 use crate::domain::role::repositories::role_repository::RoleRepository;
@@ -12,6 +17,9 @@ use crate::domain::user::repositories::user_has_roles_repository::UserHasRolesRe
 use crate::domain::user::repositories::user_repository::UserRepository;
 use crate::domain::user::repositories::user_social_accounts_repository::UserSocialAccountsRepository;
 use crate::domain::user::repositories::user_vc_accounts_repository::UserVersionControlAccountsRepository;
+use crate::domain::user_preferences::repositories::user_preferences_repository::UserPreferencesRepository;
+use crate::domain::user_preferences::services::quiet_hours_resolver::QuietHoursResolver;
+use crate::domain::user_preferences::value_objects::quiet_hours_window::QuietHoursWindow;
 use crate::domain::version_control::ports::version_control_client::VersionControlClient;
 use crate::infrastructure::drivers::cache::contract::CacheService;
 use crate::infrastructure::drivers::cache::redis::RedisCache;
@@ -19,7 +27,6 @@ use crate::infrastructure::drivers::message_broker::contracts::broker::MessageBr
 use crate::infrastructure::drivers::message_broker::contracts::publisher::MessageBrokerPublisher;
 use crate::infrastructure::drivers::message_broker::rabbitmq::broker::MessageBrokerRabbitMQ;
 use crate::infrastructure::drivers::message_broker::rabbitmq::publisher::MessageBrokerRabbitMQPublisher;
-use crate::domain::health_ping::ports::health_check_client::HealthCheckClient;
 use crate::infrastructure::integrations::health_check::ReqwestHealthCheckClient;
 use crate::infrastructure::integrations::oauth::github::GithubOAuthClient;
 use crate::infrastructure::integrations::task_tracker::kaiten::{
@@ -29,12 +36,17 @@ use crate::infrastructure::integrations::version_control::github::client::Github
 use crate::infrastructure::processing::event_bus::EventBus;
 use crate::infrastructure::repositories::mysql::digest_subscription::MySQLDigestSubscriptionRepository;
 use crate::infrastructure::repositories::mysql::health_ping::MySQLHealthPingRepository;
+use crate::infrastructure::repositories::mysql::notification_log::MySQLNotificationLogRepository;
+use crate::infrastructure::repositories::mysql::pending_notifications::MySQLPendingNotificationsRepository;
+use crate::infrastructure::repositories::mysql::pr_review::MySQLPrReviewRepository;
+use crate::infrastructure::repositories::mysql::release_plan::MySQLReleasePlanRepository;
 use crate::infrastructure::repositories::mysql::repository::MySQLRepositoryRepository;
 use crate::infrastructure::repositories::mysql::repository_task_tracker::MySQLRepositoryTaskTrackerRepository;
 use crate::infrastructure::repositories::mysql::role::MySQLRoleRepository;
 use crate::infrastructure::repositories::mysql::user::MySQLUserRepository;
 use crate::infrastructure::repositories::mysql::user_connection_repositories::MySQLUserConnectionRepositoriesRepository;
 use crate::infrastructure::repositories::mysql::user_has_roles::MySQLUserHasRolesRepository;
+use crate::infrastructure::repositories::mysql::user_preferences::MySQLUserPreferencesRepository;
 use crate::infrastructure::repositories::mysql::user_social_accounts::MySQLUserSocialServicesRepository;
 use crate::infrastructure::repositories::mysql::user_vc_accounts::MySQLUserVersionControlServicesRepository;
 use crate::infrastructure::services::notification::CompositionNotificationService;
@@ -65,6 +77,12 @@ pub struct ApplicationSharedDependency {
     pub task_tracker_client: Arc<dyn TaskTrackerClient>,
     pub task_tracker_service: Arc<dyn TaskTrackerService>,
     pub version_control_client: Arc<dyn VersionControlClient>,
+    pub user_preferences_repo: Arc<dyn UserPreferencesRepository>,
+    pub quiet_hours_resolver: Arc<QuietHoursResolver>,
+    pub pending_notifications_repo: Arc<dyn PendingNotificationsRepository>,
+    pub pr_review_repo: Arc<dyn PrReviewRepository>,
+    pub notification_log_repo: Arc<dyn NotificationLogRepository>,
+    pub release_plan_repo: Arc<dyn ReleasePlanRepository>,
 }
 
 impl ApplicationSharedDependency {
@@ -145,6 +163,30 @@ impl ApplicationSharedDependency {
             GithubVersionControlClient::new(config.github.api_base.clone()),
         );
 
+        let user_preferences_repo: Arc<dyn UserPreferencesRepository> =
+            Arc::new(MySQLUserPreferencesRepository::new(mysql_pool.clone()));
+
+        let default_quiet_hours_window = QuietHoursWindow::new(
+            config.notifications.default_dnd_start,
+            config.notifications.default_dnd_end,
+        );
+        let quiet_hours_resolver = Arc::new(QuietHoursResolver::new(
+            default_quiet_hours_window,
+            config.notifications.default_timezone,
+        ));
+
+        let pending_notifications_repo: Arc<dyn PendingNotificationsRepository> =
+            Arc::new(MySQLPendingNotificationsRepository::new(mysql_pool.clone()));
+
+        let pr_review_repo: Arc<dyn PrReviewRepository> =
+            Arc::new(MySQLPrReviewRepository::new(mysql_pool.clone()));
+
+        let notification_log_repo: Arc<dyn NotificationLogRepository> =
+            Arc::new(MySQLNotificationLogRepository::new(mysql_pool.clone()));
+
+        let release_plan_repo: Arc<dyn ReleasePlanRepository> =
+            Arc::new(MySQLReleasePlanRepository::new(mysql_pool.clone()));
+
         Ok(Self {
             event_bus,
             message_broker,
@@ -167,6 +209,12 @@ impl ApplicationSharedDependency {
             task_tracker_client,
             task_tracker_service,
             version_control_client,
+            user_preferences_repo,
+            quiet_hours_resolver,
+            pending_notifications_repo,
+            pr_review_repo,
+            notification_log_repo,
+            release_plan_repo,
         })
     }
 }

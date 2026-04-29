@@ -10,8 +10,12 @@ use crate::delivery::bot::telegram::dialogues::TelegramBotDialogueState;
 use crate::delivery::bot::telegram::dialogues::admin::TelegramBotDialogueAdminDispatcher;
 use crate::delivery::bot::telegram::dialogues::bind_repository::TelegramBotBindRepositoryDispatcher;
 use crate::delivery::bot::telegram::dialogues::digest::TelegramBotDigestDispatcher;
+use crate::delivery::bot::telegram::dialogues::notifications::TelegramBotNotificationsDispatcher;
+use crate::delivery::bot::telegram::dialogues::onboarding::TelegramBotOnboardingDispatcher;
 use crate::delivery::bot::telegram::dialogues::registration::TelegramBotDialogueRegistrationDispatcher;
+use crate::delivery::bot::telegram::dialogues::release_plan::TelegramBotReleasePlanDispatcher;
 use crate::delivery::bot::telegram::dialogues::report::TelegramBotDialogueReportByDateRangeDispatcher;
+use crate::delivery::bot::telegram::dialogues::setup_notifications::TelegramBotSetupNotificationsDispatcher;
 use crate::delivery::bot::telegram::dialogues::setup_webhook::TelegramBotSetupWebhookDispatcher;
 use crate::delivery::contract::ApplicationDelivery;
 use std::sync::Arc;
@@ -78,8 +82,24 @@ impl ApplicationDelivery for DeliveryBotMessengerTelegram {
                     .branch(TelegramBotSetupWebhookDispatcher::new()),
             )
             .branch(
+                case![TelegramBotDialogueState::SetupNotifications(state)]
+                    .branch(TelegramBotSetupNotificationsDispatcher::new()),
+            )
+            .branch(
                 case![TelegramBotDialogueState::Digest(state)]
                     .branch(TelegramBotDigestDispatcher::new()),
+            )
+            .branch(
+                case![TelegramBotDialogueState::Notifications(state)]
+                    .branch(TelegramBotNotificationsDispatcher::new()),
+            )
+            .branch(
+                case![TelegramBotDialogueState::Onboarding(state)]
+                    .branch(TelegramBotOnboardingDispatcher::new()),
+            )
+            .branch(
+                case![TelegramBotDialogueState::ReleasePlan(state)]
+                    .branch(TelegramBotReleasePlanDispatcher::new()),
             );
 
         Dispatcher::builder(bot, handler)

@@ -1,5 +1,5 @@
 use crate::delivery::bot::telegram::keyboards::actions::{
-    impl_keyboard_action, KeyboardActionLabel,
+    KeyboardActionLabel, impl_keyboard_action,
 };
 
 use crate::domain::role::value_objects::role_name::RoleName;
@@ -11,6 +11,8 @@ pub enum TelegramBotChooseRoleAction {
     QualityAssurance,
     #[strum(serialize = "developer")]
     Developer,
+    #[strum(serialize = "product_manager")]
+    ProductManager,
 }
 
 impl From<TelegramBotChooseRoleAction> for RoleName {
@@ -18,6 +20,7 @@ impl From<TelegramBotChooseRoleAction> for RoleName {
         match value {
             TelegramBotChooseRoleAction::Developer => RoleName::Developer,
             TelegramBotChooseRoleAction::QualityAssurance => RoleName::QualityAssurance,
+            TelegramBotChooseRoleAction::ProductManager => RoleName::ProductManager,
         }
     }
 }
@@ -27,6 +30,7 @@ impl TelegramBotChooseRoleAction {
         match role {
             RoleName::Developer => Some(Self::Developer),
             RoleName::QualityAssurance => Some(Self::QualityAssurance),
+            RoleName::ProductManager => Some(Self::ProductManager),
             _ => None,
         }
     }
@@ -37,6 +41,7 @@ impl KeyboardActionLabel for TelegramBotChooseRoleAction {
         match self {
             TelegramBotChooseRoleAction::Developer => "👨‍💻 Разработчик",
             TelegramBotChooseRoleAction::QualityAssurance => "🧪 Тестировщик",
+            TelegramBotChooseRoleAction::ProductManager => "📋 PR-менеджер",
         }
     }
 }

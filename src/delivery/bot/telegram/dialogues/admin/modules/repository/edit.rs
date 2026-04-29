@@ -90,9 +90,7 @@ impl TelegramBotDialogueAdminRepositoryEditDispatcher {
             .await
         {
             Ok(r) => format!("📦 <b>{}/{}</b>\n🔗 {}", r.owner, r.name, r.url),
-            Err(_) => {
-                t!("telegram_bot.dialogues.admin.repository.data_unavailable").to_string()
-            }
+            Err(_) => t!("telegram_bot.dialogues.admin.repository.data_unavailable").to_string(),
         };
 
         let keyboard = KeyboardBuilder::new()
@@ -115,10 +113,10 @@ impl TelegramBotDialogueAdminRepositoryEditDispatcher {
             msg.chat().id,
             msg.id(),
             format!(
-            "{}{}",
-            current_info,
-            t!("telegram_bot.dialogues.admin.repository.what_to_edit")
-        ),
+                "{}{}",
+                current_info,
+                t!("telegram_bot.dialogues.admin.repository.what_to_edit")
+            ),
         )
         .parse_mode(teloxide::types::ParseMode::Html)
         .reply_markup(keyboard)

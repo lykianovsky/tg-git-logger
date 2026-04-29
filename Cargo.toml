@@ -27,6 +27,7 @@ hmac = "0.12"        # или последняя версия
 sha2 = "0.10"
 async-trait = "0.1.89"
 chrono = "0.4.43"
+chrono-tz = { version = "0.10", features = ["serde"] }
 regex = "1.12.2"
 hex = "0.4"
 teloxide = { version = "0.17.0", features = ["macros"] }

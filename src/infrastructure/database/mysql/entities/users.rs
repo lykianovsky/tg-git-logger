@@ -14,16 +14,50 @@ pub struct Model {
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
+    #[sea_orm(has_many = "super::digest_subscriptions::Entity")]
+    DigestSubscriptions,
+    #[sea_orm(has_many = "super::notification_log::Entity")]
+    NotificationLog,
+    #[sea_orm(has_many = "super::pending_notifications::Entity")]
+    PendingNotifications,
+    #[sea_orm(has_many = "super::release_plans::Entity")]
+    ReleasePlans,
     #[sea_orm(has_many = "super::user_connection_repositories::Entity")]
     UserConnectionRepositories,
     #[sea_orm(has_many = "super::user_has_roles::Entity")]
     UserHasRoles,
     #[sea_orm(has_many = "super::user_notifications::Entity")]
     UserNotifications,
+    #[sea_orm(has_one = "super::user_preferences::Entity")]
+    UserPreferences,
     #[sea_orm(has_many = "super::user_social_accounts::Entity")]
     UserSocialAccounts,
     #[sea_orm(has_many = "super::user_version_control_accounts::Entity")]
     UserVersionControlAccounts,
+}
+
+impl Related<super::digest_subscriptions::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::DigestSubscriptions.def()
+    }
+}
+
+impl Related<super::notification_log::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::NotificationLog.def()
+    }
+}
+
+impl Related<super::pending_notifications::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::PendingNotifications.def()
+    }
+}
+
+impl Related<super::release_plans::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::ReleasePlans.def()
+    }
 }
 
 impl Related<super::user_connection_repositories::Entity> for Entity {
@@ -41,6 +75,12 @@ impl Related<super::user_has_roles::Entity> for Entity {
 impl Related<super::user_notifications::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::UserNotifications.def()
+    }
+}
+
+impl Related<super::user_preferences::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::UserPreferences.def()
     }
 }
 

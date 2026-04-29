@@ -23,16 +23,11 @@ impl CommandExecutor for ToggleDigestSubscriptionExecutor {
     type Error = ToggleDigestSubscriptionExecutorError;
 
     async fn execute(&self, cmd: &Self::Command) -> Result<Self::Response, Self::Error> {
-        let mut subscription = self
-            .digest_subscription_repo
-            .find_by_id(cmd.id)
-            .await?;
+        let mut subscription = self.digest_subscription_repo.find_by_id(cmd.id).await?;
 
         subscription.is_active = !subscription.is_active;
 
-        self.digest_subscription_repo
-            .update(&subscription)
-            .await?;
+        self.digest_subscription_repo.update(&subscription).await?;
 
         Ok(ToggleDigestSubscriptionResponse {
             is_active: subscription.is_active,

@@ -60,7 +60,7 @@ impl TelegramBotDialogueAdminRepositoryCreateDispatcher {
             msg.chat.id,
             t!("telegram_bot.dialogues.admin.repository.create.enter_owner").to_string(),
         )
-            .await?;
+        .await?;
         Ok(())
     }
 
@@ -75,8 +75,7 @@ impl TelegramBotDialogueAdminRepositoryCreateDispatcher {
             None => {
                 bot.send_message(
                     msg.chat.id,
-                    t!("telegram_bot.dialogues.admin.repository.create.owner_required")
-                        .to_string(),
+                    t!("telegram_bot.dialogues.admin.repository.create.owner_required").to_string(),
                 )
                 .await?;
                 return Ok(());
@@ -93,7 +92,7 @@ impl TelegramBotDialogueAdminRepositoryCreateDispatcher {
             msg.chat.id,
             t!("telegram_bot.dialogues.admin.repository.create.enter_url").to_string(),
         )
-            .await?;
+        .await?;
         Ok(())
     }
 

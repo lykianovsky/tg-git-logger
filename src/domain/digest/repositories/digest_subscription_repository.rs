@@ -64,8 +64,5 @@ pub trait DigestSubscriptionRepository: Send + Sync {
         subscription: &DigestSubscription,
     ) -> Result<DigestSubscription, UpdateDigestSubscriptionError>;
 
-    async fn delete(
-        &self,
-        id: DigestSubscriptionId,
-    ) -> Result<(), DeleteDigestSubscriptionError>;
+    async fn delete(&self, id: DigestSubscriptionId) -> Result<(), DeleteDigestSubscriptionError>;
 }

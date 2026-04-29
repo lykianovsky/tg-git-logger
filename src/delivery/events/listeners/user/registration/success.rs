@@ -19,24 +19,38 @@ impl EventListener<UserRegistrationSuccessEvent> for UserRegistrationSuccessList
         let mut message = MessageBuilder::new()
             .line(&t!("notifications.registration.success_title").to_string())
             .empty_line()
-            .line(&t!(
-                "notifications.registration.success_user_id",
-                id = payload.user.id.0
-            ).to_string())
-            .line(&t!(
-                "notifications.registration.success_github",
-                login = payload.user_version_control_account.version_control_login
-            ).to_string())
-            .line(&t!(
-                "notifications.registration.success_social",
-                social_type = format!("{:?}", payload.social_type)
-            ).to_string())
-            .line(&t!(
-                "notifications.registration.success_chat_id",
-                chat_id = payload.chat_id.0
-            ).to_string())
+            .line(
+                &t!(
+                    "notifications.registration.success_user_id",
+                    id = payload.user.id.0
+                )
+                .to_string(),
+            )
+            .line(
+                &t!(
+                    "notifications.registration.success_github",
+                    login = payload.user_version_control_account.version_control_login
+                )
+                .to_string(),
+            )
+            .line(
+                &t!(
+                    "notifications.registration.success_social",
+                    social_type = format!("{:?}", payload.social_type)
+                )
+                .to_string(),
+            )
+            .line(
+                &t!(
+                    "notifications.registration.success_chat_id",
+                    chat_id = payload.chat_id.0
+                )
+                .to_string(),
+            )
             .empty_line()
-            .line(&t!("notifications.registration.success_ready").to_string());
+            .line(&t!("notifications.registration.success_ready").to_string())
+            .empty_line()
+            .line(&t!("telegram_bot.notifications.registration.next_step").to_string());
 
         tracing::debug!(
             "{}, {}",
@@ -44,9 +58,9 @@ impl EventListener<UserRegistrationSuccessEvent> for UserRegistrationSuccessList
             self.telegram_admin_user_id.0
         );
         if payload.user_social_account.social_user_id == self.telegram_admin_user_id {
-            message = message.empty_line().line(
-                &t!("notifications.registration.success_admin_greeting").to_string(),
-            )
+            message = message
+                .empty_line()
+                .line(&t!("notifications.registration.success_admin_greeting").to_string())
         }
 
         self.publisher

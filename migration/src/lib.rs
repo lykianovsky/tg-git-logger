@@ -16,6 +16,14 @@ mod m20260328_000002_add_unique_user_connection_repositories;
 mod m20260401_000001_create_digest_subscriptions;
 mod m20260401_000002_create_health_pings;
 mod m20260401_000003_add_failed_since_to_health_pings;
+mod m20260429_000001_create_user_preferences;
+mod m20260429_000002_create_pending_notifications;
+mod m20260429_000003_create_pr_reviews;
+mod m20260429_000004_create_notification_log;
+mod m20260429_000005_create_release_plans;
+mod m20260429_000006_create_release_plan_repositories;
+mod m20260429_000007_add_notifications_chat_id_to_repositories;
+mod m20260429_000008_pending_notifications_user_id_nullable;
 
 pub struct Migrator;
 
@@ -43,6 +51,14 @@ impl MigratorTrait for Migrator {
             Box::new(m20260401_000001_create_digest_subscriptions::Migration),
             Box::new(m20260401_000002_create_health_pings::Migration),
             Box::new(m20260401_000003_add_failed_since_to_health_pings::Migration),
+            Box::new(m20260429_000001_create_user_preferences::Migration),
+            Box::new(m20260429_000002_create_pending_notifications::Migration),
+            Box::new(m20260429_000003_create_pr_reviews::Migration),
+            Box::new(m20260429_000004_create_notification_log::Migration),
+            Box::new(m20260429_000005_create_release_plans::Migration),
+            Box::new(m20260429_000006_create_release_plan_repositories::Migration),
+            Box::new(m20260429_000007_add_notifications_chat_id_to_repositories::Migration),
+            Box::new(m20260429_000008_pending_notifications_user_id_nullable::Migration),
         ]
     }
 }

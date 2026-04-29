@@ -1,8 +1,9 @@
 use crate::domain::shared::date::range::DateRange;
 use crate::domain::version_control::ports::version_control_client::{
-    VersionControlClient, VersionControlClientBranchCheckError,
+    OpenPullRequestSummary, VersionControlClient, VersionControlClientBranchCheckError,
     VersionControlClientDateRangeReportError, VersionControlClientGetUserError,
-    VersionControlClientGetUserResponse,
+    VersionControlClientGetUserResponse, VersionControlClientListPullRequestsError,
+    VersionControlClientPostCommentError,
 };
 use crate::domain::version_control::value_objects::report::{
     VersionControlDateRangeReport, VersionControlDateRangeReportAuthor,
@@ -15,7 +16,24 @@ use async_trait::async_trait;
 use chrono::Utc;
 use graphql_client::GraphQLQuery;
 use reqwest::Client;
+use serde::Deserialize;
 use thiserror::Error;
+
+#[derive(Debug, Deserialize)]
+struct GithubRestPullRequest {
+    number: u64,
+    title: String,
+    html_url: String,
+    user: GithubRestUser,
+    updated_at: chrono::DateTime<chrono::Utc>,
+    #[serde(default)]
+    requested_reviewers: Vec<GithubRestUser>,
+}
+
+#[derive(Debug, Deserialize)]
+struct GithubRestUser {
+    login: String,
+}
 
 #[derive(Debug, Error)]
 pub enum GithubClientError {
@@ -354,6 +372,110 @@ impl VersionControlClient for GithubVersionControlClient {
             commits,
             pull_requests,
         })
+    }
+
+    async fn list_open_pull_requests(
+        &self,
+        access_token: &str,
+        owner: &str,
+        repo: &str,
+    ) -> Result<Vec<OpenPullRequestSummary>, VersionControlClientListPullRequestsError> {
+        let mut all = Vec::new();
+        let mut page: u32 = 1;
+
+        loop {
+            let url = format!(
+                "{}/repos/{}/{}/pulls?state=open&per_page=100&page={}",
+                self.base, owner, repo, page
+            );
+            let resp = self
+                .client
+                .get(&url)
+                .bearer_auth(access_token)
+                .header("User-Agent", "Telegram-Git-App")
+                .send()
+                .await
+                .map_err(|e| VersionControlClientListPullRequestsError::Transport(e.to_string()))?;
+
+            match resp.status() {
+                s if s.is_success() => {
+                    let prs: Vec<GithubRestPullRequest> = resp.json().await.map_err(|e| {
+                        VersionControlClientListPullRequestsError::Transport(e.to_string())
+                    })?;
+                    let count = prs.len();
+                    for pr in prs {
+                        all.push(OpenPullRequestSummary {
+                            number: pr.number,
+                            title: pr.title,
+                            url: pr.html_url,
+                            author_login: pr.user.login,
+                            updated_at: pr.updated_at,
+                            requested_reviewers: pr
+                                .requested_reviewers
+                                .into_iter()
+                                .map(|u| u.login)
+                                .collect(),
+                        });
+                    }
+                    if count < 100 {
+                        break;
+                    }
+                    page += 1;
+                }
+                s if s == reqwest::StatusCode::UNAUTHORIZED
+                    || s == reqwest::StatusCode::FORBIDDEN =>
+                {
+                    return Err(VersionControlClientListPullRequestsError::Unauthorized(
+                        format!("GitHub returned {}", s),
+                    ));
+                }
+                s => {
+                    return Err(VersionControlClientListPullRequestsError::Transport(
+                        format!("Unexpected status: {}", s),
+                    ));
+                }
+            }
+        }
+
+        Ok(all)
+    }
+
+    async fn post_pr_comment(
+        &self,
+        access_token: &str,
+        owner: &str,
+        repo: &str,
+        pr_number: u64,
+        body: &str,
+    ) -> Result<(), VersionControlClientPostCommentError> {
+        let url = format!(
+            "{}/repos/{}/{}/issues/{}/comments",
+            self.base, owner, repo, pr_number
+        );
+
+        let resp = self
+            .client
+            .post(&url)
+            .bearer_auth(access_token)
+            .header("User-Agent", "Telegram-Git-App")
+            .json(&serde_json::json!({ "body": body }))
+            .send()
+            .await
+            .map_err(|e| VersionControlClientPostCommentError::Transport(e.to_string()))?;
+
+        match resp.status() {
+            s if s.is_success() => Ok(()),
+            s if s == reqwest::StatusCode::UNAUTHORIZED || s == reqwest::StatusCode::FORBIDDEN => {
+                Err(VersionControlClientPostCommentError::Unauthorized(format!(
+                    "GitHub returned {}",
+                    s
+                )))
+            }
+            s => Err(VersionControlClientPostCommentError::Transport(format!(
+                "Unexpected status: {}",
+                s
+            ))),
+        }
     }
 
     async fn branch_exists(

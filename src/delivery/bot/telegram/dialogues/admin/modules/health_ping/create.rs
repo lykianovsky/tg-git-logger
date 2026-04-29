@@ -1,7 +1,7 @@
 use crate::application::health_ping::commands::create_health_ping::command::CreateHealthPingCommand;
 use crate::bootstrap::executors::ApplicationBoostrapExecutors;
-use crate::delivery::bot::telegram::dialogues::admin::helpers::{extract_text, parse_integer};
 use crate::delivery::bot::telegram::dialogues::admin::TelegramBotDialogueAdminState;
+use crate::delivery::bot::telegram::dialogues::admin::helpers::{extract_text, parse_integer};
 use crate::delivery::bot::telegram::dialogues::{
     TelegramBotDialogueState, TelegramBotDialogueType,
 };
@@ -15,12 +15,9 @@ use teloxide::{Bot, dptree};
 pub struct TelegramBotDialogueAdminHealthPingCreateDispatcher;
 
 impl TelegramBotDialogueAdminHealthPingCreateDispatcher {
-    pub fn message_branches(
-    ) -> Handler<
-        'static,
-        Result<(), Box<dyn std::error::Error + Send + Sync>>,
-        DpHandlerDescription,
-    > {
+    pub fn message_branches()
+    -> Handler<'static, Result<(), Box<dyn std::error::Error + Send + Sync>>, DpHandlerDescription>
+    {
         dptree::entry()
             .branch(
                 case![TelegramBotDialogueAdminState::HealthPingCreateName]
@@ -31,11 +28,8 @@ impl TelegramBotDialogueAdminHealthPingCreateDispatcher {
                     .endpoint(handle_create_url),
             )
             .branch(
-                case![TelegramBotDialogueAdminState::HealthPingCreateInterval {
-                    name,
-                    url
-                }]
-                .endpoint(handle_create_interval),
+                case![TelegramBotDialogueAdminState::HealthPingCreateInterval { name, url }]
+                    .endpoint(handle_create_interval),
             )
     }
 }
@@ -119,8 +113,7 @@ async fn handle_create_interval(
         _ => {
             bot.send_message(
                 msg.chat.id,
-                t!("telegram_bot.dialogues.admin.health_ping.interval_required")
-                    .to_string(),
+                t!("telegram_bot.dialogues.admin.health_ping.interval_required").to_string(),
             )
             .await?;
 

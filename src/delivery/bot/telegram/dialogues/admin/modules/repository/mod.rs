@@ -11,7 +11,7 @@ use crate::delivery::bot::telegram::dialogues::{
 };
 use crate::delivery::bot::telegram::keyboards::actions::TelegramBotKeyboardAction;
 use crate::delivery::bot::telegram::keyboards::actions::admin_repository::{
-    TelegramBotAdminRepositoryAction, REPO_DELETE_SELECT_PREFIX, REPO_VIEW_SELECT_PREFIX,
+    REPO_DELETE_SELECT_PREFIX, REPO_VIEW_SELECT_PREFIX, TelegramBotAdminRepositoryAction,
     repo_delete_select_callback, repo_select_callback, repo_view_select_callback,
 };
 use crate::delivery::bot::telegram::keyboards::actions::admin_repository_delete::TelegramBotAdminRepositoryDeleteAction;
@@ -145,8 +145,8 @@ impl TelegramBotDialogueAdminRepositoryDispatcher {
                     message_id,
                     t!("telegram_bot.dialogues.admin.repository.enter_name").to_string(),
                 )
-                    .reply_markup(InlineKeyboardMarkup::default())
-                    .await?;
+                .reply_markup(InlineKeyboardMarkup::default())
+                .await?;
             }
             TelegramBotAdminRepositoryAction::Edit => {
                 let repositories: Vec<Repository> = executors
@@ -234,8 +234,8 @@ impl TelegramBotDialogueAdminRepositoryDispatcher {
                     message_id,
                     t!("telegram_bot.dialogues.admin.repository.select_for_delete").to_string(),
                 )
-                    .reply_markup(InlineKeyboardMarkup::new(buttons))
-                    .await?;
+                .reply_markup(InlineKeyboardMarkup::new(buttons))
+                .await?;
             }
         }
 
@@ -370,8 +370,11 @@ impl TelegramBotDialogueAdminRepositoryDispatcher {
         bot.edit_message_text(
             msg.chat().id,
             msg.id(),
-            t!("telegram_bot.dialogues.admin.repository.delete_confirm", name = repo_label)
-                .to_string(),
+            t!(
+                "telegram_bot.dialogues.admin.repository.delete_confirm",
+                name = repo_label
+            )
+            .to_string(),
         )
         .parse_mode(teloxide::types::ParseMode::Html)
         .reply_markup(keyboard)
@@ -408,8 +411,8 @@ impl TelegramBotDialogueAdminRepositoryDispatcher {
                     msg.id(),
                     t!("telegram_bot.dialogues.admin.repository.delete_cancelled").to_string(),
                 )
-                    .reply_markup(InlineKeyboardMarkup::default())
-                    .await?;
+                .reply_markup(InlineKeyboardMarkup::default())
+                .await?;
                 dialogue.exit().await.ok();
                 return Ok(());
             }

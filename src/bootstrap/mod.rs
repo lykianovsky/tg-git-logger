@@ -4,6 +4,7 @@ pub mod registry;
 pub mod shared_dependency;
 pub mod workers;
 
+use crate::application::notification::commands::buffer_notification::executor::BufferNotificationExecutor;
 use crate::application::notification::commands::send_social_notify::executor::SendSocialNotifyExecutor;
 use crate::application::task::commands::move_task_to_test::executor::MoveTaskToTestExecutor;
 use crate::bootstrap::executors::ApplicationBoostrapExecutors;
@@ -57,6 +58,12 @@ impl ApplicationBootstrap {
 
         let send_social_notify_executor = Arc::new(SendSocialNotifyExecutor::new(
             shared_dependency.notification_service.clone(),
+            shared_dependency.user_socials_repo.clone(),
+            shared_dependency.user_preferences_repo.clone(),
+            shared_dependency.quiet_hours_resolver.clone(),
+            Arc::new(BufferNotificationExecutor::new(
+                shared_dependency.pending_notifications_repo.clone(),
+            )),
         ));
         let move_task_to_test_executor = Arc::new(MoveTaskToTestExecutor::new(
             shared_dependency.task_tracker_client.clone(),

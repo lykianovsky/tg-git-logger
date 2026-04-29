@@ -1,13 +1,13 @@
 use crate::application::health_ping::commands::update_health_ping::command::UpdateHealthPingCommand;
 use crate::application::health_ping::queries::get_all_health_pings::query::GetAllHealthPingsQuery;
 use crate::bootstrap::executors::ApplicationBoostrapExecutors;
-use crate::delivery::bot::telegram::dialogues::admin::helpers::{extract_text, parse_integer};
 use crate::delivery::bot::telegram::dialogues::admin::TelegramBotDialogueAdminState;
+use crate::delivery::bot::telegram::dialogues::admin::helpers::{extract_text, parse_integer};
 use crate::delivery::bot::telegram::dialogues::{
     TelegramBotDialogueState, TelegramBotDialogueType,
 };
-use crate::delivery::bot::telegram::keyboards::actions::admin_health_ping_edit::TelegramBotAdminHealthPingEditAction;
 use crate::delivery::bot::telegram::keyboards::actions::TelegramBotKeyboardAction;
+use crate::delivery::bot::telegram::keyboards::actions::admin_health_ping_edit::TelegramBotAdminHealthPingEditAction;
 use crate::delivery::bot::telegram::keyboards::builder::KeyboardBuilder;
 use crate::domain::health_ping::value_objects::health_ping_id::HealthPingId;
 use crate::domain::shared::command::CommandExecutor;
@@ -21,12 +21,9 @@ use teloxide::{Bot, dptree};
 pub struct TelegramBotDialogueAdminHealthPingEditDispatcher;
 
 impl TelegramBotDialogueAdminHealthPingEditDispatcher {
-    pub fn query_branches(
-    ) -> Handler<
-        'static,
-        Result<(), Box<dyn std::error::Error + Send + Sync>>,
-        DpHandlerDescription,
-    > {
+    pub fn query_branches()
+    -> Handler<'static, Result<(), Box<dyn std::error::Error + Send + Sync>>, DpHandlerDescription>
+    {
         dptree::entry()
             .branch(
                 case![TelegramBotDialogueAdminState::HealthPingEditSelect]
@@ -38,12 +35,9 @@ impl TelegramBotDialogueAdminHealthPingEditDispatcher {
             )
     }
 
-    pub fn message_branches(
-    ) -> Handler<
-        'static,
-        Result<(), Box<dyn std::error::Error + Send + Sync>>,
-        DpHandlerDescription,
-    > {
+    pub fn message_branches()
+    -> Handler<'static, Result<(), Box<dyn std::error::Error + Send + Sync>>, DpHandlerDescription>
+    {
         dptree::entry()
             .branch(
                 case![TelegramBotDialogueAdminState::HealthPingEditName { ping_id }]
@@ -179,8 +173,7 @@ async fn handle_edit_menu(
 
             bot.send_message(
                 msg.chat().id,
-                t!("telegram_bot.dialogues.admin.health_ping.enter_interval")
-                    .to_string(),
+                t!("telegram_bot.dialogues.admin.health_ping.enter_interval").to_string(),
             )
             .await?;
         }
@@ -211,8 +204,7 @@ async fn handle_edit_menu(
                             t!("telegram_bot.dialogues.admin.health_ping.disabled")
                         };
 
-                        bot.send_message(msg.chat().id, reply.to_string())
-                            .await?;
+                        bot.send_message(msg.chat().id, reply.to_string()).await?;
                     }
 
                     Err(e) => {
@@ -220,10 +212,7 @@ async fn handle_edit_menu(
 
                         bot.send_message(
                             msg.chat().id,
-                            t!(
-                                "telegram_bot.dialogues.admin.health_ping.update_error"
-                            )
-                            .to_string(),
+                            t!("telegram_bot.dialogues.admin.health_ping.update_error").to_string(),
                         )
                         .await?;
                     }
@@ -249,8 +238,7 @@ async fn handle_edit_menu(
 
             bot.send_message(
                 msg.chat().id,
-                t!("telegram_bot.dialogues.admin.health_ping.confirm_delete")
-                    .to_string(),
+                t!("telegram_bot.dialogues.admin.health_ping.confirm_delete").to_string(),
             )
             .reply_markup(keyboard)
             .await?;
@@ -289,9 +277,7 @@ async fn handle_edit_name(
     };
 
     let reply = match executors.commands.update_health_ping.execute(&cmd).await {
-        Ok(_) => {
-            t!("telegram_bot.dialogues.admin.health_ping.updated").to_string()
-        }
+        Ok(_) => t!("telegram_bot.dialogues.admin.health_ping.updated").to_string(),
 
         Err(e) => {
             tracing::error!(error = %e, "Failed to update health ping");
@@ -335,9 +321,7 @@ async fn handle_edit_url(
     };
 
     let reply = match executors.commands.update_health_ping.execute(&cmd).await {
-        Ok(_) => {
-            t!("telegram_bot.dialogues.admin.health_ping.updated").to_string()
-        }
+        Ok(_) => t!("telegram_bot.dialogues.admin.health_ping.updated").to_string(),
 
         Err(e) => {
             tracing::error!(error = %e, "Failed to update health ping");
@@ -364,8 +348,7 @@ async fn handle_edit_interval(
         _ => {
             bot.send_message(
                 msg.chat.id,
-                t!("telegram_bot.dialogues.admin.health_ping.interval_required")
-                    .to_string(),
+                t!("telegram_bot.dialogues.admin.health_ping.interval_required").to_string(),
             )
             .await?;
 
@@ -382,9 +365,7 @@ async fn handle_edit_interval(
     };
 
     let reply = match executors.commands.update_health_ping.execute(&cmd).await {
-        Ok(_) => {
-            t!("telegram_bot.dialogues.admin.health_ping.updated").to_string()
-        }
+        Ok(_) => t!("telegram_bot.dialogues.admin.health_ping.updated").to_string(),
 
         Err(e) => {
             tracing::error!(error = %e, "Failed to update health ping");

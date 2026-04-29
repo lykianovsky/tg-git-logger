@@ -48,7 +48,10 @@ impl TelegramBotTaskCommandHandler {
 
         let loading = self
             .bot
-            .send_message(self.msg.chat.id, t!("telegram_bot.commands.task.searching").to_string())
+            .send_message(
+                self.msg.chat.id,
+                t!("telegram_bot.commands.task.searching").to_string(),
+            )
             .await?;
 
         let text = match self

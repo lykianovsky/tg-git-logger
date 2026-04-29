@@ -1,7 +1,7 @@
 use crate::domain::user::entities::user_social_account::UserSocialAccount;
 use crate::domain::user::repositories::user_social_accounts_repository::{
-    CreateSocialServiceError, FindSocialServiceByIdError, FindSocialServiceByUserIdError,
-    UserSocialAccountsRepository,
+    CreateSocialServiceError, FindSocialServiceByChatIdError, FindSocialServiceByIdError,
+    FindSocialServiceByUserIdError, UserSocialAccountsRepository,
 };
 use crate::domain::user::value_objects::social_chat_id::SocialChatId;
 use crate::domain::user::value_objects::social_type::SocialType;
@@ -78,6 +78,27 @@ impl UserSocialAccountsRepository for MySQLUserSocialServicesRepository {
             .ok_or(FindSocialServiceByUserIdError::NotFound)?;
 
         Ok(UserSocialAccount::from_mysql(user).map_err(FindSocialServiceByUserIdError::DbError)?)
+    }
+
+    async fn find_by_social_chat_id(
+        &self,
+        social_chat_id: &SocialChatId,
+        social_type: &SocialType,
+    ) -> Result<Option<UserSocialAccount>, FindSocialServiceByChatIdError> {
+        let model = user_social_accounts::Entity::find()
+            .filter(user_social_accounts::Column::SocialChatId.eq(social_chat_id.0))
+            .filter(user_social_accounts::Column::SocialType.eq(social_type.to_string()))
+            .one(self.db.as_ref())
+            .await
+            .map_err(|e| FindSocialServiceByChatIdError::DbError(e.to_string()))?;
+
+        match model {
+            Some(m) => Ok(Some(
+                UserSocialAccount::from_mysql(m)
+                    .map_err(FindSocialServiceByChatIdError::DbError)?,
+            )),
+            None => Ok(None),
+        }
     }
 }
 

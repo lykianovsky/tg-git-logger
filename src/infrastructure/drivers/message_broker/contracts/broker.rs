@@ -38,8 +38,5 @@ pub trait MessageBroker: Send + Sync {
         queues: Vec<Arc<MessageBrokerQueue>>,
     ) -> Result<(), MessageBrokerSetupError>;
 
-    async fn queue_depth(
-        &self,
-        queue_name: &str,
-    ) -> Result<u32, MessageBrokerQueueDepthError>;
+    async fn queue_depth(&self, queue_name: &str) -> Result<u32, MessageBrokerQueueDepthError>;
 }

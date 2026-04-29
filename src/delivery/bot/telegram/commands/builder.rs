@@ -1,14 +1,19 @@
 use crate::bootstrap::executors::ApplicationBoostrapExecutors;
 use crate::config::application::ApplicationConfig;
 use crate::delivery::bot::telegram::commands::admin::TelegramBotAdminCommandHandler;
-use crate::delivery::bot::telegram::commands::digest::TelegramBotDigestCommandHandler;
 use crate::delivery::bot::telegram::commands::bind_repository::TelegramBotBindRepositoryCommandHandler;
+use crate::delivery::bot::telegram::commands::digest::TelegramBotDigestCommandHandler;
+use crate::delivery::bot::telegram::commands::notifications::TelegramBotNotificationsCommandHandler;
 use crate::delivery::bot::telegram::commands::register::TelegramBotRegisterCommandHandler;
+use crate::delivery::bot::telegram::commands::release_plan::TelegramBotReleasePlanCommandHandler;
 use crate::delivery::bot::telegram::commands::report::TelegramBotVersionControlReportCommandHandler;
+use crate::delivery::bot::telegram::commands::setup::TelegramBotSetupCommandHandler;
+use crate::delivery::bot::telegram::commands::setup_notifications::TelegramBotSetupNotificationsCommandHandler;
 use crate::delivery::bot::telegram::commands::setup_webhook::TelegramBotSetupWebhookCommandHandler;
 use crate::delivery::bot::telegram::commands::start::TelegramBotStartCommandHandler;
 use crate::delivery::bot::telegram::commands::task::TelegramBotTaskCommandHandler;
 use crate::delivery::bot::telegram::commands::unregister::TelegramBotUnregisterCommandHandler;
+use crate::delivery::bot::telegram::commands::vacation::TelegramBotVacationCommandHandler;
 use crate::delivery::bot::telegram::context::TelegramBotCommandContext;
 use crate::delivery::bot::telegram::dialogues::TelegramBotDialogueType;
 use std::sync::Arc;
@@ -37,15 +42,33 @@ pub enum TelegramBotCommand {
     Task(String),
     #[command(
         rename = "setup_webhook",
-        description = "Привязать чат к уведомлениям репозитория"
+        description = "Привязать чат к webhook-логам репозитория (push/release/CI/PR)"
     )]
     SetupWebhook,
+
+    #[command(
+        rename = "setup_notifications",
+        description = "Привязать чат к командным уведомлениям (теги ревью, релизы, stale)"
+    )]
+    SetupNotifications,
 
     #[command(description = "Деактивировать аккаунт")]
     Unregister,
 
     #[command(description = "Настройка дайджест-уведомлений")]
     Digest,
+
+    #[command(description = "Настройка уведомлений (DND, snooze, vacation)")]
+    Notifications,
+
+    #[command(description = "Уйти в отпуск: /vacation 5d или /vacation off")]
+    Vacation(String),
+
+    #[command(description = "Завершить настройку: репо + тихие часы")]
+    Setup,
+
+    #[command(rename = "release_plan", description = "Создать план релиза")]
+    ReleasePlan,
 }
 
 pub async fn handle(
@@ -56,14 +79,22 @@ pub async fn handle(
     dialogue: TelegramBotDialogueType,
     executors: Arc<ApplicationBoostrapExecutors>,
     config: Arc<ApplicationConfig>,
+    shared_dependency: Arc<crate::bootstrap::shared_dependency::ApplicationSharedDependency>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    if let TelegramBotCommand::SetupWebhook = &cmd {
+    if matches!(
+        &cmd,
+        TelegramBotCommand::SetupWebhook | TelegramBotCommand::SetupNotifications
+    ) {
         if !matches!(msg.chat.kind, ChatKind::Public(_)) {
-            bot.send_message(msg.chat.id, t!("telegram_bot.commands.group_only").to_string())
-                .await?;
+            bot.send_message(
+                msg.chat.id,
+                t!("telegram_bot.commands.group_only").to_string(),
+            )
+            .await?;
             return Ok(());
         }
 
+        let is_notifications = matches!(cmd, TelegramBotCommand::SetupNotifications);
         let context = TelegramBotCommandContext {
             bot,
             user,
@@ -71,6 +102,15 @@ pub async fn handle(
             cmd,
             config,
         };
+        if is_notifications {
+            return TelegramBotSetupNotificationsCommandHandler::new(
+                context,
+                executors.clone(),
+                Arc::new(dialogue),
+            )
+            .execute()
+            .await;
+        }
         return TelegramBotSetupWebhookCommandHandler::new(
             context,
             executors.clone(),
@@ -82,8 +122,11 @@ pub async fn handle(
 
     // All other commands are private-chat only
     if !matches!(msg.chat.kind, ChatKind::Private(_)) {
-        bot.send_message(msg.chat.id, t!("telegram_bot.commands.private_only").to_string())
-            .await?;
+        bot.send_message(
+            msg.chat.id,
+            t!("telegram_bot.commands.private_only").to_string(),
+        )
+        .await?;
         return Ok(());
     }
 
@@ -154,17 +197,60 @@ pub async fn handle(
         }
 
         TelegramBotCommand::Digest => {
-            TelegramBotDigestCommandHandler::new(
+            TelegramBotDigestCommandHandler::new(context, executors.clone(), Arc::new(dialogue))
+                .execute()
+                .await?;
+        }
+
+        TelegramBotCommand::Notifications => {
+            TelegramBotNotificationsCommandHandler::new(
                 context,
                 executors.clone(),
+                shared_dependency.clone(),
                 Arc::new(dialogue),
             )
             .execute()
             .await?;
         }
 
+        TelegramBotCommand::Vacation(raw_arg) => {
+            let social_user_id = crate::domain::user::value_objects::social_user_id::SocialUserId(
+                context.user.id.0 as i32,
+            );
+            TelegramBotVacationCommandHandler::new(
+                context.bot,
+                context.msg,
+                executors.clone(),
+                raw_arg,
+                social_user_id,
+            )
+            .execute()
+            .await?;
+        }
+
+        TelegramBotCommand::Setup => {
+            let social_user_id = crate::domain::user::value_objects::social_user_id::SocialUserId(
+                context.user.id.0 as i32,
+            );
+            TelegramBotSetupCommandHandler::new(
+                context.bot,
+                context.msg,
+                executors.clone(),
+                Arc::new(dialogue),
+                social_user_id,
+            )
+            .execute()
+            .await?;
+        }
+
+        TelegramBotCommand::ReleasePlan => {
+            TelegramBotReleasePlanCommandHandler::new(context.bot, context.msg, Arc::new(dialogue))
+                .execute()
+                .await?;
+        }
+
         // Handled above before private-chat guard
-        TelegramBotCommand::SetupWebhook => {}
+        TelegramBotCommand::SetupWebhook | TelegramBotCommand::SetupNotifications => {}
     }
 
     Ok(())

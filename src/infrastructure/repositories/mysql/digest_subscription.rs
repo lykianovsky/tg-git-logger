@@ -9,9 +9,7 @@ use crate::domain::repository::value_objects::repository_id::RepositoryId;
 use crate::domain::user::value_objects::user_id::UserId;
 use crate::infrastructure::database::mysql::entities::digest_subscriptions;
 use async_trait::async_trait;
-use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set,
-};
+use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
 use std::sync::Arc;
 
 pub struct MySQLDigestSubscriptionRepository {
@@ -65,8 +63,9 @@ impl DigestSubscriptionRepository for MySQLDigestSubscriptionRepository {
             .await
             .map_err(|e| CreateDigestSubscriptionError::DbError(e.to_string()))?;
 
-        Self::from_mysql(result)
-            .ok_or_else(|| CreateDigestSubscriptionError::DbError("Invalid digest_type".to_string()))
+        Self::from_mysql(result).ok_or_else(|| {
+            CreateDigestSubscriptionError::DbError("Invalid digest_type".to_string())
+        })
     }
 
     async fn find_by_id(
@@ -93,10 +92,7 @@ impl DigestSubscriptionRepository for MySQLDigestSubscriptionRepository {
             .await
             .map_err(|e| FindDigestSubscriptionError::DbError(e.to_string()))?;
 
-        let subscriptions = models
-            .into_iter()
-            .filter_map(Self::from_mysql)
-            .collect();
+        let subscriptions = models.into_iter().filter_map(Self::from_mysql).collect();
 
         Ok(subscriptions)
     }
@@ -114,10 +110,7 @@ impl DigestSubscriptionRepository for MySQLDigestSubscriptionRepository {
             .await
             .map_err(|e| FindDigestSubscriptionError::DbError(e.to_string()))?;
 
-        let subscriptions = models
-            .into_iter()
-            .filter_map(Self::from_mysql)
-            .collect();
+        let subscriptions = models.into_iter().filter_map(Self::from_mysql).collect();
 
         Ok(subscriptions)
     }
@@ -147,14 +140,12 @@ impl DigestSubscriptionRepository for MySQLDigestSubscriptionRepository {
             .await
             .map_err(|e| UpdateDigestSubscriptionError::DbError(e.to_string()))?;
 
-        Self::from_mysql(result)
-            .ok_or_else(|| UpdateDigestSubscriptionError::DbError("Invalid digest_type".to_string()))
+        Self::from_mysql(result).ok_or_else(|| {
+            UpdateDigestSubscriptionError::DbError("Invalid digest_type".to_string())
+        })
     }
 
-    async fn delete(
-        &self,
-        id: DigestSubscriptionId,
-    ) -> Result<(), DeleteDigestSubscriptionError> {
+    async fn delete(&self, id: DigestSubscriptionId) -> Result<(), DeleteDigestSubscriptionError> {
         let model = digest_subscriptions::Entity::find_by_id(id.0)
             .one(self.db.as_ref())
             .await

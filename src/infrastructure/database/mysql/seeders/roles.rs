@@ -35,6 +35,10 @@ impl Seeder for MySQLRolesSeeder<'_> {
                 id: Default::default(),
                 name: RoleName::Developer.to_string(),
             },
+            roles::Model {
+                id: Default::default(),
+                name: RoleName::ProductManager.to_string(),
+            },
         ];
 
         for role in default_roles {

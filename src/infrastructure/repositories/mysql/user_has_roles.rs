@@ -2,8 +2,7 @@ use crate::domain::role::entities::role_entity::Role;
 use crate::domain::role::value_objects::role_id::RoleId;
 use crate::domain::role::value_objects::role_name::RoleName;
 use crate::domain::user::repositories::user_has_roles_repository::{
-    AssignRoleToUserError, GetAllUserRolesError, RemoveRoleFromUserError,
-    UserHasRolesRepository,
+    AssignRoleToUserError, GetAllUserRolesError, RemoveRoleFromUserError, UserHasRolesRepository,
 };
 use crate::domain::user::value_objects::user_id::UserId;
 use crate::infrastructure::database::mysql::entities::{roles, user_has_roles};

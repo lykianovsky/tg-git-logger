@@ -18,16 +18,8 @@ impl MigrationTrait for Migration {
                             .auto_increment()
                             .primary_key(),
                     )
-                    .col(
-                        ColumnDef::new(HealthPings::Name)
-                            .string_len(255)
-                            .not_null(),
-                    )
-                    .col(
-                        ColumnDef::new(HealthPings::Url)
-                            .string_len(1024)
-                            .not_null(),
-                    )
+                    .col(ColumnDef::new(HealthPings::Name).string_len(255).not_null())
+                    .col(ColumnDef::new(HealthPings::Url).string_len(1024).not_null())
                     .col(
                         ColumnDef::new(HealthPings::IntervalMinutes)
                             .integer()
@@ -50,16 +42,8 @@ impl MigrationTrait for Migration {
                             .string_len(16)
                             .null(),
                     )
-                    .col(
-                        ColumnDef::new(HealthPings::LastResponseMs)
-                            .integer()
-                            .null(),
-                    )
-                    .col(
-                        ColumnDef::new(HealthPings::LastErrorMessage)
-                            .text()
-                            .null(),
-                    )
+                    .col(ColumnDef::new(HealthPings::LastResponseMs).integer().null())
+                    .col(ColumnDef::new(HealthPings::LastErrorMessage).text().null())
                     .col(
                         ColumnDef::new(HealthPings::CreatedAt)
                             .timestamp_with_time_zone()
