@@ -1,5 +1,5 @@
 use crate::delivery::bot::telegram::keyboards::actions::{
-    impl_keyboard_action, KeyboardActionLabel,
+    KeyboardActionLabel, impl_keyboard_action,
 };
 use strum_macros::{AsRefStr, EnumString};
 

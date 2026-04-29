@@ -1,4 +1,14 @@
 use crate::config::environment::ENV;
+use chrono::NaiveTime;
+use chrono_tz::Tz;
+
+pub struct ApplicationNotificationsConfig {
+    pub default_dnd_start: NaiveTime,
+    pub default_dnd_end: NaiveTime,
+    pub default_timezone: Tz,
+    pub re_review_nudge_dedup_hours: i64,
+    pub stale_threshold_hours: i64,
+}
 
 pub struct ApplicationTaskTrackerConfig {
     pub extract_pattern: String,
@@ -63,6 +73,7 @@ pub struct ApplicationConfig {
     pub secret: ApplicationSecretConfig,
     pub kaiten: ApplicationKaitenConfig,
     pub task_tracker: ApplicationTaskTrackerConfig,
+    pub notifications: ApplicationNotificationsConfig,
 }
 
 impl ApplicationConfig {
@@ -78,6 +89,7 @@ impl ApplicationConfig {
         let secret = Self::build_secret_config();
         let kaiten = Self::build_kaiten_config();
         let task_tracker = Self::build_task_tracker_config();
+        let notifications = Self::build_notifications_config();
 
         Self {
             port,
@@ -91,6 +103,7 @@ impl ApplicationConfig {
             secret,
             kaiten,
             task_tracker,
+            notifications,
         }
     }
 
@@ -195,5 +208,38 @@ impl ApplicationConfig {
         let extract_pattern = ENV.get("TASK_TRACKER_EXTRACT_PATTERN_REGEXP");
 
         ApplicationTaskTrackerConfig { extract_pattern }
+    }
+
+    pub fn build_notifications_config() -> ApplicationNotificationsConfig {
+        let default_dnd_start = NaiveTime::parse_from_str(
+            &ENV.get_or("NOTIFICATIONS_DEFAULT_DND_START", "20:00"),
+            "%H:%M",
+        )
+        .unwrap();
+        let default_dnd_end = NaiveTime::parse_from_str(
+            &ENV.get_or("NOTIFICATIONS_DEFAULT_DND_END", "10:00"),
+            "%H:%M",
+        )
+        .unwrap();
+        let default_timezone: Tz = ENV
+            .get_or("NOTIFICATIONS_DEFAULT_TIMEZONE", "Europe/Moscow")
+            .parse()
+            .unwrap();
+        let re_review_nudge_dedup_hours: i64 = ENV
+            .get_or("REVIEW_RE_REVIEW_NUDGE_DEDUP_HOURS", "12")
+            .parse()
+            .unwrap();
+        let stale_threshold_hours: i64 = ENV
+            .get_or("REVIEW_STALE_THRESHOLD_HOURS", "24")
+            .parse()
+            .unwrap();
+
+        ApplicationNotificationsConfig {
+            default_dnd_start,
+            default_dnd_end,
+            default_timezone,
+            re_review_nudge_dedup_hours,
+            stale_threshold_hours,
+        }
     }
 }

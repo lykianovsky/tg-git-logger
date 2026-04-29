@@ -117,8 +117,12 @@ async fn handle_select(
             bot.edit_message_text(
                 chat_id,
                 msg.id(),
-                t!("telegram_bot.dialogues.setup_webhook.already_bound", owner = owner, name = name)
-                    .to_string(),
+                t!(
+                    "telegram_bot.dialogues.setup_webhook.already_bound",
+                    owner = owner,
+                    name = name
+                )
+                .to_string(),
             )
             .parse_mode(ParseMode::Html)
             .reply_markup(keyboard)
@@ -145,8 +149,12 @@ async fn handle_select(
             bot.edit_message_text(
                 chat_id,
                 msg.id(),
-                t!("telegram_bot.dialogues.setup_webhook.bound_to_other", owner = owner, name = name)
-                    .to_string(),
+                t!(
+                    "telegram_bot.dialogues.setup_webhook.bound_to_other",
+                    owner = owner,
+                    name = name
+                )
+                .to_string(),
             )
             .parse_mode(ParseMode::Html)
             .reply_markup(keyboard)
@@ -174,7 +182,7 @@ async fn handle_confirm_unbind(
         None => return Ok(()),
     };
 
-        let is_cancelled = query
+    let is_cancelled = query
         .data
         .as_deref()
         .and_then(|d| TelegramBotConfirmAction::from_callback_data(d).ok())
@@ -206,8 +214,12 @@ async fn handle_confirm_unbind(
             bot.edit_message_text(
                 msg.chat().id,
                 msg.id(),
-                t!("telegram_bot.dialogues.setup_webhook.unbound_success", owner = owner, name = name)
-                    .to_string(),
+                t!(
+                    "telegram_bot.dialogues.setup_webhook.unbound_success",
+                    owner = owner,
+                    name = name
+                )
+                .to_string(),
             )
             .parse_mode(ParseMode::Html)
             .await?;
@@ -241,7 +253,7 @@ async fn handle_confirm_rebind(
         None => return Ok(()),
     };
 
-        let is_cancelled = query
+    let is_cancelled = query
         .data
         .as_deref()
         .and_then(|d| TelegramBotConfirmAction::from_callback_data(d).ok())
@@ -293,8 +305,12 @@ async fn bind_chat(
             bot.edit_message_text(
                 chat_id,
                 message_id,
-                t!("telegram_bot.dialogues.setup_webhook.bound_success", owner = owner, name = name)
-                    .to_string(),
+                t!(
+                    "telegram_bot.dialogues.setup_webhook.bound_success",
+                    owner = owner,
+                    name = name
+                )
+                .to_string(),
             )
             .parse_mode(ParseMode::Html)
             .await?;

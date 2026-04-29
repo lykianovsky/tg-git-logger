@@ -5,11 +5,11 @@ use crate::bootstrap::executors::ApplicationBoostrapExecutors;
 use crate::delivery::bot::telegram::dialogues::{
     TelegramBotDialogueState, TelegramBotDialogueType,
 };
+use crate::delivery::bot::telegram::keyboards::actions::TelegramBotKeyboardAction;
 use crate::delivery::bot::telegram::keyboards::actions::confirm::TelegramBotConfirmAction;
 use crate::delivery::bot::telegram::keyboards::actions::digest_list::TelegramBotDigestListAction;
 use crate::delivery::bot::telegram::keyboards::actions::digest_repository::TelegramBotDigestRepositoryAction;
 use crate::delivery::bot::telegram::keyboards::actions::digest_type::TelegramBotDigestTypeAction;
-use crate::delivery::bot::telegram::keyboards::actions::TelegramBotKeyboardAction;
 use crate::delivery::bot::telegram::keyboards::builder::KeyboardBuilder;
 use crate::domain::digest::value_objects::digest_subscription_id::DigestSubscriptionId;
 use crate::domain::digest::value_objects::digest_type::DigestType;
@@ -22,7 +22,7 @@ use teloxide::dptree::case;
 use teloxide::payloads::SendMessageSetters;
 use teloxide::prelude::*;
 use teloxide::types::{InlineKeyboardButton, InlineKeyboardMarkup};
-use teloxide::{dptree, Bot};
+use teloxide::{Bot, dptree};
 
 #[derive(Debug, Clone, Default)]
 pub enum TelegramBotDigestState {
@@ -239,18 +239,28 @@ async fn handle_choose_type(
         )
         .await;
 
+    let bound = bound_repos.map(|r| r.repositories).unwrap_or_default();
+
+    if bound.is_empty() {
+        bot.send_message(
+            msg.chat().id,
+            t!("telegram_bot.dialogues.digest.no_bound_repos").to_string(),
+        )
+        .await?;
+        dialogue.exit().await.ok();
+        return Ok(());
+    }
+
     let mut rows: Vec<Vec<InlineKeyboardButton>> = vec![vec![InlineKeyboardButton::callback(
         TelegramBotDigestRepositoryAction::All.label(),
         TelegramBotDigestRepositoryAction::All.to_callback_data(),
     )]];
 
-    if let Ok(result) = bound_repos {
-        for repo in &result.repositories {
-            rows.push(vec![InlineKeyboardButton::callback(
-                format!("{}/{}", repo.owner, repo.name),
-                repo.id.0.to_string(),
-            )]);
-        }
+    for repo in &bound {
+        rows.push(vec![InlineKeyboardButton::callback(
+            format!("{}/{}", repo.owner, repo.name),
+            repo.id.0.to_string(),
+        )]);
     }
 
     rows.push(vec![InlineKeyboardButton::callback(

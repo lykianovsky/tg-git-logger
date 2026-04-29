@@ -1,5 +1,7 @@
 use crate::application::digest::commands::send_due_digests::command::SendDueDigestsCommand;
 use crate::application::health_ping::commands::check_all_health_pings::command::CheckAllHealthPingsCommand;
+use crate::application::notification::commands::flush_pending_notifications::command::FlushPendingNotificationsExecutorCommand;
+use crate::application::notification::commands::scan_stale_pull_requests::command::ScanStalePullRequestsExecutorCommand;
 use crate::bootstrap::executors::ApplicationBoostrapExecutors;
 use crate::config::application::ApplicationConfig;
 use crate::delivery::contract::ApplicationDelivery;
@@ -86,10 +88,7 @@ impl ApplicationDelivery for DeliveryScheduler {
 
                         match executors.commands.send_due_digests.execute(&cmd).await {
                             Ok(r) if r.sent_count > 0 => {
-                                tracing::info!(
-                                    sent = r.sent_count,
-                                    "Digest notifications sent"
-                                );
+                                tracing::info!(sent = r.sent_count, "Digest notifications sent");
                             }
                             Err(e) => {
                                 tracing::error!(error = %e, "Digest send failed");
@@ -102,6 +101,71 @@ impl ApplicationDelivery for DeliveryScheduler {
             )
             .await
             .expect("JobScheduler failed to add digest job");
+
+        // Pending notifications flush — every minute at :15 (staggered)
+        let flush_executors = self.executors.clone();
+
+        scheduler
+            .add(
+                Job::new_async("15 * * * * *", move |_uuid, _lock| {
+                    let executors = flush_executors.clone();
+
+                    Box::pin(async move {
+                        match executors
+                            .commands
+                            .flush_pending_notifications
+                            .execute(&FlushPendingNotificationsExecutorCommand {})
+                            .await
+                        {
+                            Ok(r) if r.flushed_count > 0 => {
+                                tracing::info!(
+                                    flushed = r.flushed_count,
+                                    "Pending notifications flushed"
+                                );
+                            }
+                            Err(e) => {
+                                tracing::error!(error = %e, "Pending notifications flush failed");
+                            }
+                            _ => {}
+                        }
+                    })
+                })
+                .expect("Pending flush job create error"),
+            )
+            .await
+            .expect("JobScheduler failed to add pending flush job");
+
+        // Stale PR digest — раз в день в 15:00 МСК (12:00 UTC)
+        let stale_executors = self.executors.clone();
+        scheduler
+            .add(
+                Job::new_async("0 0 12 * * *", move |_uuid, _lock| {
+                    let executors = stale_executors.clone();
+                    Box::pin(async move {
+                        match executors
+                            .commands
+                            .scan_stale_pull_requests
+                            .execute(&ScanStalePullRequestsExecutorCommand {})
+                            .await
+                        {
+                            Ok(r) if r.stale_count > 0 => {
+                                tracing::info!(
+                                    repos = r.repos_scanned,
+                                    stale = r.stale_count,
+                                    "Stale PR digest sent"
+                                );
+                            }
+                            Err(e) => {
+                                tracing::error!(error = %e, "Stale PR scan failed");
+                            }
+                            _ => {}
+                        }
+                    })
+                })
+                .expect("Stale PR scan job create error"),
+            )
+            .await
+            .expect("JobScheduler failed to add stale PR job");
 
         scheduler.start().await.expect("JobScheduler start failed");
 

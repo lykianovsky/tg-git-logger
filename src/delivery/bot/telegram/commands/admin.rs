@@ -81,7 +81,10 @@ impl TelegramBotAdminCommandHandler {
 
         self.context
             .bot
-            .send_message(self.context.msg.chat.id, t!("telegram_bot.commands.admin.panel_title").to_string())
+            .send_message(
+                self.context.msg.chat.id,
+                t!("telegram_bot.commands.admin.panel_title").to_string(),
+            )
             .reply_markup(keyboard)
             .await?;
 

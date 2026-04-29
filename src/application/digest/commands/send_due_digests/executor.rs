@@ -39,7 +39,11 @@ impl CommandExecutor for SendDueDigestsExecutor {
     type Error = SendDueDigestsExecutorError;
 
     async fn execute(&self, cmd: &Self::Command) -> Result<Self::Response, Self::Error> {
-        tracing::debug!(hour = cmd.hour, minute = cmd.minute, "Looking for due digests");
+        tracing::debug!(
+            hour = cmd.hour,
+            minute = cmd.minute,
+            "Looking for due digests"
+        );
 
         let subscriptions = self
             .digest_subscription_repo
@@ -91,11 +95,7 @@ impl CommandExecutor for SendDueDigestsExecutor {
             }
 
             // Get user's social account for chat_id
-            let social = match self
-                .user_socials_repo
-                .find_by_user_id(&sub.user_id)
-                .await
-            {
+            let social = match self.user_socials_repo.find_by_user_id(&sub.user_id).await {
                 Ok(s) => {
                     tracing::debug!(
                         user_id = sub.user_id.0,
@@ -115,12 +115,8 @@ impl CommandExecutor for SendDueDigestsExecutor {
             };
 
             let type_label = match sub.digest_type {
-                DigestType::Daily => {
-                    t!("notifications.digest.type_daily").to_string()
-                }
-                DigestType::Weekly => {
-                    t!("notifications.digest.type_weekly").to_string()
-                }
+                DigestType::Daily => t!("notifications.digest.type_daily").to_string(),
+                DigestType::Weekly => t!("notifications.digest.type_weekly").to_string(),
             };
 
             let message = MessageBuilder::new()
@@ -153,7 +149,10 @@ impl CommandExecutor for SendDueDigestsExecutor {
                 continue;
             }
 
-            tracing::debug!(subscription_id = sub.id.0, "Digest sent, updating last_sent_at");
+            tracing::debug!(
+                subscription_id = sub.id.0,
+                "Digest sent, updating last_sent_at"
+            );
 
             // Update last_sent_at
             let mut updated_sub = sub.clone();

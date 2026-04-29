@@ -84,7 +84,10 @@ impl MigrationTrait for Migration {
                     .foreign_key(
                         ForeignKey::create()
                             .name("fk_digest_subscriptions_repository")
-                            .from(DigestSubscriptions::Table, DigestSubscriptions::RepositoryId)
+                            .from(
+                                DigestSubscriptions::Table,
+                                DigestSubscriptions::RepositoryId,
+                            )
                             .to(Repositories::Table, Repositories::Id)
                             .on_delete(ForeignKeyAction::Cascade)
                             .on_update(ForeignKeyAction::Cascade),

@@ -43,30 +43,38 @@ impl TelegramBotDialogueAdminTaskTrackerDispatcher {
                     .endpoint(Self::handle_menu),
             )
             .branch(
-                case![TelegramBotDialogueAdminState::ConfigureTaskTrackerEditSelectField {
-                    repository_id
-                }]
+                case![
+                    TelegramBotDialogueAdminState::ConfigureTaskTrackerEditSelectField {
+                        repository_id
+                    }
+                ]
                 .endpoint(Self::handle_edit_select_field),
             )
             .branch(
-                case![TelegramBotDialogueAdminState::ConfigureTaskTrackerSelectSpace {
-                    repository_id
-                }]
+                case![
+                    TelegramBotDialogueAdminState::ConfigureTaskTrackerSelectSpace {
+                        repository_id
+                    }
+                ]
                 .endpoint(Self::handle_select_space),
             )
             .branch(
-                case![TelegramBotDialogueAdminState::ConfigureTaskTrackerSelectBoard {
-                    repository_id,
-                    space_id
-                }]
+                case![
+                    TelegramBotDialogueAdminState::ConfigureTaskTrackerSelectBoard {
+                        repository_id,
+                        space_id
+                    }
+                ]
                 .endpoint(Self::handle_select_board),
             )
             .branch(
-                case![TelegramBotDialogueAdminState::ConfigureTaskTrackerSelectColumn {
-                    repository_id,
-                    space_id,
-                    board_id
-                }]
+                case![
+                    TelegramBotDialogueAdminState::ConfigureTaskTrackerSelectColumn {
+                        repository_id,
+                        space_id,
+                        board_id
+                    }
+                ]
                 .endpoint(Self::handle_select_column),
             )
     }
@@ -76,17 +84,21 @@ impl TelegramBotDialogueAdminTaskTrackerDispatcher {
     -> Handler<'static, Result<(), Box<dyn Error + Send + Sync>>, DpHandlerDescription> {
         dptree::entry()
             .branch(
-                case![TelegramBotDialogueAdminState::ConfigureTaskTrackerEnterPattern {
-                    repository_id,
-                    space_id,
-                    qa_column_id
-                }]
+                case![
+                    TelegramBotDialogueAdminState::ConfigureTaskTrackerEnterPattern {
+                        repository_id,
+                        space_id,
+                        qa_column_id
+                    }
+                ]
                 .endpoint(Self::handle_enter_pattern),
             )
             .branch(
-                case![TelegramBotDialogueAdminState::ConfigureTaskTrackerEditExtractPattern {
-                    repository_id
-                }]
+                case![
+                    TelegramBotDialogueAdminState::ConfigureTaskTrackerEditExtractPattern {
+                        repository_id
+                    }
+                ]
                 .endpoint(Self::handle_edit_extract_pattern),
             )
     }
@@ -267,8 +279,8 @@ impl TelegramBotDialogueAdminTaskTrackerDispatcher {
                     msg.id(),
                     t!("telegram_bot.dialogues.admin.task_tracker.what_to_edit").to_string(),
                 )
-                    .reply_markup(keyboard)
-                    .await?;
+                .reply_markup(keyboard)
+                .await?;
             }
             TelegramBotAdminTaskTrackerAction::Reconfigure => {
                 Self::start_space_selection(
@@ -470,7 +482,7 @@ impl TelegramBotDialogueAdminTaskTrackerDispatcher {
                 loading_msg.id,
                 t!("telegram_bot.dialogues.admin.task_tracker.no_spaces").to_string(),
             )
-                .await?;
+            .await?;
             dialogue.exit().await.ok();
             return Ok(());
         }
@@ -491,8 +503,8 @@ impl TelegramBotDialogueAdminTaskTrackerDispatcher {
             loading_msg.id,
             t!("telegram_bot.dialogues.admin.task_tracker.select_space").to_string(),
         )
-            .reply_markup(InlineKeyboardMarkup::new(buttons))
-            .await?;
+        .reply_markup(InlineKeyboardMarkup::new(buttons))
+        .await?;
 
         Ok(())
     }
@@ -529,7 +541,11 @@ impl TelegramBotDialogueAdminTaskTrackerDispatcher {
             .reply_markup(InlineKeyboardMarkup::default())
             .await?;
 
-        let boards = match shared_dependency.task_tracker_client.list_boards(space_id).await {
+        let boards = match shared_dependency
+            .task_tracker_client
+            .list_boards(space_id)
+            .await
+        {
             Ok(b) => b,
             Err(e) => {
                 tracing::error!(error = %e, space_id = space_id, "Failed to load boards");
@@ -574,8 +590,8 @@ impl TelegramBotDialogueAdminTaskTrackerDispatcher {
             loading.id,
             t!("telegram_bot.dialogues.admin.task_tracker.select_board").to_string(),
         )
-            .reply_markup(InlineKeyboardMarkup::new(buttons))
-            .await?;
+        .reply_markup(InlineKeyboardMarkup::new(buttons))
+        .await?;
 
         Ok(())
     }
@@ -612,7 +628,11 @@ impl TelegramBotDialogueAdminTaskTrackerDispatcher {
             .reply_markup(InlineKeyboardMarkup::default())
             .await?;
 
-        let columns = match shared_dependency.task_tracker_client.list_columns(board_id).await {
+        let columns = match shared_dependency
+            .task_tracker_client
+            .list_columns(board_id)
+            .await
+        {
             Ok(c) => c,
             Err(e) => {
                 tracing::error!(error = %e, board_id = board_id, "Failed to load columns");

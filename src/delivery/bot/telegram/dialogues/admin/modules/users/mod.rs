@@ -30,13 +30,11 @@ use teloxide::{Bot, dptree};
 pub struct TelegramBotDialogueAdminUsersDispatcher;
 
 impl TelegramBotDialogueAdminUsersDispatcher {
-    pub fn query_branches(
-    ) -> Handler<'static, Result<(), Box<dyn std::error::Error + Send + Sync>>, DpHandlerDescription>
+    pub fn query_branches()
+    -> Handler<'static, Result<(), Box<dyn std::error::Error + Send + Sync>>, DpHandlerDescription>
     {
         dptree::entry()
-            .branch(
-                case![TelegramBotDialogueAdminState::UserList].endpoint(handle_list_action),
-            )
+            .branch(case![TelegramBotDialogueAdminState::UserList].endpoint(handle_list_action))
             .branch(
                 case![TelegramBotDialogueAdminState::UserMenu { user_id }]
                     .endpoint(handle_user_menu),
@@ -84,17 +82,12 @@ impl TelegramBotDialogueAdminUsersDispatcher {
             .empty_line();
 
         if users.is_empty() {
-            builder = builder.line(
-                &t!("telegram_bot.dialogues.admin.users.empty").to_string(),
-            );
+            builder = builder.line(&t!("telegram_bot.dialogues.admin.users.empty").to_string());
         } else {
             for user in &users {
                 let active_icon = if user.is_active { "✅" } else { "⏸" };
 
-                let login = user
-                    .social_login
-                    .as_deref()
-                    .unwrap_or("—");
+                let login = user.social_login.as_deref().unwrap_or("—");
 
                 let roles_str = if user.roles.is_empty() {
                     "—".to_string()
@@ -125,9 +118,8 @@ impl TelegramBotDialogueAdminUsersDispatcher {
             ]);
         }
 
-        keyboard = keyboard.row::<TelegramBotAdminUsersListAction>(vec![
-            TelegramBotAdminUsersListAction::Cancel,
-        ]);
+        keyboard = keyboard
+            .row::<TelegramBotAdminUsersListAction>(vec![TelegramBotAdminUsersListAction::Cancel]);
 
         bot.edit_message_text(chat_id, message_id, text)
             .parse_mode(ParseMode::Html)
@@ -143,6 +135,7 @@ fn role_display_name(role: &RoleName) -> &'static str {
         RoleName::Admin => "Админ",
         RoleName::Developer => "Разработчик",
         RoleName::QualityAssurance => "QA",
+        RoleName::ProductManager => "PR-менеджер",
     }
 }
 
@@ -261,7 +254,10 @@ async fn handle_user_menu(
 
     // If user_id == 0, we're in selection mode — parse from callback data
     if data.starts_with(USER_SELECT_PREFIX) {
-        let parsed_id: i32 = match data.strip_prefix(USER_SELECT_PREFIX).and_then(|s| s.parse().ok()) {
+        let parsed_id: i32 = match data
+            .strip_prefix(USER_SELECT_PREFIX)
+            .and_then(|s| s.parse().ok())
+        {
             Some(v) => v,
             None => {
                 dialogue.exit().await.ok();
@@ -562,15 +558,9 @@ async fn show_user_menu(
         .build();
 
     let keyboard = KeyboardBuilder::new()
-        .row::<TelegramBotAdminUserMenuAction>(vec![
-            TelegramBotAdminUserMenuAction::Toggle,
-        ])
-        .row::<TelegramBotAdminUserMenuAction>(vec![
-            TelegramBotAdminUserMenuAction::AssignRole,
-        ])
-        .row::<TelegramBotAdminUserMenuAction>(vec![
-            TelegramBotAdminUserMenuAction::RemoveRole,
-        ])
+        .row::<TelegramBotAdminUserMenuAction>(vec![TelegramBotAdminUserMenuAction::Toggle])
+        .row::<TelegramBotAdminUserMenuAction>(vec![TelegramBotAdminUserMenuAction::AssignRole])
+        .row::<TelegramBotAdminUserMenuAction>(vec![TelegramBotAdminUserMenuAction::RemoveRole])
         .build();
 
     dialogue

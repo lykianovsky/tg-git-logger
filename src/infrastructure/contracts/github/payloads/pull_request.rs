@@ -14,6 +14,8 @@ pub struct GithubPullRequestEvent {
     pub pull_request: GithubPullRequest,
     pub repository: GithubRepository,
     pub sender: GithubUser,
+    #[serde(default)]
+    pub requested_reviewer: Option<GithubUser>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -28,6 +30,8 @@ pub struct GithubPullRequest {
     pub user: GithubUser,
     pub assignee: Option<GithubUser>,
     pub assignees: Vec<GithubUser>,
+    #[serde(default)]
+    pub requested_reviewers: Vec<GithubUser>,
 
     pub created_at: String,
     pub updated_at: String,
@@ -37,6 +41,8 @@ pub struct GithubPullRequest {
     pub merge_commit_sha: Option<String>,
     pub merged: bool,
     pub merged_by: Option<GithubUser>,
+    #[serde(default)]
+    pub mergeable_state: Option<String>,
 
     pub commits: u64,
     pub additions: u64,
@@ -90,6 +96,7 @@ impl GithubEvent for GithubPullRequestEvent {
             repo: self.repository.full_name.clone(),
             repo_url: self.repository.html_url.clone(),
             title: pr.title.clone(),
+            body: pr.body.clone(),
             number: self.number,
             action: WebhookPullRequestEventActionType::from_str(self.action.as_str())
                 .unwrap_or(WebhookPullRequestEventActionType::Unknown),
@@ -111,6 +118,13 @@ impl GithubEvent for GithubPullRequestEvent {
             additions: pr.additions,
             deletions: pr.deletions,
             changed_files: pr.changed_files,
+            requested_reviewer: self.requested_reviewer.as_ref().map(|u| u.login.clone()),
+            requested_reviewers: pr
+                .requested_reviewers
+                .iter()
+                .map(|u| u.login.clone())
+                .collect(),
+            mergeable_state: pr.mergeable_state.clone(),
         }
     }
 }

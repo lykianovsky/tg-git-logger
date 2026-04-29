@@ -1,7 +1,18 @@
 use crate::domain::shared::date::range::DateRange;
 use crate::domain::version_control::value_objects::report::VersionControlDateRangeReport;
 use async_trait::async_trait;
+use chrono::{DateTime, Utc};
 use thiserror::Error;
+
+#[derive(Debug, Clone)]
+pub struct OpenPullRequestSummary {
+    pub number: u64,
+    pub title: String,
+    pub url: String,
+    pub author_login: String,
+    pub updated_at: DateTime<Utc>,
+    pub requested_reviewers: Vec<String>,
+}
 
 #[derive(Debug)]
 pub struct VersionControlClientGetUserResponse {
@@ -40,6 +51,24 @@ pub enum VersionControlClientBranchCheckError {
     Transport(String),
 }
 
+#[derive(Debug, Error)]
+pub enum VersionControlClientPostCommentError {
+    #[error("Unauthorized: {0}")]
+    Unauthorized(String),
+
+    #[error("Transport error: {0}")]
+    Transport(String),
+}
+
+#[derive(Debug, Error)]
+pub enum VersionControlClientListPullRequestsError {
+    #[error("Unauthorized: {0}")]
+    Unauthorized(String),
+
+    #[error("Transport error: {0}")]
+    Transport(String),
+}
+
 #[async_trait]
 pub trait VersionControlClient: Send + Sync {
     async fn get_user(
@@ -64,4 +93,20 @@ pub trait VersionControlClient: Send + Sync {
         repo: &str,
         branch: &str,
     ) -> Result<bool, VersionControlClientBranchCheckError>;
+
+    async fn post_pr_comment(
+        &self,
+        access_token: &str,
+        owner: &str,
+        repo: &str,
+        pr_number: u64,
+        body: &str,
+    ) -> Result<(), VersionControlClientPostCommentError>;
+
+    async fn list_open_pull_requests(
+        &self,
+        access_token: &str,
+        owner: &str,
+        repo: &str,
+    ) -> Result<Vec<OpenPullRequestSummary>, VersionControlClientListPullRequestsError>;
 }

@@ -34,7 +34,10 @@ impl CommandExecutor for GetAllUsersExecutor {
     type Response = GetAllUsersResponse;
     type Error = GetAllUsersExecutorError;
 
-    async fn execute(&self, _cmd: &GetAllUsersQuery) -> Result<GetAllUsersResponse, GetAllUsersExecutorError> {
+    async fn execute(
+        &self,
+        _cmd: &GetAllUsersQuery,
+    ) -> Result<GetAllUsersResponse, GetAllUsersExecutorError> {
         let users = self
             .user_repo
             .find_all()
@@ -44,11 +47,7 @@ impl CommandExecutor for GetAllUsersExecutor {
         let mut items = Vec::with_capacity(users.len());
 
         for user in &users {
-            let social = self
-                .user_socials_repo
-                .find_by_user_id(&user.id)
-                .await
-                .ok();
+            let social = self.user_socials_repo.find_by_user_id(&user.id).await.ok();
 
             let roles = self
                 .user_has_roles_repo

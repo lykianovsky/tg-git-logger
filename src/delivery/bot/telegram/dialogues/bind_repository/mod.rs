@@ -139,7 +139,11 @@ async fn handle_confirm_unbind(
     };
 
     if matches!(action, TelegramBotConfirmAction::No) {
-        bot.send_message(msg.chat().id, t!("telegram_bot.common.cancelled").to_string()).await?;
+        bot.send_message(
+            msg.chat().id,
+            t!("telegram_bot.common.cancelled").to_string(),
+        )
+        .await?;
         dialogue.exit().await.ok();
         return Ok(());
     }

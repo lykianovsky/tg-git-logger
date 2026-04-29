@@ -2,8 +2,7 @@ use crate::infrastructure::processing::worker::MessageBrokerWorker;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
-type WorkerFactory =
-    Box<dyn Fn(String) -> Box<dyn MessageBrokerWorker> + Send + Sync + 'static>;
+type WorkerFactory = Box<dyn Fn(String) -> Box<dyn MessageBrokerWorker> + Send + Sync + 'static>;
 
 struct WorkerHandle {
     name: String,

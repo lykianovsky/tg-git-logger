@@ -7,9 +7,9 @@ use crate::bootstrap::executors::ApplicationBoostrapExecutors;
 use crate::delivery::bot::telegram::dialogues::{
     TelegramBotDialogueState, TelegramBotDialogueType,
 };
+use crate::delivery::bot::telegram::keyboards::actions::TelegramBotKeyboardAction;
 use crate::delivery::bot::telegram::keyboards::actions::date_range::TelegramBotDateRangeAction;
 use crate::delivery::bot::telegram::keyboards::actions::for_who::TelegramBotForWhoAction;
-use crate::delivery::bot::telegram::keyboards::actions::TelegramBotKeyboardAction;
 use crate::delivery::bot::telegram::keyboards::builder::KeyboardBuilder;
 use crate::domain::repository::value_objects::repository_id::RepositoryId;
 use crate::domain::shared::command::CommandExecutor;
@@ -20,14 +20,14 @@ use chrono::NaiveDate;
 use std::error::Error;
 use std::sync::Arc;
 use teloxide::dispatching::{DpHandlerDescription, UpdateFilterExt};
-use teloxide::dptree::{case, Handler};
+use teloxide::dptree::{Handler, case};
 use teloxide::payloads::{EditMessageTextSetters, SendMessageSetters};
 use teloxide::prelude::{Requester, Update};
+use teloxide::types::ChatId;
 use teloxide::types::{
     CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message, ParseMode,
 };
-use teloxide::types::ChatId;
-use teloxide::{dptree, Bot};
+use teloxide::{Bot, dptree};
 
 #[derive(Debug, Clone, Default)]
 pub enum TelegramBotDialogueReportByDateRangeState {
@@ -190,8 +190,8 @@ async fn choose_for_who(
                 message_id,
                 t!("telegram_bot.dialogues.report.select_repository").to_string(),
             )
-                .reply_markup(keyboard)
-                .await?;
+            .reply_markup(keyboard)
+            .await?;
         }
     }
 
@@ -287,8 +287,8 @@ async fn enter_branch(
         msg.chat.id,
         t!("telegram_bot.dialogues.report.select_date_range").to_string(),
     )
-        .reply_markup(keyboard)
-        .await?;
+    .reply_markup(keyboard)
+    .await?;
 
     Ok(())
 }
@@ -351,8 +351,8 @@ async fn create_report_by_date_range(
         message_id,
         t!("telegram_bot.dialogues.report.loading").to_string(),
     )
-        .reply_markup(InlineKeyboardMarkup::default())
-        .await?;
+    .reply_markup(InlineKeyboardMarkup::default())
+    .await?;
 
     let cmd = BuildVersionControlDateRangeReportExecutorCommand {
         social_user_id: SocialUserId(query.from.id.0 as i32),
@@ -391,7 +391,10 @@ async fn execute_and_send_report(
             let text = MessageBuilder::new()
                 .line(t!("telegram_bot.dialogues.report.ready").as_ref())
                 .empty_line()
-                .link(t!("telegram_bot.dialogues.report.open_link").as_ref(), &response.report_url)
+                .link(
+                    t!("telegram_bot.dialogues.report.open_link").as_ref(),
+                    &response.report_url,
+                )
                 .build();
 
             bot.edit_message_text(chat_id, loading_message_id, text)
@@ -542,11 +545,13 @@ async fn enter_date_until(
 
     let date_range = DateRange::new(since_dt, until_dt);
 
-    let social_user_id =
-        SocialUserId(msg.from.as_ref().map(|u| u.id.0 as i32).unwrap_or_default());
+    let social_user_id = SocialUserId(msg.from.as_ref().map(|u| u.id.0 as i32).unwrap_or_default());
 
     let loading = bot
-        .send_message(msg.chat.id, t!("telegram_bot.dialogues.report.loading").to_string())
+        .send_message(
+            msg.chat.id,
+            t!("telegram_bot.dialogues.report.loading").to_string(),
+        )
         .await?;
 
     let cmd = BuildVersionControlDateRangeReportExecutorCommand {

@@ -26,11 +26,7 @@ pub struct WebhookPullRequestEventListener {
 }
 
 impl WebhookPullRequestEventListener {
-    async fn extract_task_id_and_column(
-        &self,
-        repo: &str,
-        title: &str,
-    ) -> Option<(TaskId, u64)> {
+    async fn extract_task_id_and_column(&self, repo: &str, title: &str) -> Option<(TaskId, u64)> {
         let mut parts = repo.splitn(2, '/');
         let (owner, name) = match (parts.next(), parts.next()) {
             (Some(o), Some(n)) => (o, n),
@@ -81,8 +77,9 @@ impl EventListener<WebhookPullRequestEvent> for WebhookPullRequestEventListener 
             .ok();
 
         if payload.merged && payload.action == WebhookPullRequestEventActionType::Closed {
-            if let Some((task_id, column_id)) =
-                self.extract_task_id_and_column(&payload.repo, &payload.title).await
+            if let Some((task_id, column_id)) = self
+                .extract_task_id_and_column(&payload.repo, &payload.title)
+                .await
             {
                 tracing::debug!(
                     task_id = %task_id.0,

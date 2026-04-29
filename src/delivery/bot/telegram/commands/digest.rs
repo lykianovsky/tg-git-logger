@@ -5,6 +5,8 @@ use crate::delivery::bot::telegram::dialogues::digest::TelegramBotDigestState;
 use crate::delivery::bot::telegram::dialogues::{
     TelegramBotDialogueState, TelegramBotDialogueType,
 };
+use crate::delivery::bot::telegram::keyboards::actions::TelegramBotKeyboardAction;
+use crate::delivery::bot::telegram::keyboards::actions::digest_list::TelegramBotDigestListAction;
 use crate::domain::digest::value_objects::digest_type::DigestType;
 use crate::domain::shared::command::CommandExecutor;
 use crate::domain::user::value_objects::social_user_id::SocialUserId;
@@ -12,8 +14,6 @@ use crate::utils::builder::message::MessageBuilder;
 use std::sync::Arc;
 use teloxide::payloads::SendMessageSetters;
 use teloxide::prelude::Requester;
-use crate::delivery::bot::telegram::keyboards::actions::TelegramBotKeyboardAction;
-use crate::delivery::bot::telegram::keyboards::actions::digest_list::TelegramBotDigestListAction;
 use teloxide::types::{InlineKeyboardButton, InlineKeyboardMarkup, ParseMode};
 
 pub struct TelegramBotDigestCommandHandler {
@@ -40,7 +40,13 @@ impl TelegramBotDigestCommandHandler {
 
         let query = GetUserDigestSubscriptionsQuery { social_user_id };
 
-        let subscriptions = match self.executors.queries.get_user_digest_subscriptions.execute(&query).await {
+        let subscriptions = match self
+            .executors
+            .queries
+            .get_user_digest_subscriptions
+            .execute(&query)
+            .await
+        {
             Ok(result) => result.subscriptions,
             Err(e) => {
                 tracing::error!(error = %e, "Failed to get digest subscriptions");

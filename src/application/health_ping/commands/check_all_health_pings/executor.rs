@@ -57,18 +57,17 @@ impl CheckAllHealthPingsExecutor {
         };
 
         for user_id in &admin_user_ids {
-            let social =
-                match self.user_socials_repo.find_by_user_id(user_id).await {
-                    Ok(s) => s,
-                    Err(e) => {
-                        tracing::error!(
-                            error = %e,
-                            user_id = user_id.0,
-                            "Failed to find social account for admin"
-                        );
-                        continue;
-                    }
-                };
+            let social = match self.user_socials_repo.find_by_user_id(user_id).await {
+                Ok(s) => s,
+                Err(e) => {
+                    tracing::error!(
+                        error = %e,
+                        user_id = user_id.0,
+                        "Failed to find social account for admin"
+                    );
+                    continue;
+                }
+            };
 
             let chat_id = SocialChatId(social.social_user_id.0 as i64);
 
@@ -92,10 +91,7 @@ impl CommandExecutor for CheckAllHealthPingsExecutor {
     type Response = CheckAllHealthPingsResponse;
     type Error = CheckAllHealthPingsExecutorError;
 
-    async fn execute(
-        &self,
-        _cmd: &Self::Command,
-    ) -> Result<Self::Response, Self::Error> {
+    async fn execute(&self, _cmd: &Self::Command) -> Result<Self::Response, Self::Error> {
         let pings = self.health_ping_repo.find_active_due().await?;
 
         let now = Utc::now();
@@ -112,8 +108,7 @@ impl CommandExecutor for CheckAllHealthPingsExecutor {
             updated_ping.last_error_message = result.error_message.clone();
             updated_ping.last_checked_at = Some(now);
 
-            let was_failing =
-                ping.last_status.as_deref() == Some("error");
+            let was_failing = ping.last_status.as_deref() == Some("error");
 
             if result.is_success {
                 // Recovery: was failing, now ok
@@ -160,10 +155,7 @@ impl CommandExecutor for CheckAllHealthPingsExecutor {
                 if !was_failing && ping.failed_since.is_none() {
                     updated_ping.failed_since = Some(now);
 
-                    let error_text = result
-                        .error_message
-                        .as_deref()
-                        .unwrap_or("unknown");
+                    let error_text = result.error_message.as_deref().unwrap_or("unknown");
 
                     let message = MessageBuilder::new()
                         .with_html_escape(true)

@@ -29,11 +29,7 @@ impl WorkersStatsProvider for BootstrapWorkersStatsProvider {
         for (queue_name, pool) in &self.pools {
             let active_workers = pool.lock().await.active_count();
 
-            let pending_messages = self
-                .broker
-                .queue_depth(queue_name)
-                .await
-                .unwrap_or(0);
+            let pending_messages = self.broker.queue_depth(queue_name).await.unwrap_or(0);
 
             result.push(QueueWorkerStats {
                 queue_name: queue_name.clone(),

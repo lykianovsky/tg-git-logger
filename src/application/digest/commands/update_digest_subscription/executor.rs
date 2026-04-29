@@ -23,10 +23,7 @@ impl CommandExecutor for UpdateDigestSubscriptionExecutor {
     type Error = UpdateDigestSubscriptionExecutorError;
 
     async fn execute(&self, cmd: &Self::Command) -> Result<Self::Response, Self::Error> {
-        let mut subscription = self
-            .digest_subscription_repo
-            .find_by_id(cmd.id)
-            .await?;
+        let mut subscription = self.digest_subscription_repo.find_by_id(cmd.id).await?;
 
         if let Some(is_active) = cmd.is_active {
             subscription.is_active = is_active;
@@ -40,9 +37,7 @@ impl CommandExecutor for UpdateDigestSubscriptionExecutor {
             subscription.send_minute = minute;
         }
 
-        self.digest_subscription_repo
-            .update(&subscription)
-            .await?;
+        self.digest_subscription_repo.update(&subscription).await?;
 
         Ok(UpdateDigestSubscriptionResponse)
     }

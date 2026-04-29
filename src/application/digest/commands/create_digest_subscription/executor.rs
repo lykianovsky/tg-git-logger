@@ -51,10 +51,7 @@ impl CommandExecutor for CreateDigestSubscriptionExecutor {
             updated_at: Utc::now(),
         };
 
-        let created = self
-            .digest_subscription_repo
-            .create(&subscription)
-            .await?;
+        let created = self.digest_subscription_repo.create(&subscription).await?;
 
         Ok(CreateDigestSubscriptionResponse {
             subscription: created,

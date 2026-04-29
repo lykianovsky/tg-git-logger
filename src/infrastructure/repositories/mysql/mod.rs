@@ -1,5 +1,9 @@
 pub mod digest_subscription;
 pub mod health_ping;
+pub mod notification_log;
+pub mod pending_notifications;
+pub mod pr_review;
+pub mod release_plan;
 pub mod repository;
 pub mod repository_pull_request;
 pub mod repository_task_tracker;
@@ -8,5 +12,6 @@ pub mod user;
 pub mod user_connection_repositories;
 pub mod user_has_roles;
 pub mod user_notifications;
+pub mod user_preferences;
 pub mod user_social_accounts;
 pub mod user_vc_accounts;

@@ -7,9 +7,7 @@ use crate::domain::health_ping::value_objects::health_ping_id::HealthPingId;
 use crate::infrastructure::database::mysql::entities::health_pings;
 use async_trait::async_trait;
 use chrono::Utc;
-use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set,
-};
+use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
 use std::sync::Arc;
 
 pub struct MySQLHealthPingRepository {
@@ -89,13 +87,11 @@ impl HealthPingRepository for MySQLHealthPingRepository {
         let due: Vec<HealthPing> = models
             .into_iter()
             .map(Self::from_mysql)
-            .filter(|p| {
-                match p.last_checked_at {
-                    None => true,
-                    Some(last) => {
-                        let elapsed = now.signed_duration_since(last);
-                        elapsed.num_minutes() >= p.interval_minutes as i64
-                    }
+            .filter(|p| match p.last_checked_at {
+                None => true,
+                Some(last) => {
+                    let elapsed = now.signed_duration_since(last);
+                    elapsed.num_minutes() >= p.interval_minutes as i64
                 }
             })
             .collect();

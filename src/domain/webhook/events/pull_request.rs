@@ -51,6 +51,8 @@ pub struct WebhookPullRequestEvent {
     pub repo: String,
     pub repo_url: Option<String>,
     pub title: String, // заголовок PR
+    #[serde(default)]
+    pub body: Option<String>, // тело PR
     pub number: u64,   // номер PR
     pub action: WebhookPullRequestEventActionType,
     pub merged: bool,
@@ -71,6 +73,12 @@ pub struct WebhookPullRequestEvent {
     pub additions: u64,
     pub deletions: u64,
     pub changed_files: u64,
+    #[serde(default)]
+    pub requested_reviewer: Option<String>, // login назначенного на ревью (только для action=ReviewRequested)
+    #[serde(default)]
+    pub requested_reviewers: Vec<String>, // все ожидающие ревьюеры на момент события
+    #[serde(default)]
+    pub mergeable_state: Option<String>, // GitHub: clean / dirty / unknown / blocked / behind / draft
 }
 
 impl WebhookEvent for WebhookPullRequestEvent {

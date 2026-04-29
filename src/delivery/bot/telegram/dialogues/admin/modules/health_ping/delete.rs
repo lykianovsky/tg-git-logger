@@ -1,9 +1,9 @@
 use crate::application::health_ping::commands::delete_health_ping::command::DeleteHealthPingCommand;
 use crate::bootstrap::executors::ApplicationBoostrapExecutors;
-use crate::delivery::bot::telegram::dialogues::admin::TelegramBotDialogueAdminState;
 use crate::delivery::bot::telegram::dialogues::TelegramBotDialogueType;
-use crate::delivery::bot::telegram::keyboards::actions::confirm::TelegramBotConfirmAction;
+use crate::delivery::bot::telegram::dialogues::admin::TelegramBotDialogueAdminState;
 use crate::delivery::bot::telegram::keyboards::actions::TelegramBotKeyboardAction;
+use crate::delivery::bot::telegram::keyboards::actions::confirm::TelegramBotConfirmAction;
 use crate::domain::health_ping::value_objects::health_ping_id::HealthPingId;
 use crate::domain::shared::command::CommandExecutor;
 use std::sync::Arc;
@@ -15,12 +15,9 @@ use teloxide::{Bot, dptree};
 pub struct TelegramBotDialogueAdminHealthPingDeleteDispatcher;
 
 impl TelegramBotDialogueAdminHealthPingDeleteDispatcher {
-    pub fn query_branches(
-    ) -> Handler<
-        'static,
-        Result<(), Box<dyn std::error::Error + Send + Sync>>,
-        DpHandlerDescription,
-    > {
+    pub fn query_branches()
+    -> Handler<'static, Result<(), Box<dyn std::error::Error + Send + Sync>>, DpHandlerDescription>
+    {
         dptree::entry().branch(
             case![TelegramBotDialogueAdminState::HealthPingDeleteConfirm { ping_id }]
                 .endpoint(handle_delete_confirm),
@@ -58,19 +55,14 @@ async fn handle_delete_confirm(
                 id: HealthPingId(ping_id),
             };
 
-            let reply =
-                match executors.commands.delete_health_ping.execute(&cmd).await {
-                    Ok(_) => {
-                        t!("telegram_bot.dialogues.admin.health_ping.deleted")
-                            .to_string()
-                    }
+            let reply = match executors.commands.delete_health_ping.execute(&cmd).await {
+                Ok(_) => t!("telegram_bot.dialogues.admin.health_ping.deleted").to_string(),
 
-                    Err(e) => {
-                        tracing::error!(error = %e, "Failed to delete health ping");
-                        t!("telegram_bot.dialogues.admin.health_ping.update_error")
-                            .to_string()
-                    }
-                };
+                Err(e) => {
+                    tracing::error!(error = %e, "Failed to delete health ping");
+                    t!("telegram_bot.dialogues.admin.health_ping.update_error").to_string()
+                }
+            };
 
             bot.send_message(msg.chat().id, reply).await?;
         }

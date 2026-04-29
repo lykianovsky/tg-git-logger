@@ -11,19 +11,36 @@ pub struct Model {
     pub owner: String,
     #[sea_orm(unique)]
     pub url: String,
-    pub social_chat_id: Option<i64>,
     pub created_at: DateTimeUtc,
     pub updated_at: DateTimeUtc,
+    pub social_chat_id: Option<i64>,
+    pub notifications_chat_id: Option<i64>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
+    #[sea_orm(has_many = "super::digest_subscriptions::Entity")]
+    DigestSubscriptions,
+    #[sea_orm(has_many = "super::release_plan_repositories::Entity")]
+    ReleasePlanRepositories,
     #[sea_orm(has_many = "super::repository_pull_requests::Entity")]
     RepositoryPullRequests,
     #[sea_orm(has_one = "super::repository_task_tracker::Entity")]
     RepositoryTaskTracker,
     #[sea_orm(has_many = "super::user_connection_repositories::Entity")]
     UserConnectionRepositories,
+}
+
+impl Related<super::digest_subscriptions::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::DigestSubscriptions.def()
+    }
+}
+
+impl Related<super::release_plan_repositories::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::ReleasePlanRepositories.def()
+    }
 }
 
 impl Related<super::repository_pull_requests::Entity> for Entity {
@@ -41,6 +58,19 @@ impl Related<super::repository_task_tracker::Entity> for Entity {
 impl Related<super::user_connection_repositories::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::UserConnectionRepositories.def()
+    }
+}
+
+impl Related<super::release_plans::Entity> for Entity {
+    fn to() -> RelationDef {
+        super::release_plan_repositories::Relation::ReleasePlans.def()
+    }
+    fn via() -> Option<RelationDef> {
+        Some(
+            super::release_plan_repositories::Relation::Repositories
+                .def()
+                .rev(),
+        )
     }
 }
 

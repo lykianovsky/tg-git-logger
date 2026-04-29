@@ -5,10 +5,15 @@ use crate::bootstrap::executors::ApplicationBoostrapExecutors;
 use crate::bootstrap::shared_dependency::ApplicationSharedDependency;
 use crate::config::application::ApplicationConfig;
 use crate::delivery::contract::ApplicationDelivery;
+use crate::delivery::events::listeners::github::webhook::pr_conflict::WebhookPrConflictDetectedListener;
+use crate::delivery::events::listeners::github::webhook::pr_mentions::WebhookPrMentionsListener;
+use crate::delivery::events::listeners::github::webhook::pr_opened_tag_reviewers::WebhookPrOpenedTagReviewersListener;
 use crate::delivery::events::listeners::github::webhook::pull_request::WebhookPullRequestEventListener;
 use crate::delivery::events::listeners::github::webhook::pull_request_review::WebhookPullRequestReviewEventListener;
 use crate::delivery::events::listeners::github::webhook::push::WebhookPushEventListener;
+use crate::delivery::events::listeners::github::webhook::re_review_nudge::WebhookPrReReviewNudgeListener;
 use crate::delivery::events::listeners::github::webhook::release::WebhookReleaseEventListener;
+use crate::delivery::events::listeners::github::webhook::review_requested::WebhookReviewRequestedDmListener;
 use crate::delivery::events::listeners::github::webhook::workflow::WebhookWorkflowEventListener;
 use crate::delivery::events::listeners::user::registration::failed::UserRegistrationFailedListener;
 use crate::delivery::events::listeners::user::registration::success::UserRegistrationSuccessListener;
@@ -83,13 +88,78 @@ impl ApplicationDelivery for DeliveryEventListeners {
             })
             .await;
 
-        // PR review DM notifications (approved / changes_requested)
+        // PR review: ЛС автору + короткое сообщение в групповой чат + запись в pr_reviews
         self.shared_dependency
             .event_bus
             .on(WebhookPullRequestReviewEventListener {
                 publisher: self.shared_dependency.publisher.clone(),
                 user_vc_accounts_repo: self.shared_dependency.user_version_controls_repo.clone(),
                 user_socials_repo: self.shared_dependency.user_socials_repo.clone(),
+                pr_review_repo: self.shared_dependency.pr_review_repo.clone(),
+                repository_repo: repository_repo.clone(),
+                default_chat_id,
+            })
+            .await;
+
+        // Re-review nudge: автор push'нул новые коммиты после ревью → пинг ревьюерам
+        self.shared_dependency
+            .event_bus
+            .on(WebhookPrReReviewNudgeListener {
+                publisher: self.shared_dependency.publisher.clone(),
+                pr_review_repo: self.shared_dependency.pr_review_repo.clone(),
+                notification_log_repo: self.shared_dependency.notification_log_repo.clone(),
+                user_vc_accounts_repo: self.shared_dependency.user_version_controls_repo.clone(),
+                user_socials_repo: self.shared_dependency.user_socials_repo.clone(),
+                dedup_hours: self.config.notifications.re_review_nudge_dedup_hours,
+            })
+            .await;
+
+        // Review requested DM (личное уведомление ревьюеру) + vacation handling
+        self.shared_dependency
+            .event_bus
+            .on(WebhookReviewRequestedDmListener {
+                publisher: self.shared_dependency.publisher.clone(),
+                user_vc_accounts_repo: self.shared_dependency.user_version_controls_repo.clone(),
+                user_socials_repo: self.shared_dependency.user_socials_repo.clone(),
+                user_preferences_repo: self.shared_dependency.user_preferences_repo.clone(),
+                user_has_roles_repo: self.shared_dependency.user_has_roles_repo.clone(),
+                version_control_client: self.shared_dependency.version_control_client.clone(),
+                reversible_cipher: self.shared_dependency.reversible_cipher.clone(),
+            })
+            .await;
+
+        // PR conflict detected → ЛС автору с dedup 24ч
+        self.shared_dependency
+            .event_bus
+            .on(WebhookPrConflictDetectedListener {
+                publisher: self.shared_dependency.publisher.clone(),
+                notification_log_repo: self.shared_dependency.notification_log_repo.clone(),
+                user_vc_accounts_repo: self.shared_dependency.user_version_controls_repo.clone(),
+                user_socials_repo: self.shared_dependency.user_socials_repo.clone(),
+            })
+            .await;
+
+        // Авто-теги ревьюеров в групповой чат при открытии PR
+        self.shared_dependency
+            .event_bus
+            .on(WebhookPrOpenedTagReviewersListener {
+                publisher: self.shared_dependency.publisher.clone(),
+                user_vc_accounts_repo: self.shared_dependency.user_version_controls_repo.clone(),
+                user_socials_repo: self.shared_dependency.user_socials_repo.clone(),
+                repository_repo: repository_repo.clone(),
+                default_chat_id,
+            })
+            .await;
+
+        // PR @-mentions: ЛС упомянутым + cc-тег в групповой чат
+        self.shared_dependency
+            .event_bus
+            .on(WebhookPrMentionsListener {
+                publisher: self.shared_dependency.publisher.clone(),
+                user_vc_accounts_repo: self.shared_dependency.user_version_controls_repo.clone(),
+                user_socials_repo: self.shared_dependency.user_socials_repo.clone(),
+                repository_repo: repository_repo.clone(),
+                default_chat_id,
             })
             .await;
 

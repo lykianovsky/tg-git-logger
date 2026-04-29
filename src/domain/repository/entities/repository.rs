@@ -9,9 +9,12 @@ pub struct Repository {
     pub name: String,
     pub owner: String,
     pub url: String,
-    /// Chat ID where webhook notifications for this repository are sent.
-    /// `None` means notifications fall back to the global `TELEGRAM_CHAT_ID`.
+    /// Chat ID where raw GitHub webhook notifications go (push / release / workflow / большая PR-карточка).
+    /// `None` means fallback to the global `TELEGRAM_CHAT_ID`.
     pub social_chat_id: Option<SocialChatId>,
+    /// Chat ID where curated team-relevant notifications go (теги ревьюеров, cc-mentions, approve, stale digest, релизы).
+    /// `None` means fallback to `social_chat_id`.
+    pub notifications_chat_id: Option<SocialChatId>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }

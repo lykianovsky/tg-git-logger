@@ -641,7 +641,13 @@ fn compute_best_day(commits: &[VersionControlDateRangeReportCommit]) -> String {
         .max_by_key(|(_, (_, n))| *n)
         .map(|(_, (label, n))| {
             let word = plural_commits(n);
-            t!("report.renderer.best_day", label = label, count = n, word = word).to_string()
+            t!(
+                "report.renderer.best_day",
+                label = label,
+                count = n,
+                word = word
+            )
+            .to_string()
         })
         .unwrap_or_else(|| "—".into())
 }
@@ -916,22 +922,26 @@ fn linkify_task(
 
 fn format_duration(seconds: f64) -> String {
     match seconds {
-        s if s < 60.0 => {
-            t!("report.renderer.duration_seconds", value = format!("{:.0}", s))
-                .to_string()
-        }
-        s if s < 3600.0 => {
-            t!("report.renderer.duration_minutes", value = format!("{:.0}", s / 60.0))
-                .to_string()
-        }
-        s if s < 86400.0 => {
-            t!("report.renderer.duration_hours", value = format!("{:.1}", s / 3600.0))
-                .to_string()
-        }
-        s => {
-            t!("report.renderer.duration_days", value = format!("{:.1}", s / 86400.0))
-                .to_string()
-        }
+        s if s < 60.0 => t!(
+            "report.renderer.duration_seconds",
+            value = format!("{:.0}", s)
+        )
+        .to_string(),
+        s if s < 3600.0 => t!(
+            "report.renderer.duration_minutes",
+            value = format!("{:.0}", s / 60.0)
+        )
+        .to_string(),
+        s if s < 86400.0 => t!(
+            "report.renderer.duration_hours",
+            value = format!("{:.1}", s / 3600.0)
+        )
+        .to_string(),
+        s => t!(
+            "report.renderer.duration_days",
+            value = format!("{:.1}", s / 86400.0)
+        )
+        .to_string(),
     }
 }
 
