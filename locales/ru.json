@@ -146,6 +146,7 @@
         "title": "🆕 PR открыт — ждёт ревью",
         "pr": "PR",
         "author": "Автор",
+        "repository": "Репозиторий",
         "reviewers": "Ревьюеры",
         "no_reviewers": "⚠️ не указаны",
         "open": "Открыть PR →"

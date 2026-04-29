@@ -68,6 +68,10 @@ impl EventListener<WebhookPullRequestEvent> for WebhookPrOpenedTagReviewersListe
                 &payload.author,
             )
             .section(
+                &t!("telegram_bot.notifications.pr_opened_tag.repository").to_string(),
+                &payload.repo,
+            )
+            .section(
                 &t!("telegram_bot.notifications.pr_opened_tag.reviewers").to_string(),
                 &reviewers_label,
             );
