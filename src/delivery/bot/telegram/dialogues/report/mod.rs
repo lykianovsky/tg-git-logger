@@ -133,7 +133,13 @@ async fn choose_for_who(
     };
 
     let social_user_id = SocialUserId(query.from.id.0 as i32);
-    let msg = query.message.unwrap();
+    let msg = match query.message {
+        Some(m) => m,
+        None => {
+            tracing::warn!("Callback without message in report (for_who)");
+            return Ok(());
+        }
+    };
     let chat_id = msg.chat().id;
     let message_id = msg.id();
 
@@ -215,7 +221,13 @@ async fn choose_repository(
         }
     };
 
-    let msg = query.message.unwrap();
+    let msg = match query.message {
+        Some(m) => m,
+        None => {
+            tracing::warn!("Callback without message in report (select_repo)");
+            return Ok(());
+        }
+    };
     let chat_id = msg.chat().id;
     let message_id = msg.id();
 
@@ -312,7 +324,13 @@ async fn create_report_by_date_range(
         }
     };
 
-    let msg = query.message.unwrap();
+    let msg = match query.message {
+        Some(m) => m,
+        None => {
+            tracing::warn!("Callback without message in report (date_range)");
+            return Ok(());
+        }
+    };
     let chat_id = msg.chat().id;
     let message_id = msg.id();
 

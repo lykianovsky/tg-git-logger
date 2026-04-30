@@ -151,6 +151,7 @@ impl ApplicationBoostrapExecutors {
                 config.kaiten.base.clone(),
                 config.base_url.clone(),
                 shared_dependency.cache.clone(),
+                config.secret.reversible_cipher_secret.clone(),
             )),
             get_user_roles_by_telegram_id: Arc::new(GetUserRolesByTelegramIdExecutor::new(
                 shared_dependency.user_repo.clone(),
