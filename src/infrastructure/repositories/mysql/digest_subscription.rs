@@ -7,7 +7,7 @@ use crate::domain::digest::value_objects::digest_subscription_id::DigestSubscrip
 use crate::domain::digest::value_objects::digest_type::DigestType;
 use crate::domain::repository::value_objects::repository_id::RepositoryId;
 use crate::domain::user::value_objects::user_id::UserId;
-use crate::infrastructure::database::mysql::entities::digest_subscriptions;
+use crate::infrastructure::database::mysql::entities::{digest_subscriptions, users};
 use async_trait::async_trait;
 use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
 use std::sync::Arc;
@@ -102,15 +102,21 @@ impl DigestSubscriptionRepository for MySQLDigestSubscriptionRepository {
         hour: i8,
         minute: i8,
     ) -> Result<Vec<DigestSubscription>, FindDigestSubscriptionError> {
-        let models = digest_subscriptions::Entity::find()
+        // JOIN users: подписки деактивированных юзеров (users.is_active = 0) пропускаем.
+        let rows = digest_subscriptions::Entity::find()
             .filter(digest_subscriptions::Column::IsActive.eq(1_i8))
             .filter(digest_subscriptions::Column::SendHour.eq(hour))
             .filter(digest_subscriptions::Column::SendMinute.eq(minute))
+            .find_also_related(users::Entity)
             .all(self.db.as_ref())
             .await
             .map_err(|e| FindDigestSubscriptionError::DbError(e.to_string()))?;
 
-        let subscriptions = models.into_iter().filter_map(Self::from_mysql).collect();
+        let subscriptions = rows
+            .into_iter()
+            .filter(|(_, user_opt)| matches!(user_opt, Some(u) if u.is_active != 0))
+            .filter_map(|(sub, _)| Self::from_mysql(sub))
+            .collect();
 
         Ok(subscriptions)
     }

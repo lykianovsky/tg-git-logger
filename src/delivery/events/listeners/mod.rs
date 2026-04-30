@@ -88,7 +88,7 @@ impl ApplicationDelivery for DeliveryEventListeners {
             })
             .await;
 
-        // PR review: ЛС автору + короткое сообщение в групповой чат + запись в pr_reviews
+        // PR review: ЛС автору + запись в pr_reviews
         self.shared_dependency
             .event_bus
             .on(WebhookPullRequestReviewEventListener {
@@ -96,8 +96,6 @@ impl ApplicationDelivery for DeliveryEventListeners {
                 user_vc_accounts_repo: self.shared_dependency.user_version_controls_repo.clone(),
                 user_socials_repo: self.shared_dependency.user_socials_repo.clone(),
                 pr_review_repo: self.shared_dependency.pr_review_repo.clone(),
-                repository_repo: repository_repo.clone(),
-                default_chat_id,
             })
             .await;
 
