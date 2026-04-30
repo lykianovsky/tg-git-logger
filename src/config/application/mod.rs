@@ -1,5 +1,5 @@
 use crate::config::environment::ENV;
-use chrono::NaiveTime;
+use chrono::{NaiveTime, Weekday};
 use chrono_tz::Tz;
 
 pub struct ApplicationNotificationsConfig {
@@ -8,6 +8,11 @@ pub struct ApplicationNotificationsConfig {
     pub default_timezone: Tz,
     pub re_review_nudge_dedup_hours: i64,
     pub stale_threshold_hours: i64,
+}
+
+pub struct ApplicationReleasePlanConfig {
+    pub default_call_weekday: Weekday,
+    pub default_call_time: NaiveTime,
 }
 
 pub struct ApplicationTaskTrackerConfig {
@@ -74,6 +79,7 @@ pub struct ApplicationConfig {
     pub kaiten: ApplicationKaitenConfig,
     pub task_tracker: ApplicationTaskTrackerConfig,
     pub notifications: ApplicationNotificationsConfig,
+    pub release_plan: ApplicationReleasePlanConfig,
 }
 
 impl ApplicationConfig {
@@ -90,6 +96,7 @@ impl ApplicationConfig {
         let kaiten = Self::build_kaiten_config();
         let task_tracker = Self::build_task_tracker_config();
         let notifications = Self::build_notifications_config();
+        let release_plan = Self::build_release_plan_config();
 
         Self {
             port,
@@ -104,6 +111,7 @@ impl ApplicationConfig {
             kaiten,
             task_tracker,
             notifications,
+            release_plan,
         }
     }
 
@@ -240,6 +248,33 @@ impl ApplicationConfig {
             default_timezone,
             re_review_nudge_dedup_hours,
             stale_threshold_hours,
+        }
+    }
+
+    pub fn build_release_plan_config() -> ApplicationReleasePlanConfig {
+        let weekday_str = ENV
+            .get_or("RELEASE_PLAN_DEFAULT_CALL_WEEKDAY", "monday")
+            .to_lowercase();
+        let default_call_weekday = match weekday_str.as_str() {
+            "monday" | "mon" => Weekday::Mon,
+            "tuesday" | "tue" => Weekday::Tue,
+            "wednesday" | "wed" => Weekday::Wed,
+            "thursday" | "thu" => Weekday::Thu,
+            "friday" | "fri" => Weekday::Fri,
+            "saturday" | "sat" => Weekday::Sat,
+            "sunday" | "sun" => Weekday::Sun,
+            other => panic!("Invalid RELEASE_PLAN_DEFAULT_CALL_WEEKDAY: {}", other),
+        };
+
+        let default_call_time = NaiveTime::parse_from_str(
+            &ENV.get_or("RELEASE_PLAN_DEFAULT_CALL_TIME", "16:00"),
+            "%H:%M",
+        )
+        .unwrap();
+
+        ApplicationReleasePlanConfig {
+            default_call_weekday,
+            default_call_time,
         }
     }
 }

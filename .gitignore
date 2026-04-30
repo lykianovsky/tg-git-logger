@@ -2,3 +2,4 @@
 /target
 /migration/target
 .env.local
+.claude/settings.local.json

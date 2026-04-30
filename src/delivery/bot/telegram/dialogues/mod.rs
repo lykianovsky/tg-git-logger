@@ -5,6 +5,7 @@ use crate::delivery::bot::telegram::dialogues::notifications::TelegramBotNotific
 use crate::delivery::bot::telegram::dialogues::onboarding::TelegramBotOnboardingState;
 use crate::delivery::bot::telegram::dialogues::registration::TelegramBotDialogueRegistrationState;
 use crate::delivery::bot::telegram::dialogues::release_plan::TelegramBotReleasePlanState;
+use crate::delivery::bot::telegram::dialogues::release_plan_settings::TelegramBotReleasePlanSettingsState;
 use crate::delivery::bot::telegram::dialogues::report::TelegramBotDialogueReportByDateRangeState;
 use crate::delivery::bot::telegram::dialogues::setup_notifications::TelegramBotSetupNotificationsState;
 use crate::delivery::bot::telegram::dialogues::setup_webhook::TelegramBotSetupWebhookState;
@@ -19,6 +20,7 @@ pub mod notifications;
 pub mod onboarding;
 pub mod registration;
 pub mod release_plan;
+pub mod release_plan_settings;
 pub mod report;
 pub mod setup_notifications;
 pub mod setup_webhook;
@@ -37,6 +39,7 @@ pub enum TelegramBotDialogueState {
     Notifications(TelegramBotNotificationsState),
     Onboarding(TelegramBotOnboardingState),
     ReleasePlan(TelegramBotReleasePlanState),
+    ReleasePlanSettings(TelegramBotReleasePlanSettingsState),
 }
 
 pub type TelegramBotDialogueType =

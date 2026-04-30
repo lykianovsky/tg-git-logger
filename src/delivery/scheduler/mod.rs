@@ -1,7 +1,10 @@
 use crate::application::digest::commands::send_due_digests::command::SendDueDigestsCommand;
 use crate::application::health_ping::commands::check_all_health_pings::command::CheckAllHealthPingsCommand;
 use crate::application::notification::commands::flush_pending_notifications::command::FlushPendingNotificationsExecutorCommand;
+use crate::application::notification::commands::scan_pr_conflicts::command::ScanPrConflictsExecutorCommand;
 use crate::application::notification::commands::scan_stale_pull_requests::command::ScanStalePullRequestsExecutorCommand;
+use crate::application::release_plan::commands::send_call_reminders::command::SendCallRemindersExecutorCommand;
+use crate::application::release_plan::commands::send_release_day_reminders::command::SendReleaseDayRemindersExecutorCommand;
 use crate::bootstrap::executors::ApplicationBoostrapExecutors;
 use crate::config::application::ApplicationConfig;
 use crate::delivery::contract::ApplicationDelivery;
@@ -166,6 +169,100 @@ impl ApplicationDelivery for DeliveryScheduler {
             )
             .await
             .expect("JobScheduler failed to add stale PR job");
+
+        // PR conflict scan — каждые 30 минут
+        let conflict_executors = self.executors.clone();
+        scheduler
+            .add(
+                Job::new_async("0 */30 * * * *", move |_uuid, _lock| {
+                    let executors = conflict_executors.clone();
+                    Box::pin(async move {
+                        match executors
+                            .commands
+                            .scan_pr_conflicts
+                            .execute(&ScanPrConflictsExecutorCommand)
+                            .await
+                        {
+                            Ok(r) if r.conflicts_count > 0 => {
+                                tracing::info!(
+                                    repos = r.repos_scanned,
+                                    conflicts = r.conflicts_count,
+                                    "PR conflict notifications sent"
+                                );
+                            }
+                            Err(e) => {
+                                tracing::error!(error = %e, "PR conflict scan failed");
+                            }
+                            _ => {}
+                        }
+                    })
+                })
+                .expect("PR conflict scan job create error"),
+            )
+            .await
+            .expect("JobScheduler failed to add PR conflict scan job");
+
+        // Release day reminder — каждый день в 10:00 МСК (07:00 UTC)
+        let release_day_executors = self.executors.clone();
+        scheduler
+            .add(
+                Job::new_async("0 0 7 * * *", move |_uuid, _lock| {
+                    let executors = release_day_executors.clone();
+                    Box::pin(async move {
+                        match executors
+                            .commands
+                            .send_release_day_reminders
+                            .execute(&SendReleaseDayRemindersExecutorCommand)
+                            .await
+                        {
+                            Ok(r) if r.sent_count > 0 => {
+                                tracing::info!(
+                                    sent = r.sent_count,
+                                    "Release day reminders sent"
+                                );
+                            }
+                            Err(e) => {
+                                tracing::error!(error = %e, "Release day reminders failed");
+                            }
+                            _ => {}
+                        }
+                    })
+                })
+                .expect("Release day reminder job create error"),
+            )
+            .await
+            .expect("JobScheduler failed to add release day reminder job");
+
+        // Call reminder — каждые 15 минут (в т.ч. в :00, :15, :30, :45)
+        let call_reminder_executors = self.executors.clone();
+        scheduler
+            .add(
+                Job::new_async("0 */15 * * * *", move |_uuid, _lock| {
+                    let executors = call_reminder_executors.clone();
+                    Box::pin(async move {
+                        match executors
+                            .commands
+                            .send_call_reminders
+                            .execute(&SendCallRemindersExecutorCommand)
+                            .await
+                        {
+                            Ok(r) if r.sent_count > 0 => {
+                                tracing::info!(
+                                    sent = r.sent_count,
+                                    "Release call reminders sent"
+                                );
+                            }
+                            Err(e) => {
+                                tracing::error!(error = %e, "Release call reminders failed");
+                            }
+                            _ => {}
+                        }
+                    })
+                })
+                .expect("Call reminder job create error"),
+            )
+            .await
+            .expect("JobScheduler failed to add call reminder job");
 
         scheduler.start().await.expect("JobScheduler start failed");
 

@@ -21,6 +21,7 @@ pub mod notifications_snooze;
 pub mod notifications_vacation;
 pub mod onboarding;
 pub mod release_plan;
+pub mod release_plan_settings;
 
 pub trait TelegramBotKeyboardAction {
     fn to_callback_data(&self) -> &str;

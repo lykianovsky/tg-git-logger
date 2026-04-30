@@ -14,6 +14,7 @@ use crate::delivery::bot::telegram::dialogues::notifications::TelegramBotNotific
 use crate::delivery::bot::telegram::dialogues::onboarding::TelegramBotOnboardingDispatcher;
 use crate::delivery::bot::telegram::dialogues::registration::TelegramBotDialogueRegistrationDispatcher;
 use crate::delivery::bot::telegram::dialogues::release_plan::TelegramBotReleasePlanDispatcher;
+use crate::delivery::bot::telegram::dialogues::release_plan_settings::TelegramBotReleasePlanSettingsDispatcher;
 use crate::delivery::bot::telegram::dialogues::report::TelegramBotDialogueReportByDateRangeDispatcher;
 use crate::delivery::bot::telegram::dialogues::setup_notifications::TelegramBotSetupNotificationsDispatcher;
 use crate::delivery::bot::telegram::dialogues::setup_webhook::TelegramBotSetupWebhookDispatcher;
@@ -100,6 +101,10 @@ impl ApplicationDelivery for DeliveryBotMessengerTelegram {
             .branch(
                 case![TelegramBotDialogueState::ReleasePlan(state)]
                     .branch(TelegramBotReleasePlanDispatcher::new()),
+            )
+            .branch(
+                case![TelegramBotDialogueState::ReleasePlanSettings(state)]
+                    .branch(TelegramBotReleasePlanSettingsDispatcher::new()),
             );
 
         Dispatcher::builder(bot, handler)
