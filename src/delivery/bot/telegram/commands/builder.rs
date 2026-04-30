@@ -6,6 +6,8 @@ use crate::delivery::bot::telegram::commands::digest::TelegramBotDigestCommandHa
 use crate::delivery::bot::telegram::commands::notifications::TelegramBotNotificationsCommandHandler;
 use crate::delivery::bot::telegram::commands::register::TelegramBotRegisterCommandHandler;
 use crate::delivery::bot::telegram::commands::release_plan::TelegramBotReleasePlanCommandHandler;
+use crate::delivery::bot::telegram::commands::releases::TelegramBotReleasesCommandHandler;
+use crate::delivery::bot::telegram::commands::whoami::TelegramBotWhoamiCommandHandler;
 use crate::delivery::bot::telegram::commands::report::TelegramBotVersionControlReportCommandHandler;
 use crate::delivery::bot::telegram::commands::setup::TelegramBotSetupCommandHandler;
 use crate::delivery::bot::telegram::commands::setup_notifications::TelegramBotSetupNotificationsCommandHandler;
@@ -69,6 +71,12 @@ pub enum TelegramBotCommand {
 
     #[command(rename = "release_plan", description = "Создать план релиза")]
     ReleasePlan,
+
+    #[command(description = "Список запланированных релизов")]
+    Releases,
+
+    #[command(description = "Мой профиль и настройки")]
+    Whoami,
 }
 
 pub async fn handle(
@@ -245,6 +253,22 @@ pub async fn handle(
 
         TelegramBotCommand::ReleasePlan => {
             TelegramBotReleasePlanCommandHandler::new(context.bot, context.msg, Arc::new(dialogue))
+                .execute()
+                .await?;
+        }
+
+        TelegramBotCommand::Releases => {
+            TelegramBotReleasesCommandHandler::new(
+                context,
+                executors.clone(),
+                Arc::new(dialogue),
+            )
+            .execute()
+            .await?;
+        }
+
+        TelegramBotCommand::Whoami => {
+            TelegramBotWhoamiCommandHandler::new(context, executors.clone())
                 .execute()
                 .await?;
         }

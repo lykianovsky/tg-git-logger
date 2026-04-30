@@ -3,7 +3,7 @@ use crate::domain::release_plan::entities::release_plan::{
 };
 use crate::domain::release_plan::value_objects::release_plan_id::ReleasePlanId;
 use crate::domain::release_plan::value_objects::release_plan_status::ReleasePlanStatus;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -35,10 +35,37 @@ pub trait ReleasePlanRepository: Send + Sync {
 
     async fn find_active(&self) -> Result<Vec<ReleasePlan>, FindReleasePlanError>;
 
+    async fn find_upcoming(
+        &self,
+        from_date: NaiveDate,
+    ) -> Result<Vec<ReleasePlan>, FindReleasePlanError>;
+
+    async fn find_due_for_release_day_reminder(
+        &self,
+        today: NaiveDate,
+    ) -> Result<Vec<ReleasePlan>, FindReleasePlanError>;
+
+    async fn find_due_for_call_reminder(
+        &self,
+        from: DateTime<Utc>,
+        to: DateTime<Utc>,
+    ) -> Result<Vec<ReleasePlan>, FindReleasePlanError>;
+
     async fn set_status(
         &self,
         id: ReleasePlanId,
         status: ReleasePlanStatus,
+    ) -> Result<(), UpdateReleasePlanError>;
+
+    async fn update_fields(
+        &self,
+        plan: &ReleasePlan,
+    ) -> Result<ReleasePlan, UpdateReleasePlanError>;
+
+    async fn set_repositories(
+        &self,
+        id: ReleasePlanId,
+        repository_ids: Vec<crate::domain::repository::value_objects::repository_id::RepositoryId>,
     ) -> Result<(), UpdateReleasePlanError>;
 
     async fn mark_notified(

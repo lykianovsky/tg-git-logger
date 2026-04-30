@@ -11,9 +11,9 @@ use crate::domain::user::value_objects::social_chat_id::SocialChatId;
 use crate::domain::user::value_objects::user_id::UserId;
 use crate::infrastructure::database::mysql::entities::{release_plan_repositories, release_plans};
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set,
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder, Set,
     TransactionTrait,
 };
 use std::sync::Arc;
@@ -132,6 +132,78 @@ impl ReleasePlanRepository for MySQLReleasePlanRepository {
         Ok(result)
     }
 
+    async fn find_upcoming(
+        &self,
+        from_date: NaiveDate,
+    ) -> Result<Vec<ReleasePlan>, FindReleasePlanError> {
+        let models = release_plans::Entity::find()
+            .filter(release_plans::Column::Status.eq("planned"))
+            .filter(release_plans::Column::PlannedDate.gte(from_date))
+            .order_by_asc(release_plans::Column::PlannedDate)
+            .all(self.db.as_ref())
+            .await
+            .map_err(|e| FindReleasePlanError::DbError(e.to_string()))?;
+
+        let mut result = Vec::with_capacity(models.len());
+        for model in models {
+            let repo_ids = self
+                .load_repository_ids(model.id)
+                .await
+                .map_err(|e| FindReleasePlanError::DbError(e.to_string()))?;
+            result.push(Self::from_mysql(model, repo_ids));
+        }
+        Ok(result)
+    }
+
+    async fn find_due_for_release_day_reminder(
+        &self,
+        today: NaiveDate,
+    ) -> Result<Vec<ReleasePlan>, FindReleasePlanError> {
+        let models = release_plans::Entity::find()
+            .filter(release_plans::Column::Status.eq("planned"))
+            .filter(release_plans::Column::PlannedDate.eq(today))
+            .filter(release_plans::Column::NotifiedReleaseDayAt.is_null())
+            .all(self.db.as_ref())
+            .await
+            .map_err(|e| FindReleasePlanError::DbError(e.to_string()))?;
+
+        let mut result = Vec::with_capacity(models.len());
+        for model in models {
+            let repo_ids = self
+                .load_repository_ids(model.id)
+                .await
+                .map_err(|e| FindReleasePlanError::DbError(e.to_string()))?;
+            result.push(Self::from_mysql(model, repo_ids));
+        }
+        Ok(result)
+    }
+
+    async fn find_due_for_call_reminder(
+        &self,
+        from: DateTime<Utc>,
+        to: DateTime<Utc>,
+    ) -> Result<Vec<ReleasePlan>, FindReleasePlanError> {
+        let models = release_plans::Entity::find()
+            .filter(release_plans::Column::Status.eq("planned"))
+            .filter(release_plans::Column::CallDatetime.is_not_null())
+            .filter(release_plans::Column::CallDatetime.gte(from))
+            .filter(release_plans::Column::CallDatetime.lte(to))
+            .filter(release_plans::Column::NotifiedCallAt.is_null())
+            .all(self.db.as_ref())
+            .await
+            .map_err(|e| FindReleasePlanError::DbError(e.to_string()))?;
+
+        let mut result = Vec::with_capacity(models.len());
+        for model in models {
+            let repo_ids = self
+                .load_repository_ids(model.id)
+                .await
+                .map_err(|e| FindReleasePlanError::DbError(e.to_string()))?;
+            result.push(Self::from_mysql(model, repo_ids));
+        }
+        Ok(result)
+    }
+
     async fn set_status(
         &self,
         id: ReleasePlanId,
@@ -146,6 +218,68 @@ impl ReleasePlanRepository for MySQLReleasePlanRepository {
         active.status = Set(status.as_str().to_string());
         active
             .update(self.db.as_ref())
+            .await
+            .map_err(|e| UpdateReleasePlanError::DbError(e.to_string()))?;
+        Ok(())
+    }
+
+    async fn update_fields(
+        &self,
+        plan: &ReleasePlan,
+    ) -> Result<ReleasePlan, UpdateReleasePlanError> {
+        let model = release_plans::Entity::find_by_id(plan.id.0)
+            .one(self.db.as_ref())
+            .await
+            .map_err(|e| UpdateReleasePlanError::DbError(e.to_string()))?
+            .ok_or_else(|| UpdateReleasePlanError::DbError("Not found".to_string()))?;
+
+        let mut active: release_plans::ActiveModel = model.into();
+        active.planned_date = Set(plan.planned_date);
+        active.call_datetime = Set(plan.call_datetime);
+        active.meeting_url = Set(plan.meeting_url.clone());
+        active.note = Set(plan.note.clone());
+        active.announce_chat_id = Set(plan.announce_chat_id.map(|c| c.0));
+
+        let updated = active
+            .update(self.db.as_ref())
+            .await
+            .map_err(|e| UpdateReleasePlanError::DbError(e.to_string()))?;
+
+        let repo_ids = self
+            .load_repository_ids(updated.id)
+            .await
+            .map_err(|e| UpdateReleasePlanError::DbError(e.to_string()))?;
+        Ok(Self::from_mysql(updated, repo_ids))
+    }
+
+    async fn set_repositories(
+        &self,
+        id: ReleasePlanId,
+        repository_ids: Vec<RepositoryId>,
+    ) -> Result<(), UpdateReleasePlanError> {
+        let txn = self
+            .db
+            .begin()
+            .await
+            .map_err(|e| UpdateReleasePlanError::DbError(e.to_string()))?;
+
+        release_plan_repositories::Entity::delete_many()
+            .filter(release_plan_repositories::Column::ReleasePlanId.eq(id.0))
+            .exec(&txn)
+            .await
+            .map_err(|e| UpdateReleasePlanError::DbError(e.to_string()))?;
+
+        for repo_id in &repository_ids {
+            let link = release_plan_repositories::ActiveModel {
+                release_plan_id: Set(id.0),
+                repository_id: Set(repo_id.0),
+            };
+            link.insert(&txn)
+                .await
+                .map_err(|e| UpdateReleasePlanError::DbError(e.to_string()))?;
+        }
+
+        txn.commit()
             .await
             .map_err(|e| UpdateReleasePlanError::DbError(e.to_string()))?;
         Ok(())

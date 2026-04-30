@@ -5,6 +5,8 @@ pub mod digest;
 pub mod notifications;
 pub mod register;
 pub mod release_plan;
+pub mod releases;
+pub mod whoami;
 pub mod report;
 pub mod setup;
 pub mod setup_notifications;

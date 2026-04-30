@@ -35,22 +35,46 @@ impl NotificationService for TelegramNotificationClient {
             ));
         }
 
-        self.bot
+        let started_at = std::time::Instant::now();
+
+        let result = self
+            .bot
             .send_message(ChatId(chat_id.0), message.to_string())
             .parse_mode(ParseMode::Html)
-            .await
-            .map_err(|e| {
+            .await;
+
+        let elapsed = started_at.elapsed().as_secs_f64();
+
+        match result {
+            Ok(_) => {
+                crate::infrastructure::metrics::registry::METRICS
+                    .telegram_send_total
+                    .with_label_values(&["success"])
+                    .inc();
+                crate::infrastructure::metrics::registry::METRICS
+                    .telegram_send_duration_seconds
+                    .with_label_values(&["success"])
+                    .observe(elapsed);
+                tracing::debug!(chat_id = chat_id.0, "Telegram notification sent");
+                Ok(())
+            }
+            Err(e) => {
+                crate::infrastructure::metrics::registry::METRICS
+                    .telegram_send_total
+                    .with_label_values(&["fail"])
+                    .inc();
+                crate::infrastructure::metrics::registry::METRICS
+                    .telegram_send_duration_seconds
+                    .with_label_values(&["fail"])
+                    .observe(elapsed);
                 tracing::error!(
                     error = %e,
                     chat_id = chat_id.0,
                     "Failed to send Telegram notification"
                 );
-                NotificationServiceSendError::Transport(e.to_string())
-            })?;
-
-        tracing::debug!(chat_id = chat_id.0, "Telegram notification sent");
-
-        Ok(())
+                Err(NotificationServiceSendError::Transport(e.to_string()))
+            }
+        }
     }
 
     async fn delete_message(

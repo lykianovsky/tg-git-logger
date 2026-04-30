@@ -16,6 +16,7 @@ impl JobConsumer for MoveTaskToTestJobConsumer {
         MoveTaskToTestJob::NAME
     }
 
+    #[tracing::instrument(name = "job.move_task_to_test", skip(self, payload))]
     async fn run(&self, payload: &[u8]) -> Result<JobConsumerResponse, JobConsumerError> {
         let payload: MoveTaskToTestJob = serde_json::from_slice(payload)
             .map_err(|e| JobConsumerError::DeserializationError(e.to_string()))?;

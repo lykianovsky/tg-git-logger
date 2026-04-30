@@ -1,0 +1,151 @@
+{
+  "annotations": {"list": []},
+  "editable": false,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "fieldConfig": {"defaults": {"unit": "short"}},
+      "gridPos": {"h": 6, "w": 6, "x": 0, "y": 0},
+      "id": 1,
+      "type": "stat",
+      "title": "Active release plans",
+      "targets": [{"expr": "release_plans_active_total"}]
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "fieldConfig": {"defaults": {"unit": "short"}},
+      "gridPos": {"h": 6, "w": 6, "x": 6, "y": 0},
+      "id": 2,
+      "type": "stat",
+      "title": "Releases today",
+      "targets": [{"expr": "release_plans_today_total"}]
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "fieldConfig": {"defaults": {"unit": "short"}},
+      "gridPos": {"h": 6, "w": 6, "x": 12, "y": 0},
+      "id": 3,
+      "type": "stat",
+      "title": "Repositories",
+      "targets": [{"expr": "repositories_total"}]
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "fieldConfig": {"defaults": {"unit": "short"}},
+      "gridPos": {"h": 6, "w": 6, "x": 18, "y": 0},
+      "id": 4,
+      "type": "stat",
+      "title": "Users on vacation",
+      "targets": [{"expr": "users_on_vacation_total"}]
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 6},
+      "id": 5,
+      "type": "timeseries",
+      "title": "GitHub webhook events / minute",
+      "targets": [
+        {"expr": "sum by (event_type) (rate(webhook_received_total[5m])) * 60", "legendFormat": "{{event_type}}"}
+      ]
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 6},
+      "id": 6,
+      "type": "timeseries",
+      "title": "Telegram sends / minute",
+      "targets": [
+        {"expr": "sum by (status) (rate(telegram_send_total[5m])) * 60", "legendFormat": "{{status}}"}
+      ]
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 14},
+      "id": 7,
+      "type": "timeseries",
+      "title": "RabbitMQ jobs / minute",
+      "targets": [
+        {"expr": "sum by (queue, status) (rate(job_processed_total[5m])) * 60", "legendFormat": "{{queue}} / {{status}}"}
+      ]
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "fieldConfig": {"defaults": {"unit": "s"}},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 14},
+      "id": 8,
+      "type": "timeseries",
+      "title": "Job processing latency P95",
+      "targets": [
+        {"expr": "histogram_quantile(0.95, sum by (queue, le) (rate(job_processing_duration_seconds_bucket[5m])))", "legendFormat": "{{queue}}"}
+      ]
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "fieldConfig": {"defaults": {"unit": "s"}},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 22},
+      "id": 9,
+      "type": "timeseries",
+      "title": "HTTP latency P50/P95/P99",
+      "targets": [
+        {"expr": "histogram_quantile(0.50, sum by (route, le) (rate(http_request_duration_seconds_bucket[5m])))", "legendFormat": "P50 {{route}}"},
+        {"expr": "histogram_quantile(0.95, sum by (route, le) (rate(http_request_duration_seconds_bucket[5m])))", "legendFormat": "P95 {{route}}"},
+        {"expr": "histogram_quantile(0.99, sum by (route, le) (rate(http_request_duration_seconds_bucket[5m])))", "legendFormat": "P99 {{route}}"}
+      ]
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 22},
+      "id": 10,
+      "type": "timeseries",
+      "title": "Errors / minute",
+      "targets": [
+        {"expr": "sum by (module, kind) (rate(errors_total[5m])) * 60", "legendFormat": "{{module}} / {{kind}}"}
+      ]
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 30},
+      "id": 11,
+      "type": "timeseries",
+      "title": "Health pings status",
+      "targets": [
+        {"expr": "health_ping_status", "legendFormat": "{{service}}"}
+      ]
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 30},
+      "id": 12,
+      "type": "timeseries",
+      "title": "Webhook signature failures",
+      "targets": [
+        {"expr": "sum by (source) (rate(webhook_signature_invalid_total[5m])) * 60", "legendFormat": "{{source}}"}
+      ]
+    },
+    {
+      "datasource": {"type": "loki", "uid": "Loki"},
+      "gridPos": {"h": 10, "w": 24, "x": 0, "y": 38},
+      "id": 13,
+      "type": "logs",
+      "title": "Recent errors (Loki)",
+      "targets": [
+        {"expr": "{container=\"giteye-bot\", level=\"ERROR\"}"}
+      ]
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "style": "dark",
+  "tags": ["giteye"],
+  "templating": {"list": []},
+  "time": {"from": "now-1h", "to": "now"},
+  "timepicker": {},
+  "timezone": "",
+  "title": "GitEye Bot Overview",
+  "uid": "giteye-overview",
+  "version": 1
+}

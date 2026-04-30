@@ -24,6 +24,11 @@ impl CommandExecutor for CreateReleasePlanExecutor {
     type Response = CreateReleasePlanExecutorResponse;
     type Error = CreateReleasePlanExecutorError;
 
+    #[tracing::instrument(
+        name = "create_release_plan",
+        skip_all,
+        fields(planned_date = %cmd.planned_date, repos = cmd.repository_ids.len())
+    )]
     async fn execute(&self, cmd: &Self::Command) -> Result<Self::Response, Self::Error> {
         let creator_social = self
             .user_socials_repo

@@ -1,0 +1,86 @@
+use crate::infrastructure::contracts::github::headers::GithubHeaders;
+use axum::body::{Body, Bytes, to_bytes};
+use axum::http::StatusCode;
+use axum::{extract::Request, middleware::Next, response::Response};
+use hmac::Hmac;
+use sha2::Sha256;
+use sha2::digest::Mac;
+
+pub struct GithubWebhookAuthorizationMiddleware {
+    secret: String,
+}
+
+type HmacSha256 = Hmac<Sha256>;
+
+impl GithubWebhookAuthorizationMiddleware {
+    pub fn new(secret: String) -> Self {
+        Self { secret }
+    }
+
+    pub async fn handle(self, request: Request<Body>, next: Next) -> Result<Response, StatusCode> {
+        if self.secret == "" {
+            return Ok(next.run(request).await);
+        }
+
+        let signature = request
+            .headers()
+            .get(GithubHeaders::SIGNATURE_256)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("");
+
+        let signature = signature.strip_prefix("sha256=").unwrap_or(signature);
+
+        let signature_bytes = match hex::decode(signature) {
+            Ok(bytes) => bytes,
+            Err(err) => {
+                tracing::error!(error = ?err, "Invalid hex in GitHub signature: {}", signature);
+                crate::infrastructure::metrics::registry::METRICS
+                    .webhook_signature_invalid_total
+                    .with_label_values(&["github"])
+                    .inc();
+                return Err(StatusCode::FORBIDDEN);
+            }
+        };
+
+        let mut hmac = match HmacSha256::new_from_slice(self.secret.as_bytes()) {
+            Ok(hmac) => hmac,
+            Err(err) => {
+                tracing::error!(error = ?err, "Failed to create HMAC with secret");
+                return Err(StatusCode::FORBIDDEN);
+            }
+        };
+
+        let (parts, body) = request.into_parts();
+
+        let payload: Bytes = match to_bytes(body, usize::MAX).await {
+            Ok(bytes) => bytes,
+            Err(err) => {
+                tracing::error!(error = ?err, "Failed to convert request body to bytes");
+                return Err(StatusCode::FORBIDDEN);
+            }
+        };
+
+        hmac.update(&*payload);
+
+        let verified = match hmac.verify_slice(&signature_bytes) {
+            Ok(_) => true,
+            Err(e) => {
+                tracing::error!(error = ?e, "GitHub webhook signature verification failed");
+                false
+            }
+        };
+
+        if !verified {
+            crate::infrastructure::metrics::registry::METRICS
+                .webhook_signature_invalid_total
+                .with_label_values(&["github"])
+                .inc();
+            return Err(StatusCode::FORBIDDEN);
+        }
+
+        let body = Body::from(payload);
+        let request = Request::from_parts(parts, body);
+
+        Ok(next.run(request).await)
+    }
+}

@@ -16,7 +16,13 @@ use crate::application::notification::commands::buffer_notification::executor::B
 use crate::application::notification::commands::flush_pending_notifications::executor::FlushPendingNotificationsExecutor;
 use crate::application::notification::commands::scan_stale_pull_requests::executor::ScanStalePullRequestsExecutor;
 use crate::application::notification::commands::send_social_notify::executor::SendSocialNotifyExecutor;
+use crate::application::release_plan::commands::cancel_release_plan::executor::CancelReleasePlanExecutor;
+use crate::application::release_plan::commands::complete_release_plan::executor::CompleteReleasePlanExecutor;
 use crate::application::release_plan::commands::create_release_plan::executor::CreateReleasePlanExecutor;
+use crate::application::release_plan::commands::send_call_reminders::executor::SendCallRemindersExecutor;
+use crate::application::release_plan::commands::send_release_day_reminders::executor::SendReleaseDayRemindersExecutor;
+use crate::application::release_plan::commands::update_release_plan::executor::UpdateReleasePlanExecutor;
+use crate::application::release_plan::queries::get_upcoming_release_plans::executor::GetUpcomingReleasePlansExecutor;
 use crate::application::repository::commands::create_repository::executor::CreateRepositoryExecutor;
 use crate::application::repository::commands::create_repository_task_tracker::executor::CreateRepositoryTaskTrackerExecutor;
 use crate::application::repository::commands::delete_repository::executor::DeleteRepositoryExecutor;
@@ -37,6 +43,7 @@ use crate::application::user::commands::toggle_user_active::executor::ToggleUser
 use crate::application::user::commands::unbind_repository::executor::UnbindRepositoryExecutor;
 use crate::application::user::queries::get_all_users::executor::GetAllUsersExecutor;
 use crate::application::user::queries::get_user_bound_repositories::executor::GetUserBoundRepositoriesExecutor;
+use crate::application::user::queries::get_user_overview::executor::GetUserOverviewExecutor;
 use crate::application::user::queries::get_user_roles_by_telegram_id::executor::GetUserRolesByTelegramIdExecutor;
 use crate::application::user_preferences::commands::update_user_preferences::executor::UpdateUserPreferencesExecutor;
 use crate::application::user_preferences::queries::get_user_preferences::executor::GetUserPreferencesExecutor;
@@ -61,6 +68,8 @@ pub struct ApplicationBoostrapExecutorsQueries {
     pub get_all_health_pings: Arc<GetAllHealthPingsExecutor>,
     pub get_all_users: Arc<GetAllUsersExecutor>,
     pub get_user_preferences: Arc<GetUserPreferencesExecutor>,
+    pub get_upcoming_release_plans: Arc<GetUpcomingReleasePlansExecutor>,
+    pub get_user_overview: Arc<GetUserOverviewExecutor>,
 }
 
 pub struct ApplicationBoostrapExecutorsCommands {
@@ -103,6 +112,11 @@ pub struct ApplicationBoostrapExecutorsCommands {
     pub scan_stale_pull_requests: Arc<ScanStalePullRequestsExecutor>,
 
     pub create_release_plan: Arc<CreateReleasePlanExecutor>,
+    pub update_release_plan: Arc<UpdateReleasePlanExecutor>,
+    pub cancel_release_plan: Arc<CancelReleasePlanExecutor>,
+    pub complete_release_plan: Arc<CompleteReleasePlanExecutor>,
+    pub send_release_day_reminders: Arc<SendReleaseDayRemindersExecutor>,
+    pub send_call_reminders: Arc<SendCallRemindersExecutor>,
 }
 
 pub struct ApplicationBoostrapExecutors {
@@ -165,6 +179,19 @@ impl ApplicationBoostrapExecutors {
             get_user_preferences: Arc::new(GetUserPreferencesExecutor::new(
                 shared_dependency.user_socials_repo.clone(),
                 shared_dependency.user_preferences_repo.clone(),
+            )),
+
+            get_upcoming_release_plans: Arc::new(GetUpcomingReleasePlansExecutor::new(
+                shared_dependency.release_plan_repo.clone(),
+            )),
+
+            get_user_overview: Arc::new(GetUserOverviewExecutor::new(
+                shared_dependency.user_socials_repo.clone(),
+                shared_dependency.user_has_roles_repo.clone(),
+                shared_dependency.user_version_controls_repo.clone(),
+                shared_dependency.user_preferences_repo.clone(),
+                shared_dependency.user_connection_repositories_repo.clone(),
+                shared_dependency.repository_repo.clone(),
             )),
         };
 
@@ -344,6 +371,31 @@ impl ApplicationBoostrapExecutors {
                 release_plan_repo: shared_dependency.release_plan_repo.clone(),
                 user_socials_repo: shared_dependency.user_socials_repo.clone(),
                 repository_repo: shared_dependency.repository_repo.clone(),
+                publisher: shared_dependency.publisher.clone(),
+            }),
+
+            update_release_plan: Arc::new(UpdateReleasePlanExecutor {
+                release_plan_repo: shared_dependency.release_plan_repo.clone(),
+            }),
+
+            cancel_release_plan: Arc::new(CancelReleasePlanExecutor {
+                release_plan_repo: shared_dependency.release_plan_repo.clone(),
+                user_socials_repo: shared_dependency.user_socials_repo.clone(),
+                publisher: shared_dependency.publisher.clone(),
+            }),
+
+            complete_release_plan: Arc::new(CompleteReleasePlanExecutor {
+                release_plan_repo: shared_dependency.release_plan_repo.clone(),
+            }),
+
+            send_release_day_reminders: Arc::new(SendReleaseDayRemindersExecutor {
+                release_plan_repo: shared_dependency.release_plan_repo.clone(),
+                repository_repo: shared_dependency.repository_repo.clone(),
+                publisher: shared_dependency.publisher.clone(),
+            }),
+
+            send_call_reminders: Arc::new(SendCallRemindersExecutor {
+                release_plan_repo: shared_dependency.release_plan_repo.clone(),
                 publisher: shared_dependency.publisher.clone(),
             }),
         };

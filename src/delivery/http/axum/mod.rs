@@ -5,10 +5,12 @@ use crate::bootstrap::executors::ApplicationBoostrapExecutors;
 use crate::bootstrap::shared_dependency::ApplicationSharedDependency;
 use crate::config::application::ApplicationConfig;
 use crate::delivery::contract::ApplicationDelivery;
+use crate::delivery::http::axum::controllers::metrics::AxumMetricsController;
 use crate::delivery::http::axum::controllers::oauth::github::AxumOAuthGithubController;
 use crate::delivery::http::axum::controllers::report::AxumReportController;
 use crate::delivery::http::axum::controllers::webhook::github::AxumWebhookGithubController;
 use crate::delivery::http::axum::middlewares::GithubWebhookAuthorizationMiddleware;
+use crate::delivery::http::axum::middlewares::metrics::http_metrics_middleware;
 use axum::routing::post;
 use axum::{Extension, Router, routing::get};
 use std::sync::Arc;
@@ -64,9 +66,11 @@ impl DeliveryHttpServerAxum {
 
         Router::new()
             .route("/ping", get(|| async { "PONG" }))
+            .route("/metrics", get(AxumMetricsController::handle_get))
             .route("/report/{token}", get(AxumReportController::handle_get))
             .nest("/oauth", oauth_routes)
             .nest("/webhook", webhook_routes)
+            .layer(axum::middleware::from_fn(http_metrics_middleware))
             .layer(Extension(config.clone()))
             .layer(Extension(shared_dependency.clone()))
     }
