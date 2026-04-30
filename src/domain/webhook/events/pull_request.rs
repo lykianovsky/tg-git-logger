@@ -100,17 +100,22 @@ impl WebhookEvent for WebhookPullRequestEvent {
             "🟢 Открыт"
         };
 
-        let _short_merge_commit = self
-            .merge_commit
-            .as_deref()
-            .map(|h| &h[..7.min(h.len())])
-            .unwrap_or("-");
-
-        let assignees = if self.assignees.is_empty() {
+        let assignees_text = if self.assignees.is_empty() {
             "—".to_string()
         } else {
-            self.assignees.join(", ")
+            self.assignees
+                .iter()
+                .map(|a| MessageBuilder::escape_html(a))
+                .collect::<Vec<_>>()
+                .join(", ")
         };
+
+        let safe_author = MessageBuilder::escape_html(&self.author);
+        let safe_title = MessageBuilder::escape_html(&self.title);
+        let safe_head_repo = MessageBuilder::escape_html(&self.head_repo);
+        let safe_base_repo = MessageBuilder::escape_html(&self.base_repo);
+        let safe_source = MessageBuilder::escape_html(&self.source);
+        let safe_repo = MessageBuilder::escape_html(&self.repo);
 
         // ── Заголовок ──────────────────────────────────────
         let mut builder = MessageBuilder::new()
@@ -119,8 +124,8 @@ impl WebhookEvent for WebhookPullRequestEvent {
 
         // ── PR инфо ────────────────────────────────────────
         builder = builder
-            .section_bold("👤 Автор", &self.author)
-            .section("📝 Заголовок", &self.title)
+            .section_bold("👤 Автор", &safe_author)
+            .section("📝 Заголовок", &safe_title)
             .empty_line();
 
         // ── Временные метки ────────────────────────────────
@@ -140,7 +145,7 @@ impl WebhookEvent for WebhookPullRequestEvent {
                 "🔀 Ветки",
                 &format!(
                     "<code>{}</code> → <code>{}</code>",
-                    self.head_repo, self.base_repo
+                    safe_head_repo, safe_base_repo
                 ),
             )
             .empty_line();
@@ -149,7 +154,7 @@ impl WebhookEvent for WebhookPullRequestEvent {
         builder = builder.section("📌 Состояние", state_label);
 
         if let Some(merged_by) = &self.merged_by {
-            builder = builder.section_bold("🎉 Смёржил", merged_by);
+            builder = builder.section_bold("🎉 Смёржил", &MessageBuilder::escape_html(merged_by));
         }
 
         if let Some(commit) = &self.merge_commit {
@@ -158,8 +163,8 @@ impl WebhookEvent for WebhookPullRequestEvent {
         }
 
         builder = builder
-            .section("👥 Назначены", &assignees)
-            .section_bold("⚡️ Инициатор", &self.source)
+            .section("👥 Назначены", &assignees_text)
+            .section_bold("⚡️ Инициатор", &safe_source)
             .empty_line();
 
         // ── Статистика ─────────────────────────────────────
@@ -176,20 +181,30 @@ impl WebhookEvent for WebhookPullRequestEvent {
 
         // ── Ссылки ─────────────────────────────────────────
         if let Some(url) = &self.pr_url {
-            builder = builder.section(
-                "🔗 Pull Request",
-                &format!("<a href=\"{}\">Перейти →</a>", url),
-            );
+            let trimmed = url.trim();
+            if trimmed.starts_with("http://") || trimmed.starts_with("https://") {
+                builder = builder.section(
+                    "🔗 Pull Request",
+                    &format!(
+                        "<a href=\"{}\">Перейти →</a>",
+                        MessageBuilder::escape_html(trimmed)
+                    ),
+                );
+            }
         }
 
         match &self.repo_url {
-            Some(url) => {
+            Some(url) if url.trim().starts_with("http://") || url.trim().starts_with("https://") => {
                 builder = builder.section(
                     "📦 Репозиторий",
-                    &format!("<a href=\"{}\">{}</a>", url, self.repo),
+                    &format!(
+                        "<a href=\"{}\">{}</a>",
+                        MessageBuilder::escape_html(url.trim()),
+                        safe_repo
+                    ),
                 )
             }
-            None => builder = builder.section("📦 Репозиторий", &self.repo),
+            _ => builder = builder.section("📦 Репозиторий", &safe_repo),
         }
 
         builder.build()

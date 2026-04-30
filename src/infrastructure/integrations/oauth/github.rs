@@ -28,7 +28,7 @@ impl OAuthClient for GithubOAuthClient {
         &self,
         code: &str,
     ) -> Result<OAuthClientExchangeCodeResponse, OAuthClientExchangeCodeError> {
-        tracing::info!("Starting verification github user with code: {code}");
+        tracing::debug!("Starting GitHub OAuth code exchange");
 
         let resp = self
             .client
@@ -43,19 +43,14 @@ impl OAuthClient for GithubOAuthClient {
             .await
             .map_err(|e| OAuthClientExchangeCodeError::Transport(e.to_string()))?;
 
-        // Сначала читаем как текст
         let body_text = resp
             .text()
             .await
             .map_err(|e| OAuthClientExchangeCodeError::Transport(e.to_string()))?;
 
-        tracing::debug!("GitHub OAuth response body: {}", body_text);
-
-        Ok(
-            serde_json::from_str::<OAuthClientExchangeCodeResponse>(&body_text).map_err(|e| {
-                tracing::error!("Failed to parse GitHub OAuth response: {}", e);
-                OAuthClientExchangeCodeError::Transport(e.to_string())
-            })?,
-        )
+        serde_json::from_str::<OAuthClientExchangeCodeResponse>(&body_text).map_err(|e| {
+            tracing::error!(error = %e, "Failed to parse GitHub OAuth response");
+            OAuthClientExchangeCodeError::Transport(e.to_string())
+        })
     }
 }

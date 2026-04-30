@@ -67,7 +67,7 @@ impl KaitenClient {
     {
         let url = format!("{}/api/latest{}", self.base.0, path);
 
-        tracing::info!("{}", url);
+        tracing::debug!(method = %method, path = %path, "Kaiten API request");
 
         let mut req = self
             .client
@@ -76,10 +76,6 @@ impl KaitenClient {
             .header("Content-Type", "application/json");
 
         if let Some(body) = body {
-            tracing::debug!(
-                "Request body: {}",
-                serde_json::to_string(body).unwrap_or_default()
-            );
             req = req.json(body);
         }
 
@@ -88,8 +84,7 @@ impl KaitenClient {
         let status = resp.status();
         let text = resp.text().await?;
 
-        tracing::debug!("Response status: {}", status);
-        tracing::debug!("Response body: {}", text);
+        tracing::debug!(status = %status, path = %path, body_len = text.len(), "Kaiten API response");
 
         if status == reqwest::StatusCode::NOT_FOUND {
             return Err(format!("Not found: {}", path).into());
@@ -122,8 +117,6 @@ impl TaskTrackerClient for KaitenClient {
             response_column_id = response.column_id
         );
         let _enter = span.enter();
-
-        tracing::debug!("MoveCard response: {:?}", response);
 
         if response.column_id != column_id {
             tracing::error!(

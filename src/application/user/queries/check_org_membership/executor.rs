@@ -2,6 +2,7 @@ use crate::application::user::queries::check_org_membership::error::CheckOrgMemb
 use crate::application::user::queries::check_org_membership::query::CheckOrgMembershipQuery;
 use crate::application::user::queries::check_org_membership::response::CheckOrgMembershipResponse;
 use crate::domain::shared::command::CommandExecutor;
+use crate::domain::user::repositories::user_repository::{FindUserByIdError, UserRepository};
 use crate::domain::user::repositories::user_social_accounts_repository::{
     FindSocialServiceByIdError, UserSocialAccountsRepository,
 };
@@ -15,6 +16,7 @@ use std::sync::Arc;
 const CACHE_TTL_SECS: u64 = 300;
 
 pub struct CheckOrgMembershipExecutor {
+    pub user_repo: Arc<dyn UserRepository>,
     pub user_socials_repo: Arc<dyn UserSocialAccountsRepository>,
     pub user_vc_accounts_repo: Arc<dyn UserVersionControlAccountsRepository>,
     pub version_control_client: Arc<dyn VersionControlClient>,
@@ -36,14 +38,6 @@ impl CommandExecutor for CheckOrgMembershipExecutor {
     type Error = CheckOrgMembershipError;
 
     async fn execute(&self, cmd: &Self::Command) -> Result<Self::Response, Self::Error> {
-        let Some(org) = self.required_organization.as_deref().filter(|s| !s.is_empty()) else {
-            return Ok(CheckOrgMembershipResponse::Allowed);
-        };
-
-        if cmd.social_user_id == self.admin_social_user_id {
-            return Ok(CheckOrgMembershipResponse::Allowed);
-        }
-
         let social = match self
             .user_socials_repo
             .find_by_social_user_id(&cmd.social_user_id)
@@ -57,6 +51,28 @@ impl CommandExecutor for CheckOrgMembershipExecutor {
                 return Err(CheckOrgMembershipError::DbError(msg));
             }
         };
+
+        match self.user_repo.find_by_id(social.user_id).await {
+            Ok(user) => {
+                if !user.is_active {
+                    return Ok(CheckOrgMembershipResponse::Deactivated);
+                }
+            }
+            Err(FindUserByIdError::NotFound) => {
+                return Ok(CheckOrgMembershipResponse::Deactivated);
+            }
+            Err(FindUserByIdError::DbError(msg)) => {
+                return Err(CheckOrgMembershipError::DbError(msg));
+            }
+        }
+
+        let Some(org) = self.required_organization.as_deref().filter(|s| !s.is_empty()) else {
+            return Ok(CheckOrgMembershipResponse::Allowed);
+        };
+
+        if cmd.social_user_id == self.admin_social_user_id {
+            return Ok(CheckOrgMembershipResponse::Allowed);
+        }
 
         let key = Self::cache_key(&cmd.social_user_id, org);
 

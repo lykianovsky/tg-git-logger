@@ -78,9 +78,20 @@ impl MessageBuilder {
     }
 
     pub fn link(mut self, text: &str, url: &str) -> Self {
+        let safe_url = Self::sanitize_url(url);
+        let safe_text = Self::escape_html(text);
         self.parts
-            .push(format!("<a href=\"{}\">{}</a>\n", url, text));
+            .push(format!("<a href=\"{}\">{}</a>\n", safe_url, safe_text));
         self
+    }
+
+    fn sanitize_url(url: &str) -> String {
+        let trimmed = url.trim();
+        if trimmed.starts_with("http://") || trimmed.starts_with("https://") {
+            Self::escape_html(trimmed)
+        } else {
+            "#".to_string()
+        }
     }
 
     pub fn emoji(mut self, emoji: &str) -> Self {

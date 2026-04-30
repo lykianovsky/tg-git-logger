@@ -5,22 +5,26 @@ use crate::domain::shared::command::CommandExecutor;
 use crate::domain::user::repositories::user_has_roles_repository::{
     GetAllUserRolesError, UserHasRolesRepository,
 };
+use crate::domain::user::repositories::user_repository::{FindUserByIdError, UserRepository};
 use crate::domain::user::repositories::user_social_accounts_repository::{
     FindSocialServiceByIdError, UserSocialAccountsRepository,
 };
 use std::sync::Arc;
 
 pub struct GetUserRolesByTelegramIdExecutor {
+    pub user_repo: Arc<dyn UserRepository>,
     pub user_socials_repo: Arc<dyn UserSocialAccountsRepository>,
     pub user_has_roles_repo: Arc<dyn UserHasRolesRepository>,
 }
 
 impl GetUserRolesByTelegramIdExecutor {
     pub fn new(
+        user_repo: Arc<dyn UserRepository>,
         user_socials_repo: Arc<dyn UserSocialAccountsRepository>,
         user_has_roles_repo: Arc<dyn UserHasRolesRepository>,
     ) -> Self {
         Self {
+            user_repo,
             user_socials_repo,
             user_has_roles_repo,
         }
@@ -43,6 +47,19 @@ impl CommandExecutor for GetUserRolesByTelegramIdExecutor {
                     GetUserRolesByTelegramIdError::DbError(msg)
                 }
             })?;
+
+        let user = self
+            .user_repo
+            .find_by_id(social.user_id)
+            .await
+            .map_err(|e| match e {
+                FindUserByIdError::NotFound => GetUserRolesByTelegramIdError::UserNotFound,
+                FindUserByIdError::DbError(msg) => GetUserRolesByTelegramIdError::DbError(msg),
+            })?;
+
+        if !user.is_active {
+            return Err(GetUserRolesByTelegramIdError::UserNotFound);
+        }
 
         let roles = self
             .user_has_roles_repo

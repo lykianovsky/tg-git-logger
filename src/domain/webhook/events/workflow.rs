@@ -50,25 +50,26 @@ impl WebhookEvent for WebhookWorkflowEvent {
         };
 
         let short_sha = &self.head_sha[..7.min(self.head_sha.len())];
+        let safe_repo = MessageBuilder::escape_html(&self.repo);
 
         // ── Заголовок ──────────────────────────────────────
         let mut builder = MessageBuilder::new().bold(title).empty_line();
 
         // ── Основная инфо ──────────────────────────────────
         builder = builder
-            .section_bold("⚙️ Workflow", &self.name)
+            .section_bold("⚙️ Workflow", &MessageBuilder::escape_html(&self.name))
             .section("🔢 Запуск", &format!("<b>#{}</b>", self.run_number));
 
         if let Some(actor) = &self.actor {
-            builder = builder.section_bold("👤 Инициатор", actor);
+            builder = builder.section_bold("👤 Инициатор", &MessageBuilder::escape_html(actor));
         }
 
         builder = builder.empty_line();
 
         // ── Коммит и ветка ─────────────────────────────────
         builder = builder
-            .section_code("🌿 Ветка", &self.head_branch)
-            .section_code("🔐 Коммит", short_sha)
+            .section_code("🌿 Ветка", &MessageBuilder::escape_html(&self.head_branch))
+            .section_code("🔐 Коммит", &MessageBuilder::escape_html(short_sha))
             .empty_line();
 
         // ── Статус ─────────────────────────────────────────
@@ -101,20 +102,30 @@ impl WebhookEvent for WebhookWorkflowEvent {
 
         // ── Ссылки ─────────────────────────────────────────
         if let Some(url) = &self.html_url {
-            builder = builder.section(
-                "🔗 Workflow",
-                &format!("<a href=\"{}\">Просмотреть →</a>", url),
-            );
+            let trimmed = url.trim();
+            if trimmed.starts_with("http://") || trimmed.starts_with("https://") {
+                builder = builder.section(
+                    "🔗 Workflow",
+                    &format!(
+                        "<a href=\"{}\">Просмотреть →</a>",
+                        MessageBuilder::escape_html(trimmed)
+                    ),
+                );
+            }
         }
 
         match &self.repo_url {
-            Some(url) => {
+            Some(url) if url.trim().starts_with("http://") || url.trim().starts_with("https://") => {
                 builder = builder.section(
                     "📦 Репозиторий",
-                    &format!("<a href=\"{}\">{}</a>", url, self.repo),
+                    &format!(
+                        "<a href=\"{}\">{}</a>",
+                        MessageBuilder::escape_html(url.trim()),
+                        safe_repo
+                    ),
                 )
             }
-            None => builder = builder.section("📦 Репозиторий", &self.repo),
+            _ => builder = builder.section("📦 Репозиторий", &safe_repo),
         }
 
         builder.build()

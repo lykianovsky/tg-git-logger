@@ -27,10 +27,22 @@ pub struct WebhookPrCommentEvent {
 
 impl WebhookEvent for WebhookPrCommentEvent {
     fn build_text(&self) -> String {
+        let comment_url_trimmed = self.comment_url.trim();
+        let comment_link = if comment_url_trimmed.starts_with("http://")
+            || comment_url_trimmed.starts_with("https://")
+        {
+            format!(
+                "<a href=\"{}\">Открыть комментарий →</a>",
+                MessageBuilder::escape_html(comment_url_trimmed)
+            )
+        } else {
+            "—".to_string()
+        };
+
         MessageBuilder::new()
             .bold("💬 Новый комментарий к вашему PR")
             .empty_line()
-            .section_bold("👤 От", &self.commenter)
+            .section_bold("👤 От", &MessageBuilder::escape_html(&self.commenter))
             .section(
                 "📝 PR",
                 &format!(
@@ -39,15 +51,12 @@ impl WebhookEvent for WebhookPrCommentEvent {
                     MessageBuilder::escape_html(&self.pr_title),
                 ),
             )
-            .section("📦 Репозиторий", &self.repo)
+            .section("📦 Репозиторий", &MessageBuilder::escape_html(&self.repo))
             .empty_line()
             .bold("Комментарий:")
             .line(&MessageBuilder::escape_html(&self.comment_body))
             .empty_line()
-            .section(
-                "🔗 Перейти",
-                &format!("<a href=\"{}\">Открыть комментарий →</a>", self.comment_url),
-            )
+            .section("🔗 Перейти", &comment_link)
             .build()
     }
 }

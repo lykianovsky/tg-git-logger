@@ -153,6 +153,7 @@ impl ApplicationBoostrapExecutors {
                 shared_dependency.cache.clone(),
             )),
             get_user_roles_by_telegram_id: Arc::new(GetUserRolesByTelegramIdExecutor::new(
+                shared_dependency.user_repo.clone(),
                 shared_dependency.user_socials_repo.clone(),
                 shared_dependency.user_has_roles_repo.clone(),
             )),
@@ -221,6 +222,7 @@ impl ApplicationBoostrapExecutors {
             )),
 
             check_org_membership: Arc::new(CheckOrgMembershipExecutor {
+                user_repo: shared_dependency.user_repo.clone(),
                 user_socials_repo: shared_dependency.user_socials_repo.clone(),
                 user_vc_accounts_repo: shared_dependency.user_version_controls_repo.clone(),
                 version_control_client: shared_dependency.version_control_client.clone(),

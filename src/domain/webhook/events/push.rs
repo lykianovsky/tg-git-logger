@@ -44,24 +44,31 @@ impl WebhookEvent for WebhookPushEvent {
 
         let short_before = &self.before[..7.min(self.before.len())];
         let short_after = &self.after[..7.min(self.after.len())];
+        let safe_repo = MessageBuilder::escape_html(&self.repo);
 
         // ── Заголовок ──────────────────────────────────────
         let mut builder = MessageBuilder::new().bold(title).empty_line();
 
         // ── Основная инфо ──────────────────────────────────
-        builder = builder.section_bold("👤 Автор", &self.source);
+        builder = builder.section_bold("👤 Автор", &MessageBuilder::escape_html(&self.source));
 
         match &self.repo_url {
-            Some(url) => {
+            Some(url) if url.trim().starts_with("http://") || url.trim().starts_with("https://") => {
                 builder = builder.section(
                     "📦 Репозиторий",
-                    &format!("<a href=\"{}\">{}</a>", url, self.repo),
+                    &format!(
+                        "<a href=\"{}\">{}</a>",
+                        MessageBuilder::escape_html(url.trim()),
+                        safe_repo
+                    ),
                 )
             }
-            None => builder = builder.section("📦 Репозиторий", &self.repo),
+            _ => builder = builder.section("📦 Репозиторий", &safe_repo),
         }
 
-        builder = builder.section_code("🌿 Ветка", branch).empty_line();
+        builder = builder
+            .section_code("🌿 Ветка", &MessageBuilder::escape_html(branch))
+            .empty_line();
 
         // ── Коммиты ────────────────────────────────────────
         builder = builder.section("🔢 Коммитов", &format!("<b>{}</b>", self.commits.len()));
@@ -70,7 +77,8 @@ impl WebhookEvent for WebhookPushEvent {
             "🔀 Изменения",
             &format!(
                 "<code>{}</code> → <code>{}</code>",
-                short_before, short_after
+                MessageBuilder::escape_html(short_before),
+                MessageBuilder::escape_html(short_after)
             ),
         );
 
@@ -83,12 +91,16 @@ impl WebhookEvent for WebhookPushEvent {
             let max = 5;
             for commit in self.commits.iter().take(max) {
                 let short_hash = &commit.id[..7.min(commit.id.len())];
-                let author = commit.author.as_str();
-                let message = commit.message.lines().next().unwrap_or("");
+                let safe_author = MessageBuilder::escape_html(commit.author.as_str());
+                let safe_message = MessageBuilder::escape_html(
+                    commit.message.lines().next().unwrap_or(""),
+                );
 
                 builder = builder.line(&format!(
                     "├ <code>{}</code> <i>({})</i>\n│   {}",
-                    short_hash, author, message
+                    MessageBuilder::escape_html(short_hash),
+                    safe_author,
+                    safe_message
                 ));
             }
 
@@ -104,10 +116,16 @@ impl WebhookEvent for WebhookPushEvent {
 
         // ── Ссылки ─────────────────────────────────────────
         if let Some(url) = &self.compare_url {
-            builder = builder.section(
-                "🔗 Compare",
-                &format!("<a href=\"{}\">Просмотреть изменения →</a>", url),
-            );
+            let trimmed = url.trim();
+            if trimmed.starts_with("http://") || trimmed.starts_with("https://") {
+                builder = builder.section(
+                    "🔗 Compare",
+                    &format!(
+                        "<a href=\"{}\">Просмотреть изменения →</a>",
+                        MessageBuilder::escape_html(trimmed)
+                    ),
+                );
+            }
         }
 
         builder.build()

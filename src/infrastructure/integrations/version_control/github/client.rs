@@ -234,7 +234,6 @@ impl GithubVersionControlClient {
         }
 
         let text = resp.text().await?;
-        tracing::debug!("GitHub GraphQL response: {}", text);
 
         let result: GithubGraphQLResponse<Q::ResponseData> = serde_json::from_str(&text)?;
 

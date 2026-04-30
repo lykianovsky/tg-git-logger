@@ -113,6 +113,19 @@ pub async fn handle(
         .await
     {
         Ok(CheckOrgMembershipResponse::Allowed) => {}
+        Ok(CheckOrgMembershipResponse::Deactivated) => {
+            tracing::warn!(
+                social_user_id = %social_user_id.0,
+                cmd = ?cmd,
+                "Command blocked: user is deactivated"
+            );
+            bot.send_message(
+                msg.chat.id,
+                t!("telegram_bot.commands.account_deactivated").to_string(),
+            )
+            .await?;
+            return Ok(());
+        }
         Ok(CheckOrgMembershipResponse::Blocked { organization }) => {
             tracing::warn!(
                 social_user_id = %social_user_id.0,
@@ -135,7 +148,7 @@ pub async fn handle(
             tracing::error!(
                 error = %e,
                 social_user_id = %social_user_id.0,
-                "Organization membership check failed"
+                "Access check failed"
             );
             bot.send_message(
                 msg.chat.id,
