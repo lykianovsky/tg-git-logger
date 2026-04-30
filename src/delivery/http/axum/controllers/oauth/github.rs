@@ -81,8 +81,22 @@ impl AxumOAuthGithubController {
 
         let state = match Self::retrieve_oauth_state(&key, shared.cache.clone()).await {
             Ok(s) => s,
-            Err(..) => return Redirect::to(bot_url),
+            Err(error) => {
+                tracing::warn!(
+                    error = %error,
+                    "OAuth state retrieval failed; redirecting without notifying user"
+                );
+                return Redirect::to(bot_url);
+            }
         };
+
+        if let Err(e) = shared
+            .cache
+            .del(&format!("oauth_pending:social:{}", state.social_user_id.0))
+            .await
+        {
+            tracing::warn!(error = %e, "Failed to drop oauth_pending marker");
+        }
 
         let cmd = RegisterUserViaOAuthExecutorCommand {
             code: query.code.clone(),
@@ -91,7 +105,10 @@ impl AxumOAuthGithubController {
 
         match executor.execute(&cmd).await {
             Ok(result) => {
-                tracing::debug!("{:?} {:?}", result, query);
+                tracing::debug!(
+                    user_id = ?result.user.id,
+                    "OAuth registration succeeded"
+                );
                 shared
                     .publisher
                     .publish(&UserRegistrationSuccessEvent {
@@ -105,7 +122,7 @@ impl AxumOAuthGithubController {
                     .ok();
             }
             Err(error) => {
-                tracing::error!(error = ?error, state = ?query.state, "Registration failed");
+                tracing::error!(error = ?error, "Registration failed");
                 let block_reason = match &error {
                     RegisterUserViaOAuthExecutorError::NotMemberOfRequiredOrganization(org) => {
                         Some(UserRegistrationBlockReason::NotMemberOfOrganization {

@@ -50,7 +50,10 @@ impl CommandExecutor for RegisterUserViaOAuthExecutor {
             .await
             .map_err(|e| RegisterUserViaOAuthExecutorError::DbError(e.to_string()))?;
 
-        tracing::debug!(state = ?cmd.state, "Starting OAuth registration");
+        tracing::debug!(
+            social_user_id = %cmd.state.social_user_id.0,
+            "Starting OAuth registration"
+        );
 
         if let Ok(..) = self
             .user_socials_repo

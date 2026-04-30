@@ -897,6 +897,15 @@ async fn handle_meeting_url_input(
         return Ok(());
     }
 
+    if !crate::delivery::bot::telegram::dialogues::release_plan::is_valid_http_url(&url) {
+        bot.send_message(
+            msg.chat.id,
+            t!("telegram_bot.dialogues.release_plan.invalid_url").to_string(),
+        )
+        .await?;
+        return Ok(());
+    }
+
     if let Err(e) = executors
         .commands
         .update_release_plan

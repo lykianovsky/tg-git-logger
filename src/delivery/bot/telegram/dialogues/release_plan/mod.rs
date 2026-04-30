@@ -679,6 +679,15 @@ async fn handle_meeting_url_input(
         return Ok(());
     }
 
+    if !is_valid_http_url(&url) {
+        bot.send_message(
+            msg.chat.id,
+            t!("telegram_bot.dialogues.release_plan.invalid_url").to_string(),
+        )
+        .await?;
+        return Ok(());
+    }
+
     dialogue
         .update(TelegramBotDialogueState::ReleasePlan(
             TelegramBotReleasePlanState::EnterNote {
@@ -926,5 +935,12 @@ async fn send_or_edit(
             bot.send_message(chat_id, text).await?;
             Ok(())
         }
+    }
+}
+
+pub fn is_valid_http_url(url: &str) -> bool {
+    match url::Url::parse(url) {
+        Ok(parsed) => matches!(parsed.scheme(), "http" | "https"),
+        Err(_) => false,
     }
 }

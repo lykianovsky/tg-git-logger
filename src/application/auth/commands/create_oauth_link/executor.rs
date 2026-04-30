@@ -6,7 +6,8 @@ use crate::domain::shared::command::CommandExecutor;
 use crate::domain::user::repositories::user_repository::UserRepository;
 use crate::domain::user::repositories::user_social_accounts_repository::UserSocialAccountsRepository;
 use crate::infrastructure::drivers::cache::contract::CacheService;
-use crate::utils::security::crypto::key_by_payload::create_key_by_payload;
+use rand::RngCore;
+use rand::rngs::OsRng;
 use std::sync::Arc;
 use std::time::Duration;
 use url::Url;
@@ -53,44 +54,39 @@ impl CreateOAuthLinkExecutor {
             role: cmd.role.clone(),
         };
 
-        let secret = format!(
-            "{}{}{}",
-            state.social_user_id.0, state.social_type, state.social_chat_id.0
-        );
-
-        let state_key = match create_key_by_payload(&secret, &state) {
-            Ok(cipher) => cipher,
-            Err(error) => {
-                tracing::error!(error = %error, "Create key by payload failed");
-                return Err(CreateOAuthLinkExecutorError::CipherCreatePayloadError(
-                    error.to_string(),
-                ));
-            }
-        };
-
-        if let Some(..) = self
+        let pending_key = format!("oauth_pending:social:{}", state.social_user_id.0);
+        if self
             .cache
-            .get(&state_key.0)
+            .get(&pending_key)
             .await
             .map_err(|e| CreateOAuthLinkExecutorError::Cache(e.to_string()))?
+            .is_some()
         {
-            return Err(CreateOAuthLinkExecutorError::CacheHasExist(state_key.0));
+            return Err(CreateOAuthLinkExecutorError::CacheHasExist(pending_key));
         }
+
+        let mut state_bytes = [0u8; 32];
+        OsRng.fill_bytes(&mut state_bytes);
+        let state_key = hex::encode(state_bytes);
 
         url.query_pairs_mut()
             .append_pair("client_id", &cmd.version_control.client_id)
             .append_pair("scope", &cmd.version_control.scope)
-            .append_pair("state", &state_key.0);
+            .append_pair("state", &state_key);
 
         let str = serde_json::to_string(&state)?;
 
         self.cache
-            .set(&state_key.0, &str, OAUTH_STATE_TTL_SECONDS)
+            .set(&state_key, &str, OAUTH_STATE_TTL_SECONDS)
+            .await
+            .map_err(|e| CreateOAuthLinkExecutorError::Cache(e.to_string()))?;
+
+        self.cache
+            .set(&pending_key, &state_key, OAUTH_STATE_TTL_SECONDS)
             .await
             .map_err(|e| CreateOAuthLinkExecutorError::Cache(e.to_string()))?;
 
         tracing::debug!(
-            state_key = %state_key.0,
             ttl = OAUTH_STATE_TTL_SECONDS,
             "OAuth state saved to cache"
         );
