@@ -42,6 +42,7 @@ use crate::application::user::commands::register_via_oauth::executor::RegisterUs
 use crate::application::user::commands::remove_user_role::executor::RemoveUserRoleExecutor;
 use crate::application::user::commands::toggle_user_active::executor::ToggleUserActiveExecutor;
 use crate::application::user::commands::unbind_repository::executor::UnbindRepositoryExecutor;
+use crate::application::user::queries::check_org_membership::executor::CheckOrgMembershipExecutor;
 use crate::application::user::queries::get_all_users::executor::GetAllUsersExecutor;
 use crate::application::user::queries::get_my_pull_requests::executor::GetMyPullRequestsExecutor;
 use crate::application::user::queries::get_pending_reviews::executor::GetPendingReviewsExecutor;
@@ -75,6 +76,7 @@ pub struct ApplicationBoostrapExecutorsQueries {
     pub get_user_overview: Arc<GetUserOverviewExecutor>,
     pub get_my_pull_requests: Arc<GetMyPullRequestsExecutor>,
     pub get_pending_reviews: Arc<GetPendingReviewsExecutor>,
+    pub check_org_membership: Arc<CheckOrgMembershipExecutor>,
 }
 
 pub struct ApplicationBoostrapExecutorsCommands {
@@ -217,6 +219,20 @@ impl ApplicationBoostrapExecutors {
                 shared_dependency.version_control_client.clone(),
                 shared_dependency.reversible_cipher.clone(),
             )),
+
+            check_org_membership: Arc::new(CheckOrgMembershipExecutor {
+                user_socials_repo: shared_dependency.user_socials_repo.clone(),
+                user_vc_accounts_repo: shared_dependency.user_version_controls_repo.clone(),
+                version_control_client: shared_dependency.version_control_client.clone(),
+                reversible_cipher: shared_dependency.reversible_cipher.clone(),
+                cache: shared_dependency.cache.clone(),
+                required_organization: if config.github.repository_owner.is_empty() {
+                    None
+                } else {
+                    Some(config.github.repository_owner.clone())
+                },
+                admin_social_user_id: SocialUserId(config.telegram.admin_user_id as i32),
+            }),
         };
 
         let commands = ApplicationBoostrapExecutorsCommands {
@@ -239,6 +255,11 @@ impl ApplicationBoostrapExecutors {
                 cache: shared_dependency.cache.clone(),
                 mutex: Arc::new(KeyLocker::new()),
                 telegram_admin_user_id: SocialUserId(config.telegram.admin_user_id as i32),
+                required_organization: if config.github.repository_owner.is_empty() {
+                    None
+                } else {
+                    Some(config.github.repository_owner.clone())
+                },
             }),
             dispatch_webhook_event: Arc::new(DispatchWebhookEventExecutor {
                 publisher: shared_dependency.publisher.clone(),

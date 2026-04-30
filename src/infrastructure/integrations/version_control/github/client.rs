@@ -4,7 +4,8 @@ use crate::domain::version_control::ports::version_control_client::{
     VersionControlClientBranchCheckError, VersionControlClientDateRangeReportError,
     VersionControlClientGetPrError, VersionControlClientGetUserError,
     VersionControlClientGetUserResponse, VersionControlClientListPullRequestsError,
-    VersionControlClientPostCommentError, VersionControlClientSearchPrsError,
+    VersionControlClientOrgMembershipError, VersionControlClientPostCommentError,
+    VersionControlClientSearchPrsError,
 };
 use crate::domain::version_control::value_objects::report::{
     VersionControlDateRangeReport, VersionControlDateRangeReportAuthor,
@@ -636,6 +637,47 @@ impl VersionControlClient for GithubVersionControlClient {
             repos,
         )
         .await
+    }
+
+    async fn is_user_in_organization(
+        &self,
+        access_token: &str,
+        org: &str,
+    ) -> Result<bool, VersionControlClientOrgMembershipError> {
+        #[derive(Debug, Deserialize)]
+        struct MembershipResponse {
+            state: String,
+        }
+
+        let url = format!("{}/user/memberships/orgs/{}", self.base, org);
+
+        let resp = self
+            .client
+            .get(&url)
+            .bearer_auth(access_token)
+            .header("User-Agent", "Telegram-Git-App")
+            .send()
+            .await
+            .map_err(|e| VersionControlClientOrgMembershipError::Transport(e.to_string()))?;
+
+        match resp.status() {
+            s if s.is_success() => {
+                let body: MembershipResponse = resp.json().await.map_err(|e| {
+                    VersionControlClientOrgMembershipError::Transport(e.to_string())
+                })?;
+                Ok(body.state == "active")
+            }
+            s if s == reqwest::StatusCode::NOT_FOUND => Ok(false),
+            s if s == reqwest::StatusCode::UNAUTHORIZED || s == reqwest::StatusCode::FORBIDDEN => {
+                Err(VersionControlClientOrgMembershipError::Unauthorized(
+                    format!("GitHub returned {}", s),
+                ))
+            }
+            s => Err(VersionControlClientOrgMembershipError::Transport(format!(
+                "Unexpected status: {}",
+                s
+            ))),
+        }
     }
 
     async fn branch_exists(

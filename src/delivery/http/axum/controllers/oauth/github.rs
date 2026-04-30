@@ -1,10 +1,13 @@
 use crate::application::user::commands::register_via_oauth::command::RegisterUserViaOAuthExecutorCommand;
+use crate::application::user::commands::register_via_oauth::error::RegisterUserViaOAuthExecutorError;
 use crate::application::user::commands::register_via_oauth::executor::RegisterUserViaOAuthExecutor;
 use crate::bootstrap::shared_dependency::ApplicationSharedDependency;
 use crate::config::application::ApplicationConfig;
 use crate::domain::auth::entities::oauth_state::OpenAuthorizationState;
 use crate::domain::shared::command::CommandExecutor;
-use crate::domain::user::events::registration_failed::UserRegistrationFailedEvent;
+use crate::domain::user::events::registration_failed::{
+    UserRegistrationBlockReason, UserRegistrationFailedEvent,
+};
 use crate::domain::user::events::registration_success::UserRegistrationSuccessEvent;
 use crate::infrastructure::drivers::cache::contract::CacheService;
 use axum::Extension;
@@ -102,12 +105,21 @@ impl AxumOAuthGithubController {
                     .ok();
             }
             Err(error) => {
-                tracing::error!("{:?} {:?}", error, query);
+                tracing::error!(error = ?error, state = ?query.state, "Registration failed");
+                let block_reason = match &error {
+                    RegisterUserViaOAuthExecutorError::NotMemberOfRequiredOrganization(org) => {
+                        Some(UserRegistrationBlockReason::NotMemberOfOrganization {
+                            organization: org.clone(),
+                        })
+                    }
+                    _ => None,
+                };
                 shared
                     .publisher
                     .publish(&UserRegistrationFailedEvent {
                         chat_id: cmd.state.social_chat_id,
                         social_type: cmd.state.social_type,
+                        block_reason,
                     })
                     .await
                     .ok();

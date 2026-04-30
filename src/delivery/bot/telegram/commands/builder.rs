@@ -1,3 +1,5 @@
+use crate::application::user::queries::check_org_membership::query::CheckOrgMembershipQuery;
+use crate::application::user::queries::check_org_membership::response::CheckOrgMembershipResponse;
 use crate::bootstrap::executors::ApplicationBoostrapExecutors;
 use crate::config::application::ApplicationConfig;
 use crate::delivery::bot::telegram::commands::admin::TelegramBotAdminCommandHandler;
@@ -21,6 +23,8 @@ use crate::delivery::bot::telegram::commands::unregister::TelegramBotUnregisterC
 use crate::delivery::bot::telegram::commands::vacation::TelegramBotVacationCommandHandler;
 use crate::delivery::bot::telegram::context::TelegramBotCommandContext;
 use crate::delivery::bot::telegram::dialogues::TelegramBotDialogueType;
+use crate::domain::shared::command::CommandExecutor;
+use crate::domain::user::value_objects::social_user_id::SocialUserId;
 use std::sync::Arc;
 use teloxide::Bot;
 use teloxide::macros::BotCommands;
@@ -101,6 +105,64 @@ pub async fn handle(
     config: Arc<ApplicationConfig>,
     shared_dependency: Arc<crate::bootstrap::shared_dependency::ApplicationSharedDependency>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let social_user_id = SocialUserId(user.id.0 as i32);
+    match executors
+        .queries
+        .check_org_membership
+        .execute(&CheckOrgMembershipQuery { social_user_id })
+        .await
+    {
+        Ok(CheckOrgMembershipResponse::Allowed) => {}
+        Ok(CheckOrgMembershipResponse::Blocked { organization }) => {
+            tracing::warn!(
+                social_user_id = %social_user_id.0,
+                org = %organization,
+                cmd = ?cmd,
+                "Command blocked: user not in required organization"
+            );
+            bot.send_message(
+                msg.chat.id,
+                t!(
+                    "telegram_bot.commands.org_membership_required",
+                    org = organization
+                )
+                .to_string(),
+            )
+            .await?;
+            return Ok(());
+        }
+        Err(e) => {
+            tracing::error!(
+                error = %e,
+                social_user_id = %social_user_id.0,
+                "Organization membership check failed"
+            );
+            bot.send_message(
+                msg.chat.id,
+                t!("telegram_bot.commands.org_membership_check_error").to_string(),
+            )
+            .await?;
+            return Ok(());
+        }
+    }
+
+    if matches!(&cmd, TelegramBotCommand::Releases) {
+        let context = TelegramBotCommandContext {
+            bot,
+            user,
+            msg,
+            cmd,
+            config,
+        };
+        return TelegramBotReleasesCommandHandler::new(
+            context,
+            executors.clone(),
+            Arc::new(dialogue),
+        )
+        .execute()
+        .await;
+    }
+
     if matches!(
         &cmd,
         TelegramBotCommand::SetupWebhook | TelegramBotCommand::SetupNotifications
@@ -269,16 +331,6 @@ pub async fn handle(
                 .await?;
         }
 
-        TelegramBotCommand::Releases => {
-            TelegramBotReleasesCommandHandler::new(
-                context,
-                executors.clone(),
-                Arc::new(dialogue),
-            )
-            .execute()
-            .await?;
-        }
-
         TelegramBotCommand::Whoami => {
             TelegramBotWhoamiCommandHandler::new(context, executors.clone())
                 .execute()
@@ -304,7 +356,9 @@ pub async fn handle(
         }
 
         // Handled above before private-chat guard
-        TelegramBotCommand::SetupWebhook | TelegramBotCommand::SetupNotifications => {}
+        TelegramBotCommand::SetupWebhook
+        | TelegramBotCommand::SetupNotifications
+        | TelegramBotCommand::Releases => {}
     }
 
     Ok(())

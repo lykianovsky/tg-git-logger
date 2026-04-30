@@ -7,8 +7,9 @@ use crate::domain::user::value_objects::social_user_id::SocialUserId;
 use chrono::{Duration, Utc};
 use std::sync::Arc;
 use teloxide::Bot;
+use teloxide::payloads::SendMessageSetters;
 use teloxide::prelude::Requester;
-use teloxide::types::Message;
+use teloxide::types::{Message, ParseMode};
 
 pub struct TelegramBotVacationCommandHandler {
     bot: Bot,
@@ -61,6 +62,7 @@ impl TelegramBotVacationCommandHandler {
                     self.msg.chat.id,
                     t!("telegram_bot.commands.vacation.usage").to_string(),
                 )
+                .parse_mode(ParseMode::Html)
                 .await?;
             return Ok(());
         };
@@ -76,7 +78,10 @@ impl TelegramBotVacationCommandHandler {
             .await
         {
             Ok(_) => {
-                self.bot.send_message(self.msg.chat.id, reply).await?;
+                self.bot
+                    .send_message(self.msg.chat.id, reply)
+                    .parse_mode(ParseMode::Html)
+                    .await?;
             }
             Err(e) => {
                 tracing::error!(error = %e, "Failed to apply /vacation patch");
@@ -85,6 +90,7 @@ impl TelegramBotVacationCommandHandler {
                         self.msg.chat.id,
                         t!("telegram_bot.commands.vacation.error").to_string(),
                     )
+                    .parse_mode(ParseMode::Html)
                     .await?;
             }
         }

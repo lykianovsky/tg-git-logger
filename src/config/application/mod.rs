@@ -36,6 +36,7 @@ pub struct ApplicationGithubConfig {
     pub oauth_client_scope: String,
     pub oauth_client_id: String,
     pub oauth_client_secret: String,
+    pub repository_owner: String,
 }
 
 pub struct ApplicationRedisConfig {
@@ -176,6 +177,7 @@ impl ApplicationConfig {
         let oauth_client_scope = ENV.get("GITHUB_OAUTH_CLIENT_SCOPE");
         let oauth_client_id = ENV.get("GITHUB_OAUTH_CLIENT_ID");
         let oauth_client_secret = ENV.get("GITHUB_OAUTH_CLIENT_SECRET");
+        let repository_owner = ENV.get_or("GITHUB_REPOSITORY_OWNER", "");
 
         let webhook_secret = ENV.get_or("GITHUB_WEBHOOK_SECRET", "");
 
@@ -183,6 +185,13 @@ impl ApplicationConfig {
             tracing::warn!(
                 "GITHUB_WEBHOOK_SECRET is not set or empty. \
                  Provide it in .env for better security."
+            )
+        }
+
+        if repository_owner.is_empty() {
+            tracing::warn!(
+                "GITHUB_REPOSITORY_OWNER is not set. \
+                 Organization membership checks will be disabled."
             )
         }
 
@@ -194,6 +203,7 @@ impl ApplicationConfig {
             oauth_client_id,
             oauth_client_secret,
             webhook_secret,
+            repository_owner,
         }
     }
 

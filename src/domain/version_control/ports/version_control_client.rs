@@ -101,6 +101,15 @@ pub enum VersionControlClientGetPrError {
     Transport(String),
 }
 
+#[derive(Debug, Error)]
+pub enum VersionControlClientOrgMembershipError {
+    #[error("Unauthorized: {0}")]
+    Unauthorized(String),
+
+    #[error("Transport error: {0}")]
+    Transport(String),
+}
+
 #[async_trait]
 pub trait VersionControlClient: Send + Sync {
     async fn get_user(
@@ -163,4 +172,10 @@ pub trait VersionControlClient: Send + Sync {
         login: &str,
         repos: &[String],
     ) -> Result<Vec<UserPullRequestSummary>, VersionControlClientSearchPrsError>;
+
+    async fn is_user_in_organization(
+        &self,
+        access_token: &str,
+        org: &str,
+    ) -> Result<bool, VersionControlClientOrgMembershipError>;
 }
