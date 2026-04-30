@@ -10,6 +10,14 @@ use serde::{Deserialize, Serialize};
 pub struct UserRegistrationFailedEvent {
     pub social_type: SocialType,
     pub chat_id: SocialChatId,
+    #[serde(default)]
+    pub block_reason: Option<UserRegistrationBlockReason>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(tag = "type", content = "details")]
+pub enum UserRegistrationBlockReason {
+    NotMemberOfOrganization { organization: String },
 }
 
 impl DomainEvent for UserRegistrationFailedEvent {

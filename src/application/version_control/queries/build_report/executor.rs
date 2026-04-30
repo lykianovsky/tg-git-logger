@@ -17,9 +17,12 @@ use crate::domain::version_control::ports::version_control_client::{
 use crate::infrastructure::drivers::cache::contract::CacheService;
 use crate::utils::builder::message::MessageBuilder;
 use crate::utils::security::crypto::reversible::ReversibleCipher;
+use hmac::{Hmac, Mac};
 use rust_i18n::t;
-use sha2::{Digest, Sha256};
+use sha2::Sha256;
 use std::sync::Arc;
+
+type HmacSha256 = Hmac<Sha256>;
 
 const REPORT_CACHE_TTL_SECONDS: u64 = 3_600; // 1 hour
 
@@ -34,6 +37,7 @@ pub struct BuildVersionControlDateRangeReportExecutor {
     kaiten_base: String,
     base_url: String,
     cache: Arc<dyn CacheService>,
+    report_url_secret: String,
 }
 
 impl BuildVersionControlDateRangeReportExecutor {
@@ -48,6 +52,7 @@ impl BuildVersionControlDateRangeReportExecutor {
         kaiten_base: String,
         base_url: String,
         cache: Arc<dyn CacheService>,
+        report_url_secret: String,
     ) -> Self {
         Self {
             reversible_cipher,
@@ -60,6 +65,7 @@ impl BuildVersionControlDateRangeReportExecutor {
             kaiten_base,
             base_url,
             cache,
+            report_url_secret,
         }
     }
 
@@ -106,7 +112,10 @@ impl BuildVersionControlDateRangeReportExecutor {
         normalized.date_range = normalized.date_range.normalize_to_day();
 
         let json = serde_json::to_string(&normalized)?;
-        Ok(format!("{:x}", Sha256::digest(json.as_bytes())))
+        let mut mac = HmacSha256::new_from_slice(self.report_url_secret.as_bytes())
+            .expect("HMAC accepts any-length key");
+        mac.update(json.as_bytes());
+        Ok(format!("{:x}", mac.finalize().into_bytes()))
     }
 }
 

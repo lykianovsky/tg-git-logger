@@ -1,3 +1,4 @@
+pub mod check_org_membership;
 pub mod get_all_users;
 pub mod get_my_pull_requests;
 pub mod get_pending_reviews;

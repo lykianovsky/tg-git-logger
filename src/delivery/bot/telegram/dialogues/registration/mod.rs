@@ -62,7 +62,13 @@ impl TelegramBotDialogueRegistrationDispatcher {
         };
 
         let user = query.from;
-        let msg = query.message.unwrap();
+        let msg = match query.message {
+            Some(m) => m,
+            None => {
+                tracing::warn!("Callback without message in registration dialogue");
+                return Ok(());
+            }
+        };
         let chat_id = msg.chat().id;
         let message_id = msg.id();
 

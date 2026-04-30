@@ -1,10 +1,13 @@
 use crate::application::user::commands::register_via_oauth::command::RegisterUserViaOAuthExecutorCommand;
+use crate::application::user::commands::register_via_oauth::error::RegisterUserViaOAuthExecutorError;
 use crate::application::user::commands::register_via_oauth::executor::RegisterUserViaOAuthExecutor;
 use crate::bootstrap::shared_dependency::ApplicationSharedDependency;
 use crate::config::application::ApplicationConfig;
 use crate::domain::auth::entities::oauth_state::OpenAuthorizationState;
 use crate::domain::shared::command::CommandExecutor;
-use crate::domain::user::events::registration_failed::UserRegistrationFailedEvent;
+use crate::domain::user::events::registration_failed::{
+    UserRegistrationBlockReason, UserRegistrationFailedEvent,
+};
 use crate::domain::user::events::registration_success::UserRegistrationSuccessEvent;
 use crate::infrastructure::drivers::cache::contract::CacheService;
 use axum::Extension;
@@ -78,8 +81,22 @@ impl AxumOAuthGithubController {
 
         let state = match Self::retrieve_oauth_state(&key, shared.cache.clone()).await {
             Ok(s) => s,
-            Err(..) => return Redirect::to(bot_url),
+            Err(error) => {
+                tracing::warn!(
+                    error = %error,
+                    "OAuth state retrieval failed; redirecting without notifying user"
+                );
+                return Redirect::to(bot_url);
+            }
         };
+
+        if let Err(e) = shared
+            .cache
+            .del(&format!("oauth_pending:social:{}", state.social_user_id.0))
+            .await
+        {
+            tracing::warn!(error = %e, "Failed to drop oauth_pending marker");
+        }
 
         let cmd = RegisterUserViaOAuthExecutorCommand {
             code: query.code.clone(),
@@ -88,7 +105,10 @@ impl AxumOAuthGithubController {
 
         match executor.execute(&cmd).await {
             Ok(result) => {
-                tracing::debug!("{:?} {:?}", result, query);
+                tracing::debug!(
+                    user_id = ?result.user.id,
+                    "OAuth registration succeeded"
+                );
                 shared
                     .publisher
                     .publish(&UserRegistrationSuccessEvent {
@@ -102,12 +122,21 @@ impl AxumOAuthGithubController {
                     .ok();
             }
             Err(error) => {
-                tracing::error!("{:?} {:?}", error, query);
+                tracing::error!(error = ?error, "Registration failed");
+                let block_reason = match &error {
+                    RegisterUserViaOAuthExecutorError::NotMemberOfRequiredOrganization(org) => {
+                        Some(UserRegistrationBlockReason::NotMemberOfOrganization {
+                            organization: org.clone(),
+                        })
+                    }
+                    _ => None,
+                };
                 shared
                     .publisher
                     .publish(&UserRegistrationFailedEvent {
                         chat_id: cmd.state.social_chat_id,
                         social_type: cmd.state.social_type,
+                        block_reason,
                     })
                     .await
                     .ok();

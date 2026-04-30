@@ -34,19 +34,24 @@ impl WebhookEvent for WebhookReleaseEvent {
             "🎉 Новый релиз"
         };
 
+        let safe_repo = MessageBuilder::escape_html(&self.repo);
+
         // ── Заголовок ──────────────────────────────────────
         let mut builder = MessageBuilder::new().bold(title).empty_line();
 
         // ── Основная инфо ──────────────────────────────────
         if let Some(name) = &self.name {
-            builder = builder.section_bold("📌 Название", name);
+            builder = builder.section_bold("📌 Название", &MessageBuilder::escape_html(name));
         }
 
-        builder = builder.section_code("🏷️ Тег", &self.tag_name);
-        builder = builder.section_code("🌿 Ветка", &self.target_commitish);
+        builder = builder.section_code("🏷️ Тег", &MessageBuilder::escape_html(&self.tag_name));
+        builder = builder.section_code(
+            "🌿 Ветка",
+            &MessageBuilder::escape_html(&self.target_commitish),
+        );
 
         if let Some(author) = &self.author {
-            builder = builder.section_bold("👤 Автор", author);
+            builder = builder.section_bold("👤 Автор", &MessageBuilder::escape_html(author));
         }
 
         builder = builder.empty_line();
@@ -87,22 +92,38 @@ impl WebhookEvent for WebhookReleaseEvent {
                 body.clone()
             };
 
-            builder = builder.bold("📋 Описание").line(&truncated).empty_line();
+            builder = builder
+                .bold("📋 Описание")
+                .line(&MessageBuilder::escape_html(&truncated))
+                .empty_line();
         }
 
         // ── Ссылки ─────────────────────────────────────────
         if let Some(url) = &self.html_url {
-            builder = builder.section("🔗 Релиз", &format!("<a href=\"{}\">Перейти →</a>", url));
+            let trimmed = url.trim();
+            if trimmed.starts_with("http://") || trimmed.starts_with("https://") {
+                builder = builder.section(
+                    "🔗 Релиз",
+                    &format!(
+                        "<a href=\"{}\">Перейти →</a>",
+                        MessageBuilder::escape_html(trimmed)
+                    ),
+                );
+            }
         }
 
         match &self.repo_url {
-            Some(url) => {
+            Some(url) if url.trim().starts_with("http://") || url.trim().starts_with("https://") => {
                 builder = builder.section(
                     "📦 Репозиторий",
-                    &format!("<a href=\"{}\">{}</a>", url, self.repo),
+                    &format!(
+                        "<a href=\"{}\">{}</a>",
+                        MessageBuilder::escape_html(url.trim()),
+                        safe_repo
+                    ),
                 )
             }
-            None => builder = builder.section("📦 Репозиторий", &self.repo),
+            _ => builder = builder.section("📦 Репозиторий", &safe_repo),
         }
 
         builder.build()

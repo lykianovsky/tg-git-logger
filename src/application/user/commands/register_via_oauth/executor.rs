@@ -33,6 +33,7 @@ pub struct RegisterUserViaOAuthExecutor {
     pub cache: Arc<dyn CacheService>,
     pub mutex: Arc<KeyLocker<String>>,
     pub telegram_admin_user_id: SocialUserId,
+    pub required_organization: Option<String>,
 }
 
 impl CommandExecutor for RegisterUserViaOAuthExecutor {
@@ -49,7 +50,10 @@ impl CommandExecutor for RegisterUserViaOAuthExecutor {
             .await
             .map_err(|e| RegisterUserViaOAuthExecutorError::DbError(e.to_string()))?;
 
-        tracing::debug!(state = ?cmd.state, "Starting OAuth registration");
+        tracing::debug!(
+            social_user_id = %cmd.state.social_user_id.0,
+            "Starting OAuth registration"
+        );
 
         if let Ok(..) = self
             .user_socials_repo
@@ -69,6 +73,28 @@ impl CommandExecutor for RegisterUserViaOAuthExecutor {
             .version_control_client
             .get_user(&exchange_code_response.access_token)
             .await?;
+
+        if let Some(org) = self.required_organization.as_deref().filter(|s| !s.is_empty()) {
+            let is_admin = cmd.state.social_user_id == self.telegram_admin_user_id;
+            if !is_admin {
+                let is_member = self
+                    .version_control_client
+                    .is_user_in_organization(&exchange_code_response.access_token, org)
+                    .await?;
+                if !is_member {
+                    tracing::warn!(
+                        login = %version_control_client_user.login,
+                        org = %org,
+                        "Registration blocked: user is not a member of required organization"
+                    );
+                    return Err(
+                        RegisterUserViaOAuthExecutorError::NotMemberOfRequiredOrganization(
+                            org.to_string(),
+                        ),
+                    );
+                }
+            }
+        }
 
         let user = self
             .user_repo

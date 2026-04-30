@@ -16,7 +16,4 @@ pub enum CreateOAuthLinkExecutorError {
 
     #[error("Cache has exist by key: {0}")]
     CacheHasExist(String),
-
-    #[error("Cipher create key by payload error: {0}")]
-    CipherCreatePayloadError(String),
 }

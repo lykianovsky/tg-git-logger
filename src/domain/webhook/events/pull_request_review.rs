@@ -41,19 +41,25 @@ impl WebhookEvent for WebhookPullRequestReviewEvent {
             WebhookPullRequestReviewState::Unknown => ("ℹ️", "Ревью PR"),
         };
 
+        let pr_url_trimmed = self.pr_url.trim();
+        let pr_link = if pr_url_trimmed.starts_with("http://")
+            || pr_url_trimmed.starts_with("https://")
+        {
+            format!(
+                "<a href=\"{}\">{}</a>",
+                MessageBuilder::escape_html(pr_url_trimmed),
+                MessageBuilder::escape_html(&self.pr_title)
+            )
+        } else {
+            MessageBuilder::escape_html(&self.pr_title)
+        };
+
         let mut builder = MessageBuilder::new()
             .bold(&format!("{} {} — PR #{}", icon, heading, self.pr_number))
             .empty_line()
-            .section(
-                "📝 PR",
-                &format!(
-                    "<a href=\"{}\">{}</a>",
-                    self.pr_url,
-                    MessageBuilder::escape_html(&self.pr_title),
-                ),
-            )
-            .section_bold("👤 Ревьюер", &self.reviewer)
-            .section("📦 Репозиторий", &self.repo);
+            .section("📝 PR", &pr_link)
+            .section_bold("👤 Ревьюер", &MessageBuilder::escape_html(&self.reviewer))
+            .section("📦 Репозиторий", &MessageBuilder::escape_html(&self.repo));
 
         if self.state == WebhookPullRequestReviewState::ChangesRequested {
             builder = builder.section(
@@ -69,12 +75,21 @@ impl WebhookEvent for WebhookPullRequestReviewEvent {
                 .line(&MessageBuilder::escape_html(body));
         }
 
+        let review_url_trimmed = self.review_url.trim();
+        let review_link = if review_url_trimmed.starts_with("http://")
+            || review_url_trimmed.starts_with("https://")
+        {
+            format!(
+                "<a href=\"{}\">Открыть →</a>",
+                MessageBuilder::escape_html(review_url_trimmed)
+            )
+        } else {
+            "—".to_string()
+        };
+
         builder
             .empty_line()
-            .section(
-                "🔗 Ревью",
-                &format!("<a href=\"{}\">Открыть →</a>", self.review_url),
-            )
+            .section("🔗 Ревью", &review_link)
             .build()
     }
 }

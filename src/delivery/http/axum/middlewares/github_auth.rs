@@ -6,6 +6,8 @@ use hmac::Hmac;
 use sha2::Sha256;
 use sha2::digest::Mac;
 
+const MAX_WEBHOOK_BODY_BYTES: usize = 10 * 1024 * 1024;
+
 pub struct GithubWebhookAuthorizationMiddleware {
     secret: String,
 }
@@ -18,8 +20,11 @@ impl GithubWebhookAuthorizationMiddleware {
     }
 
     pub async fn handle(self, request: Request<Body>, next: Next) -> Result<Response, StatusCode> {
-        if self.secret == "" {
-            return Ok(next.run(request).await);
+        if self.secret.is_empty() {
+            tracing::error!(
+                "GITHUB_WEBHOOK_SECRET is not configured; rejecting webhook request"
+            );
+            return Err(StatusCode::SERVICE_UNAVAILABLE);
         }
 
         let signature = request
@@ -32,8 +37,8 @@ impl GithubWebhookAuthorizationMiddleware {
 
         let signature_bytes = match hex::decode(signature) {
             Ok(bytes) => bytes,
-            Err(err) => {
-                tracing::error!(error = ?err, "Invalid hex in GitHub signature: {}", signature);
+            Err(_) => {
+                tracing::warn!("Invalid hex in GitHub signature header");
                 return Err(StatusCode::FORBIDDEN);
             }
         };
@@ -42,31 +47,24 @@ impl GithubWebhookAuthorizationMiddleware {
             Ok(hmac) => hmac,
             Err(err) => {
                 tracing::error!(error = ?err, "Failed to create HMAC with secret");
-                return Err(StatusCode::FORBIDDEN);
+                return Err(StatusCode::INTERNAL_SERVER_ERROR);
             }
         };
 
         let (parts, body) = request.into_parts();
 
-        let payload: Bytes = match to_bytes(body, usize::MAX).await {
+        let payload: Bytes = match to_bytes(body, MAX_WEBHOOK_BODY_BYTES).await {
             Ok(bytes) => bytes,
             Err(err) => {
-                tracing::error!(error = ?err, "Failed to convert request body to bytes");
-                return Err(StatusCode::FORBIDDEN);
+                tracing::warn!(error = ?err, "Webhook body too large or read failed");
+                return Err(StatusCode::PAYLOAD_TOO_LARGE);
             }
         };
 
-        hmac.update(&*payload);
+        hmac.update(&payload);
 
-        let verified = match hmac.verify_slice(&signature_bytes) {
-            Ok(_) => true,
-            Err(e) => {
-                tracing::error!(error = ?e, "GitHub webhook signature verification failed");
-                false
-            }
-        };
-
-        if !verified {
+        if hmac.verify_slice(&signature_bytes).is_err() {
+            tracing::warn!("GitHub webhook signature verification failed");
             return Err(StatusCode::FORBIDDEN);
         }
 

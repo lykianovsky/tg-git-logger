@@ -18,8 +18,6 @@ impl AxumWebhookGithubController {
         Extension(executor): Extension<Arc<DispatchWebhookEventExecutor>>,
         Json(payload): Json<serde_json::Value>,
     ) -> StatusCode {
-        tracing::debug!("Received GitHub webhook payload: {:?}", payload);
-
         let raw_event_type = match headers
             .get(GithubHeaders::EVENT)
             .and_then(|header_value| header_value.to_str().ok())
@@ -31,15 +29,13 @@ impl AxumWebhookGithubController {
             }
         };
 
-        tracing::debug!("GitHub event header received: {}", raw_event_type);
+        tracing::debug!(event_type = %raw_event_type, "Received GitHub webhook event");
 
         let github_event_type = GithubEventType::from_str(raw_event_type)
             .unwrap_or(GithubEventType::Unknown(raw_event_type.to_string()));
 
-        tracing::debug!("Parsed GitHub event type: {:?}", github_event_type);
-
         if github_event_type == GithubEventType::Ping {
-            tracing::info!("Received ping-pong GitHub event type: {}", raw_event_type);
+            tracing::info!(event_type = %raw_event_type, "Received GitHub ping event");
             return StatusCode::OK;
         }
 
@@ -47,7 +43,7 @@ impl AxumWebhookGithubController {
         {
             Ok(event) => event,
             Err(error) => {
-                tracing::error!("Failed to map GitHub event: {:?}", error);
+                tracing::error!(error = ?error, event_type = %raw_event_type, "Failed to map GitHub event");
                 return StatusCode::BAD_REQUEST;
             }
         };
@@ -55,12 +51,9 @@ impl AxumWebhookGithubController {
         let cmd = DispatchWebhookEventExecutorCommand { event };
 
         match executor.execute(&cmd).await {
-            Ok(result) => {
-                tracing::debug!("{:?}", result);
-                StatusCode::OK
-            }
+            Ok(_) => StatusCode::OK,
             Err(error) => {
-                tracing::error!("{:?}", error);
+                tracing::error!(error = ?error, "Failed to dispatch webhook event");
                 StatusCode::BAD_REQUEST
             }
         }

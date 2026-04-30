@@ -43,7 +43,7 @@ impl AxumReportController {
             )
                 .into_response(),
             Err(e) => {
-                tracing::error!(error = %e, token = %token, "Failed to retrieve report html from cache");
+                tracing::error!(error = %e, "Failed to retrieve report html from cache");
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
                     [(header::CONTENT_TYPE, "text/plain; charset=utf-8")],
