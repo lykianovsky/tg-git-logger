@@ -7,7 +7,7 @@ use crate::domain::user::repositories::user_vc_accounts_repository::{
 use crate::domain::user::value_objects::user_id::UserId;
 use crate::domain::user::value_objects::version_control_type::VersionControlType;
 use crate::domain::user::value_objects::version_control_user_id::VersionControlUserId;
-use crate::infrastructure::database::mysql::entities::user_version_control_accounts;
+use crate::infrastructure::database::mysql::entities::{user_version_control_accounts, users};
 use crate::utils::security::crypto::reversible::ReversibleCipherValue;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseConnection, DatabaseTransaction, EntityTrait,
@@ -91,14 +91,22 @@ impl UserVersionControlAccountsRepository for MySQLUserVersionControlServicesRep
         &self,
         login: &str,
     ) -> Result<UserVersionControlAccount, FindVersionControlServiceByLoginError> {
-        let result = user_version_control_accounts::Entity::find()
+        // JOIN users: деактивированные юзеры (users.is_active = 0) считаются "не найденными",
+        // чтобы webhook-листенеры скипали их так же, как незарегистрированных.
+        let (vc_model, user_opt) = user_version_control_accounts::Entity::find()
             .filter(user_version_control_accounts::Column::VersionControlLogin.eq(login))
+            .find_also_related(users::Entity)
             .one(self.db.as_ref())
             .await
             .map_err(|e| FindVersionControlServiceByLoginError::DbError(e.to_string()))?
             .ok_or(FindVersionControlServiceByLoginError::NotFound)?;
 
-        UserVersionControlAccount::from_mysql(result)
+        match user_opt {
+            Some(u) if u.is_active != 0 => {}
+            _ => return Err(FindVersionControlServiceByLoginError::NotFound),
+        }
+
+        UserVersionControlAccount::from_mysql(vc_model)
             .map_err(FindVersionControlServiceByLoginError::DbError)
     }
 }

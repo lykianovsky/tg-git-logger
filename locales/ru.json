@@ -209,10 +209,6 @@
       "pending_digest": {
         "title": "📥 Уведомления за время вашего отсутствия"
       },
-      "review_chat": {
-        "approved": "✅ Одобрено:",
-        "changes_requested": "🔁 Запрошены правки:"
-      },
       "pr_conflict": {
         "title": "⚠️ В вашем PR появились конфликты",
         "pr": "PR",
