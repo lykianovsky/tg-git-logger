@@ -1,9 +1,10 @@
 use crate::domain::shared::date::range::DateRange;
 use crate::domain::version_control::ports::version_control_client::{
-    OpenPullRequestSummary, VersionControlClient, VersionControlClientBranchCheckError,
-    VersionControlClientDateRangeReportError, VersionControlClientGetUserError,
+    OpenPullRequestSummary, UserPullRequestSummary, VersionControlClient,
+    VersionControlClientBranchCheckError, VersionControlClientDateRangeReportError,
+    VersionControlClientGetPrError, VersionControlClientGetUserError,
     VersionControlClientGetUserResponse, VersionControlClientListPullRequestsError,
-    VersionControlClientPostCommentError,
+    VersionControlClientPostCommentError, VersionControlClientSearchPrsError,
 };
 use crate::domain::version_control::value_objects::report::{
     VersionControlDateRangeReport, VersionControlDateRangeReportAuthor,
@@ -124,6 +125,88 @@ impl GithubVersionControlClient {
         Self {
             base,
             client: Client::new(),
+        }
+    }
+
+    async fn search_prs_internal(
+        &self,
+        access_token: &str,
+        base_query: &str,
+        repos: &[String],
+    ) -> Result<Vec<UserPullRequestSummary>, VersionControlClientSearchPrsError> {
+        #[derive(Debug, Deserialize)]
+        struct SearchResponse {
+            items: Vec<SearchItem>,
+        }
+        #[derive(Debug, Deserialize)]
+        struct SearchItem {
+            number: u64,
+            title: String,
+            html_url: String,
+            user: GithubRestUser,
+            updated_at: chrono::DateTime<chrono::Utc>,
+            created_at: chrono::DateTime<chrono::Utc>,
+            repository_url: String,
+        }
+
+        let mut query = base_query.to_string();
+        for repo in repos.iter().take(10) {
+            query.push_str(&format!(" repo:{}", repo));
+        }
+
+        let url = format!("{}/search/issues", self.base);
+        let resp = self
+            .client
+            .get(&url)
+            .bearer_auth(access_token)
+            .header("User-Agent", "Telegram-Git-App")
+            .query(&[("q", query.as_str()), ("per_page", "50")])
+            .send()
+            .await
+            .map_err(|e| VersionControlClientSearchPrsError::Transport(e.to_string()))?;
+
+        match resp.status() {
+            s if s.is_success() => {
+                let body: SearchResponse = resp
+                    .json()
+                    .await
+                    .map_err(|e| VersionControlClientSearchPrsError::Transport(e.to_string()))?;
+                let prs = body
+                    .items
+                    .into_iter()
+                    .map(|it| {
+                        let repo = it
+                            .repository_url
+                            .rsplitn(3, '/')
+                            .take(2)
+                            .collect::<Vec<_>>()
+                            .into_iter()
+                            .rev()
+                            .collect::<Vec<_>>()
+                            .join("/");
+                        UserPullRequestSummary {
+                            number: it.number,
+                            title: it.title,
+                            url: it.html_url,
+                            repo,
+                            author_login: it.user.login,
+                            updated_at: it.updated_at,
+                            created_at: it.created_at,
+                        }
+                    })
+                    .collect();
+                Ok(prs)
+            }
+            s if s == reqwest::StatusCode::UNAUTHORIZED || s == reqwest::StatusCode::FORBIDDEN => {
+                Err(VersionControlClientSearchPrsError::Unauthorized(format!(
+                    "GitHub returned {}",
+                    s
+                )))
+            }
+            s => Err(VersionControlClientSearchPrsError::Transport(format!(
+                "Unexpected status: {}",
+                s
+            ))),
         }
     }
 
@@ -476,6 +559,83 @@ impl VersionControlClient for GithubVersionControlClient {
                 s
             ))),
         }
+    }
+
+    async fn get_pr_mergeable_state(
+        &self,
+        access_token: &str,
+        owner: &str,
+        repo: &str,
+        pr_number: u64,
+    ) -> Result<Option<String>, VersionControlClientGetPrError> {
+        #[derive(Debug, Deserialize)]
+        struct PrDetail {
+            #[serde(default)]
+            mergeable_state: Option<String>,
+        }
+
+        let url = format!(
+            "{}/repos/{}/{}/pulls/{}",
+            self.base, owner, repo, pr_number
+        );
+
+        let resp = self
+            .client
+            .get(&url)
+            .bearer_auth(access_token)
+            .header("User-Agent", "Telegram-Git-App")
+            .send()
+            .await
+            .map_err(|e| VersionControlClientGetPrError::Transport(e.to_string()))?;
+
+        match resp.status() {
+            s if s.is_success() => {
+                let detail: PrDetail = resp
+                    .json()
+                    .await
+                    .map_err(|e| VersionControlClientGetPrError::Transport(e.to_string()))?;
+                Ok(detail.mergeable_state)
+            }
+            s if s == reqwest::StatusCode::NOT_FOUND => Err(VersionControlClientGetPrError::NotFound),
+            s if s == reqwest::StatusCode::UNAUTHORIZED || s == reqwest::StatusCode::FORBIDDEN => {
+                Err(VersionControlClientGetPrError::Unauthorized(format!(
+                    "GitHub returned {}",
+                    s
+                )))
+            }
+            s => Err(VersionControlClientGetPrError::Transport(format!(
+                "Unexpected status: {}",
+                s
+            ))),
+        }
+    }
+
+    async fn search_user_authored_open_prs(
+        &self,
+        access_token: &str,
+        login: &str,
+        repos: &[String],
+    ) -> Result<Vec<UserPullRequestSummary>, VersionControlClientSearchPrsError> {
+        self.search_prs_internal(
+            access_token,
+            &format!("is:pr is:open author:{}", login),
+            repos,
+        )
+        .await
+    }
+
+    async fn search_user_pending_reviews(
+        &self,
+        access_token: &str,
+        login: &str,
+        repos: &[String],
+    ) -> Result<Vec<UserPullRequestSummary>, VersionControlClientSearchPrsError> {
+        self.search_prs_internal(
+            access_token,
+            &format!("is:pr is:open review-requested:{}", login),
+            repos,
+        )
+        .await
     }
 
     async fn branch_exists(

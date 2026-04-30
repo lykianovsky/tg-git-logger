@@ -22,11 +22,6 @@ impl CommandExecutor for CancelReleasePlanExecutor {
     type Response = CancelReleasePlanExecutorResponse;
     type Error = CancelReleasePlanExecutorError;
 
-    #[tracing::instrument(
-        name = "cancel_release_plan",
-        skip_all,
-        fields(plan_id = cmd.plan_id.0)
-    )]
     async fn execute(&self, cmd: &Self::Command) -> Result<Self::Response, Self::Error> {
         let plan = self.release_plan_repo.find_by_id(cmd.plan_id).await?;
 

@@ -16,11 +16,6 @@ impl CommandExecutor for UpdateReleasePlanExecutor {
     type Response = UpdateReleasePlanExecutorResponse;
     type Error = UpdateReleasePlanExecutorError;
 
-    #[tracing::instrument(
-        name = "update_release_plan",
-        skip_all,
-        fields(plan_id = cmd.plan_id.0)
-    )]
     async fn execute(&self, cmd: &Self::Command) -> Result<Self::Response, Self::Error> {
         if let ReleasePlanPatch::SetRepositories { ids } = &cmd.patch {
             self.release_plan_repo

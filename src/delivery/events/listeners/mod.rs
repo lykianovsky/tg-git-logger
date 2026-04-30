@@ -5,9 +5,11 @@ use crate::bootstrap::executors::ApplicationBoostrapExecutors;
 use crate::bootstrap::shared_dependency::ApplicationSharedDependency;
 use crate::config::application::ApplicationConfig;
 use crate::delivery::contract::ApplicationDelivery;
+use crate::delivery::events::listeners::github::webhook::ci_fail_dm::WebhookCiFailDmListener;
 use crate::delivery::events::listeners::github::webhook::pr_conflict::WebhookPrConflictDetectedListener;
 use crate::delivery::events::listeners::github::webhook::pr_mentions::WebhookPrMentionsListener;
 use crate::delivery::events::listeners::github::webhook::pr_opened_tag_reviewers::WebhookPrOpenedTagReviewersListener;
+use crate::delivery::events::listeners::github::webhook::pr_ready_to_merge::WebhookPrReadyToMergeListener;
 use crate::delivery::events::listeners::github::webhook::pull_request::WebhookPullRequestEventListener;
 use crate::delivery::events::listeners::github::webhook::pull_request_review::WebhookPullRequestReviewEventListener;
 use crate::delivery::events::listeners::github::webhook::push::WebhookPushEventListener;
@@ -88,6 +90,17 @@ impl ApplicationDelivery for DeliveryEventListeners {
             })
             .await;
 
+        // CI fail (workflow_run.failure) → ЛС инициатору если он привязан
+        self.shared_dependency
+            .event_bus
+            .on(WebhookCiFailDmListener {
+                publisher: self.shared_dependency.publisher.clone(),
+                notification_log_repo: self.shared_dependency.notification_log_repo.clone(),
+                user_vc_accounts_repo: self.shared_dependency.user_version_controls_repo.clone(),
+                user_socials_repo: self.shared_dependency.user_socials_repo.clone(),
+            })
+            .await;
+
         // PR review: ЛС автору + короткое сообщение в групповой чат + запись в pr_reviews
         self.shared_dependency
             .event_bus
@@ -98,6 +111,17 @@ impl ApplicationDelivery for DeliveryEventListeners {
                 pr_review_repo: self.shared_dependency.pr_review_repo.clone(),
                 repository_repo: repository_repo.clone(),
                 default_chat_id,
+            })
+            .await;
+
+        // PR approved + mergeable=clean → ЛС всем админам (один раз на PR)
+        self.shared_dependency
+            .event_bus
+            .on(WebhookPrReadyToMergeListener {
+                publisher: self.shared_dependency.publisher.clone(),
+                notification_log_repo: self.shared_dependency.notification_log_repo.clone(),
+                user_has_roles_repo: self.shared_dependency.user_has_roles_repo.clone(),
+                user_socials_repo: self.shared_dependency.user_socials_repo.clone(),
             })
             .await;
 

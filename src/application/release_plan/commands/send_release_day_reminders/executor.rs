@@ -24,7 +24,6 @@ impl CommandExecutor for SendReleaseDayRemindersExecutor {
     type Response = SendReleaseDayRemindersExecutorResponse;
     type Error = SendReleaseDayRemindersExecutorError;
 
-    #[tracing::instrument(name = "send_release_day_reminders", skip_all)]
     async fn execute(&self, _cmd: &Self::Command) -> Result<Self::Response, Self::Error> {
         let today_msk = Utc::now().with_timezone(&Moscow).date_naive();
 

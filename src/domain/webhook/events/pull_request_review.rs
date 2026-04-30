@@ -28,6 +28,8 @@ pub struct WebhookPullRequestReviewEvent {
     pub review_body: Option<String>, // top-level review comment body (None if empty)
     pub state: WebhookPullRequestReviewState,
     pub review_comments: u64, // total review-comment count on the PR at submission time
+    #[serde(default)]
+    pub mergeable_state: Option<String>, // GitHub: clean / dirty / unknown / blocked / behind / draft
 }
 
 impl WebhookEvent for WebhookPullRequestReviewEvent {

@@ -87,22 +87,9 @@ impl MessageBrokerWorker for MessageBrokerJobsWorker {
                         }
                     };
 
-                    let job_started_at = std::time::Instant::now();
-                    let job_run_result = handler.run(&delivery.envelope.payload).await;
-                    let job_elapsed = job_started_at.elapsed().as_secs_f64();
-                    let queue_label = self.queue.name.as_str();
-                    crate::infrastructure::metrics::registry::METRICS
-                        .job_processing_duration_seconds
-                        .with_label_values(&[queue_label])
-                        .observe(job_elapsed);
-
-                    match job_run_result {
+                    match handler.run(&delivery.envelope.payload).await {
                         Ok(response) => match response {
                             JobConsumerResponse::Ok => {
-                                crate::infrastructure::metrics::registry::METRICS
-                                    .job_processed_total
-                                    .with_label_values(&[queue_label, "success"])
-                                    .inc();
                                 tracing::info!(
                                     worker = %self.name,
                                     queue = %self.queue.name,
@@ -112,10 +99,6 @@ impl MessageBrokerWorker for MessageBrokerJobsWorker {
                                 delivery.ack().await
                             }
                             JobConsumerResponse::Reject(reason) => {
-                                crate::infrastructure::metrics::registry::METRICS
-                                    .job_processed_total
-                                    .with_label_values(&[queue_label, "rejected"])
-                                    .inc();
                                 tracing::warn!(
                                     worker = %self.name,
                                     queue = %self.queue.name,
@@ -126,10 +109,6 @@ impl MessageBrokerWorker for MessageBrokerJobsWorker {
                                 delivery.reject(reason.as_str()).await
                             }
                             JobConsumerResponse::Requeue => {
-                                crate::infrastructure::metrics::registry::METRICS
-                                    .job_processed_total
-                                    .with_label_values(&[queue_label, "requeued"])
-                                    .inc();
                                 tracing::warn!(
                                     worker = %self.name,
                                     queue = %self.queue.name,
@@ -139,10 +118,6 @@ impl MessageBrokerWorker for MessageBrokerJobsWorker {
                                 delivery.requeue().await
                             }
                             JobConsumerResponse::Retry(reason) => {
-                                crate::infrastructure::metrics::registry::METRICS
-                                    .job_processed_total
-                                    .with_label_values(&[queue_label, "retry"])
-                                    .inc();
                                 tracing::warn!(
                                     worker = %self.name,
                                     queue = %self.queue.name,
@@ -154,10 +129,6 @@ impl MessageBrokerWorker for MessageBrokerJobsWorker {
                             }
                         },
                         Err(error) => {
-                            crate::infrastructure::metrics::registry::METRICS
-                                .job_processed_total
-                                .with_label_values(&[queue_label, "error"])
-                                .inc();
                             tracing::error!(error = %error, "Failed handle run from job");
 
                             match error {

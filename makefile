@@ -55,31 +55,6 @@ docker-prod-restart:
 	docker-compose -f docker-compose.prod.yml --env-file .env.local up -d --build
 
 # ========================
-# Monitoring (Prometheus + Grafana + Loki + Promtail)
-# ========================
-
-monitoring-up:
-	docker-compose -f docker-compose.monitoring.yml up -d
-
-monitoring-down:
-	docker-compose -f docker-compose.monitoring.yml down
-
-monitoring-restart:
-	docker-compose -f docker-compose.monitoring.yml up -d --force-recreate
-
-monitoring-logs:
-	docker-compose -f docker-compose.monitoring.yml logs -f
-
-monitoring-logs-grafana:
-	docker-compose -f docker-compose.monitoring.yml logs -f grafana
-
-monitoring-logs-prometheus:
-	docker-compose -f docker-compose.monitoring.yml logs -f prometheus
-
-monitoring-logs-loki:
-	docker-compose -f docker-compose.monitoring.yml logs -f loki
-
-# ========================
 # Utilities
 # ========================
 

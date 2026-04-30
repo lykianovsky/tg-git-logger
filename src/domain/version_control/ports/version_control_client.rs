@@ -14,6 +14,26 @@ pub struct OpenPullRequestSummary {
     pub requested_reviewers: Vec<String>,
 }
 
+#[derive(Debug, Clone)]
+pub struct UserPullRequestSummary {
+    pub number: u64,
+    pub title: String,
+    pub url: String,
+    pub repo: String, // owner/repo
+    pub author_login: String,
+    pub updated_at: DateTime<Utc>,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Error)]
+pub enum VersionControlClientSearchPrsError {
+    #[error("Unauthorized: {0}")]
+    Unauthorized(String),
+
+    #[error("Transport error: {0}")]
+    Transport(String),
+}
+
 #[derive(Debug)]
 pub struct VersionControlClientGetUserResponse {
     pub id: i64,
@@ -69,6 +89,18 @@ pub enum VersionControlClientListPullRequestsError {
     Transport(String),
 }
 
+#[derive(Debug, Error)]
+pub enum VersionControlClientGetPrError {
+    #[error("Unauthorized: {0}")]
+    Unauthorized(String),
+
+    #[error("Not found")]
+    NotFound,
+
+    #[error("Transport error: {0}")]
+    Transport(String),
+}
+
 #[async_trait]
 pub trait VersionControlClient: Send + Sync {
     async fn get_user(
@@ -109,4 +141,26 @@ pub trait VersionControlClient: Send + Sync {
         owner: &str,
         repo: &str,
     ) -> Result<Vec<OpenPullRequestSummary>, VersionControlClientListPullRequestsError>;
+
+    async fn get_pr_mergeable_state(
+        &self,
+        access_token: &str,
+        owner: &str,
+        repo: &str,
+        pr_number: u64,
+    ) -> Result<Option<String>, VersionControlClientGetPrError>;
+
+    async fn search_user_authored_open_prs(
+        &self,
+        access_token: &str,
+        login: &str,
+        repos: &[String],
+    ) -> Result<Vec<UserPullRequestSummary>, VersionControlClientSearchPrsError>;
+
+    async fn search_user_pending_reviews(
+        &self,
+        access_token: &str,
+        login: &str,
+        repos: &[String],
+    ) -> Result<Vec<UserPullRequestSummary>, VersionControlClientSearchPrsError>;
 }

@@ -29,6 +29,8 @@ pub struct GithubReviewPullRequest {
     pub user: GithubReviewUser,
     #[serde(default)]
     pub review_comments: u64,
+    #[serde(default)]
+    pub mergeable_state: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -70,6 +72,7 @@ impl GithubEvent for GithubPullRequestReviewEvent {
             review_body: self.review.body.clone().filter(|b| !b.trim().is_empty()),
             state,
             review_comments: self.pull_request.review_comments,
+            mergeable_state: self.pull_request.mergeable_state.clone(),
         }
     }
 }

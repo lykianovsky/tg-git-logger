@@ -26,7 +26,6 @@ impl TelegramBotWhoamiCommandHandler {
         Self { context, executors }
     }
 
-    #[tracing::instrument(name = "tg.whoami", skip_all, fields(user_id = self.context.user.id.0))]
     pub async fn execute(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let social_user_id = SocialUserId(self.context.user.id.0 as i32);
 

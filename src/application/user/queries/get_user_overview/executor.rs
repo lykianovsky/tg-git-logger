@@ -45,11 +45,6 @@ impl CommandExecutor for GetUserOverviewExecutor {
     type Response = GetUserOverviewResponse;
     type Error = GetUserOverviewError;
 
-    #[tracing::instrument(
-        name = "get_user_overview",
-        skip_all,
-        fields(social_user_id = cmd.social_user_id.0)
-    )]
     async fn execute(&self, cmd: &Self::Command) -> Result<Self::Response, Self::Error> {
         let social = self
             .user_socials_repo

@@ -89,6 +89,27 @@
       "admin": {
         "panel_title": "🔧 Панель администратора"
       },
+      "status": {
+        "title": "📡 Статус сервисов",
+        "empty": "Health-pings не настроены. Добавьте их в /admin.",
+        "not_registered": "❌ Вы не зарегистрированы.",
+        "forbidden": "⛔ Команда доступна только администратору.",
+        "error": "❌ Не удалось получить статус. Попробуйте позже."
+      },
+      "my_prs": {
+        "title": "📋 Ваши открытые PR (%{count}):",
+        "empty": "✅ Открытых PR нет.",
+        "not_registered": "❌ Вы не зарегистрированы. /register",
+        "no_github": "❌ GitHub не привязан. Завершите /register.",
+        "error": "❌ Не удалось получить список. Попробуйте позже."
+      },
+      "pending_reviews": {
+        "title": "👀 Ждут вашего ревью (%{count}):",
+        "empty": "✅ Ничего не висит.",
+        "not_registered": "❌ Вы не зарегистрированы. /register",
+        "no_github": "❌ GitHub не привязан. Завершите /register.",
+        "error": "❌ Не удалось получить список. Попробуйте позже."
+      },
       "task": {
         "invalid_id": "❌ Введите числовой ID карточки: <code>/task 12345</code>",
         "searching": "⏳ Ищем карточку...",
@@ -197,6 +218,19 @@
         "pr": "PR",
         "repository": "Репозиторий",
         "open": "Открыть PR →"
+      },
+      "pr_ready_to_merge": {
+        "title": "🟢 PR готов к мерджу",
+        "pr": "PR",
+        "repository": "Репозиторий",
+        "author": "Автор",
+        "open": "Открыть PR →"
+      },
+      "ci_fail": {
+        "title": "🔴 Workflow упал",
+        "workflow": "Workflow",
+        "repository": "Репозиторий",
+        "open": "Открыть прогон →"
       },
       "re_review_nudge": {
         "title": "🔄 Автор обновил PR — посмотрите ещё раз",

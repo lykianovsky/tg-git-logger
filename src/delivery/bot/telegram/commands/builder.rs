@@ -3,7 +3,9 @@ use crate::config::application::ApplicationConfig;
 use crate::delivery::bot::telegram::commands::admin::TelegramBotAdminCommandHandler;
 use crate::delivery::bot::telegram::commands::bind_repository::TelegramBotBindRepositoryCommandHandler;
 use crate::delivery::bot::telegram::commands::digest::TelegramBotDigestCommandHandler;
+use crate::delivery::bot::telegram::commands::my_prs::TelegramBotMyPrsCommandHandler;
 use crate::delivery::bot::telegram::commands::notifications::TelegramBotNotificationsCommandHandler;
+use crate::delivery::bot::telegram::commands::pending_reviews::TelegramBotPendingReviewsCommandHandler;
 use crate::delivery::bot::telegram::commands::register::TelegramBotRegisterCommandHandler;
 use crate::delivery::bot::telegram::commands::release_plan::TelegramBotReleasePlanCommandHandler;
 use crate::delivery::bot::telegram::commands::releases::TelegramBotReleasesCommandHandler;
@@ -13,6 +15,7 @@ use crate::delivery::bot::telegram::commands::setup::TelegramBotSetupCommandHand
 use crate::delivery::bot::telegram::commands::setup_notifications::TelegramBotSetupNotificationsCommandHandler;
 use crate::delivery::bot::telegram::commands::setup_webhook::TelegramBotSetupWebhookCommandHandler;
 use crate::delivery::bot::telegram::commands::start::TelegramBotStartCommandHandler;
+use crate::delivery::bot::telegram::commands::status::TelegramBotStatusCommandHandler;
 use crate::delivery::bot::telegram::commands::task::TelegramBotTaskCommandHandler;
 use crate::delivery::bot::telegram::commands::unregister::TelegramBotUnregisterCommandHandler;
 use crate::delivery::bot::telegram::commands::vacation::TelegramBotVacationCommandHandler;
@@ -77,6 +80,15 @@ pub enum TelegramBotCommand {
 
     #[command(description = "Мой профиль и настройки")]
     Whoami,
+
+    #[command(description = "Статус сервисов и health-pings (Admin)")]
+    Status,
+
+    #[command(rename = "my_prs", description = "Мои открытые PR")]
+    MyPrs,
+
+    #[command(rename = "pending_reviews", description = "PR, ожидающие моего ревью")]
+    PendingReviews,
 }
 
 pub async fn handle(
@@ -269,6 +281,24 @@ pub async fn handle(
 
         TelegramBotCommand::Whoami => {
             TelegramBotWhoamiCommandHandler::new(context, executors.clone())
+                .execute()
+                .await?;
+        }
+
+        TelegramBotCommand::Status => {
+            TelegramBotStatusCommandHandler::new(context, executors.clone())
+                .execute()
+                .await?;
+        }
+
+        TelegramBotCommand::MyPrs => {
+            TelegramBotMyPrsCommandHandler::new(context, executors.clone())
+                .execute()
+                .await?;
+        }
+
+        TelegramBotCommand::PendingReviews => {
+            TelegramBotPendingReviewsCommandHandler::new(context, executors.clone())
                 .execute()
                 .await?;
         }

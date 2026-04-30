@@ -34,10 +34,6 @@ impl GithubWebhookAuthorizationMiddleware {
             Ok(bytes) => bytes,
             Err(err) => {
                 tracing::error!(error = ?err, "Invalid hex in GitHub signature: {}", signature);
-                crate::infrastructure::metrics::registry::METRICS
-                    .webhook_signature_invalid_total
-                    .with_label_values(&["github"])
-                    .inc();
                 return Err(StatusCode::FORBIDDEN);
             }
         };
@@ -71,10 +67,6 @@ impl GithubWebhookAuthorizationMiddleware {
         };
 
         if !verified {
-            crate::infrastructure::metrics::registry::METRICS
-                .webhook_signature_invalid_total
-                .with_label_values(&["github"])
-                .inc();
             return Err(StatusCode::FORBIDDEN);
         }
 

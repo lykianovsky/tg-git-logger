@@ -14,6 +14,7 @@ use crate::application::health_ping::queries::get_all_health_pings::executor::Ge
 use crate::application::monitoring::queries::get_queues_stats::executor::GetQueuesStatsExecutor;
 use crate::application::notification::commands::buffer_notification::executor::BufferNotificationExecutor;
 use crate::application::notification::commands::flush_pending_notifications::executor::FlushPendingNotificationsExecutor;
+use crate::application::notification::commands::scan_pr_conflicts::executor::ScanPrConflictsExecutor;
 use crate::application::notification::commands::scan_stale_pull_requests::executor::ScanStalePullRequestsExecutor;
 use crate::application::notification::commands::send_social_notify::executor::SendSocialNotifyExecutor;
 use crate::application::release_plan::commands::cancel_release_plan::executor::CancelReleasePlanExecutor;
@@ -42,6 +43,8 @@ use crate::application::user::commands::remove_user_role::executor::RemoveUserRo
 use crate::application::user::commands::toggle_user_active::executor::ToggleUserActiveExecutor;
 use crate::application::user::commands::unbind_repository::executor::UnbindRepositoryExecutor;
 use crate::application::user::queries::get_all_users::executor::GetAllUsersExecutor;
+use crate::application::user::queries::get_my_pull_requests::executor::GetMyPullRequestsExecutor;
+use crate::application::user::queries::get_pending_reviews::executor::GetPendingReviewsExecutor;
 use crate::application::user::queries::get_user_bound_repositories::executor::GetUserBoundRepositoriesExecutor;
 use crate::application::user::queries::get_user_overview::executor::GetUserOverviewExecutor;
 use crate::application::user::queries::get_user_roles_by_telegram_id::executor::GetUserRolesByTelegramIdExecutor;
@@ -70,6 +73,8 @@ pub struct ApplicationBoostrapExecutorsQueries {
     pub get_user_preferences: Arc<GetUserPreferencesExecutor>,
     pub get_upcoming_release_plans: Arc<GetUpcomingReleasePlansExecutor>,
     pub get_user_overview: Arc<GetUserOverviewExecutor>,
+    pub get_my_pull_requests: Arc<GetMyPullRequestsExecutor>,
+    pub get_pending_reviews: Arc<GetPendingReviewsExecutor>,
 }
 
 pub struct ApplicationBoostrapExecutorsCommands {
@@ -110,6 +115,7 @@ pub struct ApplicationBoostrapExecutorsCommands {
     pub update_user_preferences: Arc<UpdateUserPreferencesExecutor>,
 
     pub scan_stale_pull_requests: Arc<ScanStalePullRequestsExecutor>,
+    pub scan_pr_conflicts: Arc<ScanPrConflictsExecutor>,
 
     pub create_release_plan: Arc<CreateReleasePlanExecutor>,
     pub update_release_plan: Arc<UpdateReleasePlanExecutor>,
@@ -192,6 +198,24 @@ impl ApplicationBoostrapExecutors {
                 shared_dependency.user_preferences_repo.clone(),
                 shared_dependency.user_connection_repositories_repo.clone(),
                 shared_dependency.repository_repo.clone(),
+            )),
+
+            get_my_pull_requests: Arc::new(GetMyPullRequestsExecutor::new(
+                shared_dependency.user_socials_repo.clone(),
+                shared_dependency.user_version_controls_repo.clone(),
+                shared_dependency.user_connection_repositories_repo.clone(),
+                shared_dependency.repository_repo.clone(),
+                shared_dependency.version_control_client.clone(),
+                shared_dependency.reversible_cipher.clone(),
+            )),
+
+            get_pending_reviews: Arc::new(GetPendingReviewsExecutor::new(
+                shared_dependency.user_socials_repo.clone(),
+                shared_dependency.user_version_controls_repo.clone(),
+                shared_dependency.user_connection_repositories_repo.clone(),
+                shared_dependency.repository_repo.clone(),
+                shared_dependency.version_control_client.clone(),
+                shared_dependency.reversible_cipher.clone(),
             )),
         };
 
@@ -365,6 +389,17 @@ impl ApplicationBoostrapExecutors {
                 version_control_client: shared_dependency.version_control_client.clone(),
                 reversible_cipher: shared_dependency.reversible_cipher.clone(),
                 stale_threshold_hours: config.notifications.stale_threshold_hours,
+            }),
+
+            scan_pr_conflicts: Arc::new(ScanPrConflictsExecutor {
+                publisher: shared_dependency.publisher.clone(),
+                repository_repo: shared_dependency.repository_repo.clone(),
+                notification_log_repo: shared_dependency.notification_log_repo.clone(),
+                user_has_roles_repo: shared_dependency.user_has_roles_repo.clone(),
+                user_socials_repo: shared_dependency.user_socials_repo.clone(),
+                user_vc_accounts_repo: shared_dependency.user_version_controls_repo.clone(),
+                version_control_client: shared_dependency.version_control_client.clone(),
+                reversible_cipher: shared_dependency.reversible_cipher.clone(),
             }),
 
             create_release_plan: Arc::new(CreateReleasePlanExecutor {

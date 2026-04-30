@@ -157,9 +157,8 @@ impl ApplicationBootstrap {
 
     fn setup_logging(&self, config: &ApplicationConfig) {
         let debug_filter: &str = if config.debug { "debug" } else { "info" };
-        let log_format = std::env::var("LOG_FORMAT").unwrap_or_else(|_| "text".to_string());
 
-        let builder = tracing_subscriber::fmt()
+        tracing_subscriber::fmt()
             .with_env_filter(debug_filter)
             .with_span_events(
                 tracing_subscriber::fmt::format::FmtSpan::ENTER
@@ -167,12 +166,7 @@ impl ApplicationBootstrap {
             )
             .with_target(true)
             .with_file(true)
-            .with_line_number(config.debug);
-
-        if log_format == "json" {
-            builder.json().init();
-        } else {
-            builder.init();
-        }
+            .with_line_number(config.debug)
+            .init();
     }
 }

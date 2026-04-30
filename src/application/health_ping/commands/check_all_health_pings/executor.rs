@@ -193,16 +193,7 @@ impl CommandExecutor for CheckAllHealthPingsExecutor {
                     ping_name = %ping.name,
                     "Failed to update health ping status"
                 );
-                crate::infrastructure::metrics::registry::METRICS
-                    .errors_total
-                    .with_label_values(&["health_ping", "update_failed"])
-                    .inc();
             }
-
-            crate::infrastructure::metrics::registry::METRICS
-                .health_ping_status
-                .with_label_values(&[&ping.name])
-                .set(if result.is_success { 1 } else { 0 });
 
             checked_count += 1;
         }

@@ -13,11 +13,6 @@ use std::sync::Arc;
 pub struct AxumWebhookGithubController {}
 
 impl AxumWebhookGithubController {
-    #[tracing::instrument(
-        name = "webhook.github",
-        skip_all,
-        fields(event_type = tracing::field::Empty)
-    )]
     pub async fn handle_post(
         headers: HeaderMap,
         Extension(executor): Extension<Arc<DispatchWebhookEventExecutor>>,
@@ -41,19 +36,6 @@ impl AxumWebhookGithubController {
         let github_event_type = GithubEventType::from_str(raw_event_type)
             .unwrap_or(GithubEventType::Unknown(raw_event_type.to_string()));
 
-        tracing::Span::current().record("event_type", raw_event_type);
-
-        // Normalize event_type label to a small known set to avoid Prometheus
-        // cardinality blow-up if random/unexpected event types arrive.
-        let metric_label = match &github_event_type {
-            GithubEventType::Unknown(_) => "unknown",
-            _ => raw_event_type,
-        };
-        crate::infrastructure::metrics::registry::METRICS
-            .webhook_received_total
-            .with_label_values(&[metric_label])
-            .inc();
-
         tracing::debug!("Parsed GitHub event type: {:?}", github_event_type);
 
         if github_event_type == GithubEventType::Ping {
@@ -66,10 +48,6 @@ impl AxumWebhookGithubController {
             Ok(event) => event,
             Err(error) => {
                 tracing::error!("Failed to map GitHub event: {:?}", error);
-                crate::infrastructure::metrics::registry::METRICS
-                    .errors_total
-                    .with_label_values(&["webhook", "map_failed"])
-                    .inc();
                 return StatusCode::BAD_REQUEST;
             }
         };
@@ -83,10 +61,6 @@ impl AxumWebhookGithubController {
             }
             Err(error) => {
                 tracing::error!("{:?}", error);
-                crate::infrastructure::metrics::registry::METRICS
-                    .errors_total
-                    .with_label_values(&["webhook", "dispatch_failed"])
-                    .inc();
                 StatusCode::BAD_REQUEST
             }
         }

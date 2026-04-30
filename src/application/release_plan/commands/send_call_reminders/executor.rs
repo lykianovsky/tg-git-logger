@@ -22,7 +22,6 @@ impl CommandExecutor for SendCallRemindersExecutor {
     type Response = SendCallRemindersExecutorResponse;
     type Error = SendCallRemindersExecutorError;
 
-    #[tracing::instrument(name = "send_call_reminders", skip_all)]
     async fn execute(&self, _cmd: &Self::Command) -> Result<Self::Response, Self::Error> {
         let now = Utc::now();
         let in_one_hour = now + Duration::hours(1);

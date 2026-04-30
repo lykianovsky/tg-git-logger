@@ -15,11 +15,6 @@ impl CommandExecutor for CompleteReleasePlanExecutor {
     type Response = CompleteReleasePlanExecutorResponse;
     type Error = CompleteReleasePlanExecutorError;
 
-    #[tracing::instrument(
-        name = "complete_release_plan",
-        skip_all,
-        fields(plan_id = cmd.plan_id.0)
-    )]
     async fn execute(&self, cmd: &Self::Command) -> Result<Self::Response, Self::Error> {
         self.release_plan_repo
             .set_status(cmd.plan_id, ReleasePlanStatus::Done)

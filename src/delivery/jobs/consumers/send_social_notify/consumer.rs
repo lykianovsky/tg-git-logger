@@ -16,7 +16,6 @@ impl JobConsumer for SendSocialNotifyJobConsumer {
         SendSocialNotifyJob::NAME
     }
 
-    #[tracing::instrument(name = "job.send_social_notify", skip(self, payload))]
     async fn run(&self, payload: &[u8]) -> Result<JobConsumerResponse, JobConsumerError> {
         let payload: SendSocialNotifyJob = serde_json::from_slice(payload)
             .map_err(|e| JobConsumerError::DeserializationError(e.to_string()))?;

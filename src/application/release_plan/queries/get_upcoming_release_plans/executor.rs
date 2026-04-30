@@ -20,11 +20,6 @@ impl CommandExecutor for GetUpcomingReleasePlansExecutor {
     type Response = GetUpcomingReleasePlansResponse;
     type Error = GetUpcomingReleasePlansError;
 
-    #[tracing::instrument(
-        name = "get_upcoming_release_plans",
-        skip_all,
-        fields(from_date = %cmd.from_date)
-    )]
     async fn execute(&self, cmd: &Self::Command) -> Result<Self::Response, Self::Error> {
         let plans = self.release_plan_repo.find_upcoming(cmd.from_date).await?;
         Ok(GetUpcomingReleasePlansResponse { plans })
