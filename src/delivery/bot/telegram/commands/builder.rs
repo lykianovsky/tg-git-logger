@@ -339,9 +339,15 @@ pub async fn handle(
         }
 
         TelegramBotCommand::ReleasePlan => {
-            TelegramBotReleasePlanCommandHandler::new(context.bot, context.msg, Arc::new(dialogue))
-                .execute()
-                .await?;
+            TelegramBotReleasePlanCommandHandler::new(
+                context.bot,
+                context.msg,
+                context.user,
+                executors.clone(),
+                Arc::new(dialogue),
+            )
+            .execute()
+            .await?;
         }
 
         TelegramBotCommand::Whoami => {
