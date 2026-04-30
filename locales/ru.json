@@ -181,7 +181,8 @@
         "note": "Заметка",
         "btn_edit": "📝 Редактировать",
         "btn_cancel": "❌ Отменить",
-        "btn_complete": "✅ Закрыть"
+        "btn_complete": "✅ Закрыть",
+        "btn_back": "↩️ К списку"
       }
     },
     "notifications": {

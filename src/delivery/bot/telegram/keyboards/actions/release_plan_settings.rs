@@ -3,17 +3,24 @@ use crate::delivery::bot::telegram::keyboards::actions::{
 };
 use strum_macros::{AsRefStr, EnumString};
 
-/// Prefix for callback "open settings menu for plan id" — under each plan in /releases list.
-pub const RPS_SELECT_PREFIX: &str = "rps_select_";
-/// Prefix for callback "cancel plan" — opens reason input.
+/// Prefix for callback "view release plan card" — list item callback.
+pub const RPS_VIEW_PREFIX: &str = "rps_view_";
+/// Prefix for callback "open settings menu for plan id" — opens edit menu (Admin/PM only).
+pub const RPS_EDIT_PREFIX: &str = "rps_edit_";
+/// Callback "back to releases list" — re-renders the plan list message.
+pub const RPS_BACK_TO_LIST: &str = "rps_back_to_list";
+/// Prefix for callback "cancel plan" — opens reason input (Admin/PM only).
 pub const RPS_CANCEL_BTN_PREFIX: &str = "rps_cancel_";
-/// Prefix for callback "complete plan" — opens confirmation.
+/// Prefix for callback "complete plan" — opens confirmation (Admin/PM only).
 pub const RPS_COMPLETE_BTN_PREFIX: &str = "rps_complete_";
 /// Prefix for repo toggle inside settings menu.
 pub const RPS_REPO_TOGGLE_PREFIX: &str = "rps_repo_";
 
-pub fn rps_select_callback(plan_id: i32) -> String {
-    format!("{}{}", RPS_SELECT_PREFIX, plan_id)
+pub fn rps_view_callback(plan_id: i32) -> String {
+    format!("{}{}", RPS_VIEW_PREFIX, plan_id)
+}
+pub fn rps_edit_callback(plan_id: i32) -> String {
+    format!("{}{}", RPS_EDIT_PREFIX, plan_id)
 }
 pub fn rps_cancel_btn_callback(plan_id: i32) -> String {
     format!("{}{}", RPS_CANCEL_BTN_PREFIX, plan_id)

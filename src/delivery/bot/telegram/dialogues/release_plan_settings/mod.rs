@@ -10,9 +10,10 @@ use crate::delivery::bot::telegram::dialogues::{
 };
 use crate::delivery::bot::telegram::keyboards::actions::TelegramBotKeyboardAction;
 use crate::delivery::bot::telegram::keyboards::actions::release_plan_settings::{
-    RPS_CANCEL_BTN_PREFIX, RPS_COMPLETE_BTN_PREFIX, RPS_REPO_TOGGLE_PREFIX, RPS_SELECT_PREFIX,
-    TelegramBotReleasePlanSettingsConfirmAction, TelegramBotReleasePlanSettingsMenuAction,
-    TelegramBotReleasePlanSettingsReposAction, rps_repo_toggle_callback,
+    RPS_BACK_TO_LIST, RPS_CANCEL_BTN_PREFIX, RPS_COMPLETE_BTN_PREFIX, RPS_EDIT_PREFIX,
+    RPS_REPO_TOGGLE_PREFIX, RPS_VIEW_PREFIX, TelegramBotReleasePlanSettingsConfirmAction,
+    TelegramBotReleasePlanSettingsMenuAction, TelegramBotReleasePlanSettingsReposAction,
+    rps_cancel_btn_callback, rps_complete_btn_callback, rps_edit_callback, rps_repo_toggle_callback,
 };
 use crate::domain::release_plan::value_objects::release_plan_id::ReleasePlanId;
 use crate::domain::repository::value_objects::repository_id::RepositoryId;
@@ -272,9 +273,26 @@ async fn handle_awaiting_selection(
     };
     let chat_id = msg.chat().id;
     let message_id = msg.id();
+    let social_user_id = SocialUserId(query.from.id.0 as i32);
 
-    if let Some(rest) = data.strip_prefix(RPS_SELECT_PREFIX) {
+    if data == RPS_BACK_TO_LIST {
+        show_release_list(&bot, &executors, chat_id, message_id).await?;
+        return Ok(());
+    }
+
+    if let Some(rest) = data.strip_prefix(RPS_VIEW_PREFIX) {
         if let Ok(plan_id) = rest.parse::<i32>() {
+            let can_manage = is_user_manager(&executors, social_user_id).await;
+            show_release_card(&bot, &executors, chat_id, message_id, plan_id, can_manage).await?;
+            return Ok(());
+        }
+    }
+
+    if let Some(rest) = data.strip_prefix(RPS_EDIT_PREFIX) {
+        if let Ok(plan_id) = rest.parse::<i32>() {
+            if !is_user_manager(&executors, social_user_id).await {
+                return Ok(());
+            }
             dialogue
                 .update(TelegramBotDialogueState::ReleasePlanSettings(
                     TelegramBotReleasePlanSettingsState::Menu { plan_id },
@@ -287,6 +305,9 @@ async fn handle_awaiting_selection(
 
     if let Some(rest) = data.strip_prefix(RPS_CANCEL_BTN_PREFIX) {
         if let Ok(plan_id) = rest.parse::<i32>() {
+            if !is_user_manager(&executors, social_user_id).await {
+                return Ok(());
+            }
             dialogue
                 .update(TelegramBotDialogueState::ReleasePlanSettings(
                     TelegramBotReleasePlanSettingsState::EnterCancelReason { plan_id },
@@ -307,6 +328,9 @@ async fn handle_awaiting_selection(
 
     if let Some(rest) = data.strip_prefix(RPS_COMPLETE_BTN_PREFIX) {
         if let Ok(plan_id) = rest.parse::<i32>() {
+            if !is_user_manager(&executors, social_user_id).await {
+                return Ok(());
+            }
             dialogue
                 .update(TelegramBotDialogueState::ReleasePlanSettings(
                     TelegramBotReleasePlanSettingsState::ConfirmComplete { plan_id },
@@ -327,6 +351,172 @@ async fn handle_awaiting_selection(
     }
 
     Ok(())
+}
+
+async fn is_user_manager(
+    executors: &Arc<ApplicationBoostrapExecutors>,
+    social_user_id: SocialUserId,
+) -> bool {
+    use crate::application::user::queries::get_user_roles_by_telegram_id::query::GetUserRolesByTelegramIdQuery;
+    use crate::domain::role::value_objects::role_name::RoleName;
+
+    match executors
+        .queries
+        .get_user_roles_by_telegram_id
+        .execute(&GetUserRolesByTelegramIdQuery { social_user_id })
+        .await
+    {
+        Ok(r) => r.roles.contains(&RoleName::Admin) || r.roles.contains(&RoleName::ProductManager),
+        Err(_) => false,
+    }
+}
+
+async fn show_release_list(
+    bot: &Bot,
+    executors: &Arc<ApplicationBoostrapExecutors>,
+    chat_id: ChatId,
+    message_id: MessageId,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    use crate::application::release_plan::queries::get_upcoming_release_plans::query::GetUpcomingReleasePlansQuery;
+    use crate::application::repository::queries::get_all_repositories::query::GetAllRepositoriesQuery;
+    use crate::delivery::bot::telegram::commands::releases::build_plans_list_keyboard;
+    use crate::domain::repository::value_objects::repository_id::RepositoryId;
+
+    let today_msk = Utc::now().with_timezone(&Moscow).date_naive();
+
+    let plans = match executors
+        .queries
+        .get_upcoming_release_plans
+        .execute(&GetUpcomingReleasePlansQuery {
+            from_date: today_msk,
+        })
+        .await
+    {
+        Ok(r) => r.plans,
+        Err(_) => return Ok(()),
+    };
+
+    if plans.is_empty() {
+        edit_menu(
+            bot,
+            chat_id,
+            message_id,
+            &t!("telegram_bot.commands.releases.empty").to_string(),
+            None,
+        )
+        .await?;
+        return Ok(());
+    }
+
+    let repos = executors
+        .queries
+        .get_all_repositories
+        .execute(&GetAllRepositoriesQuery {})
+        .await
+        .map(|r| r.repositories)
+        .unwrap_or_default();
+    let repo_label_by_id: std::collections::HashMap<RepositoryId, String> = repos
+        .into_iter()
+        .map(|r| (r.id, format!("{}/{}", r.owner, r.name)))
+        .collect();
+
+    let header = t!(
+        "telegram_bot.commands.releases.title",
+        count = plans.len()
+    )
+    .to_string();
+    let kb = build_plans_list_keyboard(&plans, &repo_label_by_id, today_msk);
+    edit_menu(bot, chat_id, message_id, &header, Some(kb)).await
+}
+
+async fn show_release_card(
+    bot: &Bot,
+    executors: &Arc<ApplicationBoostrapExecutors>,
+    chat_id: ChatId,
+    message_id: MessageId,
+    plan_id: i32,
+    can_manage: bool,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    use crate::application::release_plan::queries::get_upcoming_release_plans::query::GetUpcomingReleasePlansQuery;
+    use crate::application::repository::queries::get_all_repositories::query::GetAllRepositoriesQuery;
+    use crate::delivery::bot::telegram::commands::releases::render_plan_card;
+    use crate::domain::repository::value_objects::repository_id::RepositoryId;
+
+    let today_msk = Utc::now().with_timezone(&Moscow).date_naive();
+
+    let plans = match executors
+        .queries
+        .get_upcoming_release_plans
+        .execute(&GetUpcomingReleasePlansQuery {
+            from_date: chrono::NaiveDate::MIN,
+        })
+        .await
+    {
+        Ok(r) => r.plans,
+        Err(_) => return Ok(()),
+    };
+    let plan = match plans.into_iter().find(|p| p.id.0 == plan_id) {
+        Some(p) => p,
+        None => {
+            edit_menu(
+                bot,
+                chat_id,
+                message_id,
+                &t!("telegram_bot.dialogues.release_plan_settings.not_found").to_string(),
+                Some(build_back_to_list_keyboard()),
+            )
+            .await?;
+            return Ok(());
+        }
+    };
+
+    let repos = executors
+        .queries
+        .get_all_repositories
+        .execute(&GetAllRepositoriesQuery {})
+        .await
+        .map(|r| r.repositories)
+        .unwrap_or_default();
+    let repo_label_by_id: std::collections::HashMap<RepositoryId, String> = repos
+        .into_iter()
+        .map(|r| (r.id, format!("{}/{}", r.owner, r.name)))
+        .collect();
+
+    let text = render_plan_card(&plan, &repo_label_by_id, today_msk);
+    let kb = build_card_keyboard(plan_id, can_manage);
+    edit_menu(bot, chat_id, message_id, &text, Some(kb)).await
+}
+
+fn build_card_keyboard(plan_id: i32, can_manage: bool) -> InlineKeyboardMarkup {
+    let mut rows: Vec<Vec<InlineKeyboardButton>> = Vec::new();
+    if can_manage {
+        rows.push(vec![
+            InlineKeyboardButton::callback(
+                t!("telegram_bot.commands.releases.btn_edit").to_string(),
+                rps_edit_callback(plan_id),
+            ),
+            InlineKeyboardButton::callback(
+                t!("telegram_bot.commands.releases.btn_cancel").to_string(),
+                rps_cancel_btn_callback(plan_id),
+            ),
+            InlineKeyboardButton::callback(
+                t!("telegram_bot.commands.releases.btn_complete").to_string(),
+                rps_complete_btn_callback(plan_id),
+            ),
+        ]);
+    }
+    rows.push(vec![InlineKeyboardButton::callback(
+        t!("telegram_bot.commands.releases.btn_back").to_string(),
+        RPS_BACK_TO_LIST.to_string(),
+    )]);
+    InlineKeyboardMarkup::new(rows)
+}
+
+fn build_back_to_list_keyboard() -> InlineKeyboardMarkup {
+    InlineKeyboardMarkup::new(vec![vec![InlineKeyboardButton::callback(
+        t!("telegram_bot.commands.releases.btn_back").to_string(),
+        RPS_BACK_TO_LIST.to_string(),
+    )]])
 }
 
 async fn handle_menu_callback(

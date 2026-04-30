@@ -8,12 +8,9 @@ use crate::delivery::bot::telegram::dialogues::release_plan_settings::TelegramBo
 use crate::delivery::bot::telegram::dialogues::{
     TelegramBotDialogueState, TelegramBotDialogueType,
 };
-use crate::delivery::bot::telegram::keyboards::actions::release_plan_settings::{
-    rps_cancel_btn_callback, rps_complete_btn_callback, rps_select_callback,
-};
+use crate::delivery::bot::telegram::keyboards::actions::release_plan_settings::rps_view_callback;
 use crate::domain::release_plan::entities::release_plan::ReleasePlan;
 use crate::domain::repository::value_objects::repository_id::RepositoryId;
-use crate::domain::role::value_objects::role_name::RoleName;
 use crate::domain::shared::command::CommandExecutor;
 use crate::domain::user::value_objects::social_user_id::SocialUserId;
 use crate::utils::builder::message::MessageBuilder;
@@ -47,34 +44,28 @@ impl TelegramBotReleasesCommandHandler {
     pub async fn execute(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let social_user_id = SocialUserId(self.context.user.id.0 as i32);
 
-        let roles = match self
+        if let Err(e) = self
             .executors
             .queries
             .get_user_roles_by_telegram_id
             .execute(&GetUserRolesByTelegramIdQuery { social_user_id })
             .await
         {
-            Ok(r) => r.roles,
-            Err(e) => {
-                let reply = match e {
-                    GetUserRolesByTelegramIdError::UserNotFound => {
-                        t!("telegram_bot.commands.releases.not_registered").to_string()
-                    }
-                    GetUserRolesByTelegramIdError::DbError(_) => {
-                        tracing::error!(error = %e, "Failed to load user roles");
-                        t!("telegram_bot.commands.releases.error").to_string()
-                    }
-                };
-                self.context
-                    .bot
-                    .send_message(self.context.msg.chat.id, reply)
-                    .await?;
-                return Ok(());
-            }
-        };
-
-        let can_manage = roles.contains(&RoleName::Admin)
-            || roles.contains(&RoleName::ProductManager);
+            let reply = match e {
+                GetUserRolesByTelegramIdError::UserNotFound => {
+                    t!("telegram_bot.commands.releases.not_registered").to_string()
+                }
+                GetUserRolesByTelegramIdError::DbError(_) => {
+                    tracing::error!(error = %e, "Failed to load user roles");
+                    t!("telegram_bot.commands.releases.error").to_string()
+                }
+            };
+            self.context
+                .bot
+                .send_message(self.context.msg.chat.id, reply)
+                .await?;
+            return Ok(());
+        }
 
         let today_msk = Utc::now().with_timezone(&Moscow).date_naive();
 
@@ -133,56 +124,78 @@ impl TelegramBotReleasesCommandHandler {
         )
         .to_string();
 
+        let keyboard = build_plans_list_keyboard(&plans, &repo_label_by_id, today_msk);
+
         self.context
             .bot
             .send_message(self.context.msg.chat.id, header)
             .parse_mode(ParseMode::Html)
+            .reply_markup(keyboard)
             .await?;
 
-        for plan in &plans {
-            let text = render_plan_card(plan, &repo_label_by_id, today_msk);
-            let mut send = self
-                .context
-                .bot
-                .send_message(self.context.msg.chat.id, text)
-                .parse_mode(ParseMode::Html);
-
-            if can_manage {
-                send = send.reply_markup(build_plan_actions_keyboard(plan.id.0));
-            }
-            send.await?;
-        }
-
-        if can_manage {
-            self.dialogue
-                .update(TelegramBotDialogueState::ReleasePlanSettings(
-                    TelegramBotReleasePlanSettingsState::AwaitingSelection,
-                ))
-                .await?;
-        }
+        self.dialogue
+            .update(TelegramBotDialogueState::ReleasePlanSettings(
+                TelegramBotReleasePlanSettingsState::AwaitingSelection,
+            ))
+            .await?;
 
         Ok(())
     }
 }
 
-fn build_plan_actions_keyboard(plan_id: i32) -> InlineKeyboardMarkup {
-    InlineKeyboardMarkup::new(vec![vec![
-        InlineKeyboardButton::callback(
-            t!("telegram_bot.commands.releases.btn_edit").to_string(),
-            rps_select_callback(plan_id),
-        ),
-        InlineKeyboardButton::callback(
-            t!("telegram_bot.commands.releases.btn_cancel").to_string(),
-            rps_cancel_btn_callback(plan_id),
-        ),
-        InlineKeyboardButton::callback(
-            t!("telegram_bot.commands.releases.btn_complete").to_string(),
-            rps_complete_btn_callback(plan_id),
-        ),
-    ]])
+pub fn build_plans_list_keyboard(
+    plans: &[ReleasePlan],
+    repo_label_by_id: &HashMap<RepositoryId, String>,
+    today_msk: NaiveDate,
+) -> InlineKeyboardMarkup {
+    let rows: Vec<Vec<InlineKeyboardButton>> = plans
+        .iter()
+        .map(|plan| {
+            let label = build_plan_button_label(plan, repo_label_by_id, today_msk);
+            vec![InlineKeyboardButton::callback(
+                label,
+                rps_view_callback(plan.id.0),
+            )]
+        })
+        .collect();
+    InlineKeyboardMarkup::new(rows)
 }
 
-fn render_plan_card(
+fn build_plan_button_label(
+    plan: &ReleasePlan,
+    repo_label_by_id: &HashMap<RepositoryId, String>,
+    today_msk: NaiveDate,
+) -> String {
+    let date_part = plan.planned_date.format("%d.%m").to_string();
+    let day_label = format_date_label(plan.planned_date, today_msk);
+
+    let repos_summary = if plan.repository_ids.is_empty() {
+        "—".to_string()
+    } else if plan.repository_ids.len() <= 2 {
+        plan.repository_ids
+            .iter()
+            .map(|id| {
+                repo_label_by_id
+                    .get(id)
+                    .map(|s| s.split('/').next_back().unwrap_or(s.as_str()).to_string())
+                    .unwrap_or_else(|| format!("#{}", id.0))
+            })
+            .collect::<Vec<_>>()
+            .join(", ")
+    } else {
+        let first = plan
+            .repository_ids
+            .first()
+            .and_then(|id| repo_label_by_id.get(id))
+            .map(|s| s.split('/').next_back().unwrap_or(s.as_str()).to_string())
+            .unwrap_or_else(|| "?".to_string());
+        format!("{} +{}", first, plan.repository_ids.len() - 1)
+    };
+
+    format!("📅 {} ({}) — {}", date_part, day_label, repos_summary)
+}
+
+pub fn render_plan_card(
     plan: &ReleasePlan,
     repo_label_by_id: &HashMap<RepositoryId, String>,
     today_msk: NaiveDate,
@@ -242,7 +255,7 @@ fn render_plan_card(
     builder.build()
 }
 
-fn format_date_label(planned: NaiveDate, today: NaiveDate) -> String {
+pub fn format_date_label(planned: NaiveDate, today: NaiveDate) -> String {
     let diff = (planned - today).num_days();
     if diff == 0 {
         t!("telegram_bot.commands.releases.today").to_string()
