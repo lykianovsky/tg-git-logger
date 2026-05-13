@@ -1,6 +1,21 @@
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
+/// Шапка уведомления с проектом: "📦 owner/repo" с кликабельной ссылкой при наличии URL.
+pub fn build_repo_header(repo: &str, repo_url: Option<&str>) -> String {
+    let safe_repo = MessageBuilder::escape_html(repo);
+    match repo_url.map(str::trim) {
+        Some(url) if url.starts_with("http://") || url.starts_with("https://") => {
+            format!(
+                "📦 <a href=\"{}\">{}</a>",
+                MessageBuilder::escape_html(url),
+                safe_repo
+            )
+        }
+        _ => format!("📦 {}", safe_repo),
+    }
+}
+
 #[derive(Clone, Default, Debug, Serialize, Deserialize)]
 pub struct MessageBuilder {
     parts: Vec<String>,

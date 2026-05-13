@@ -23,15 +23,21 @@ impl TelegramBotUnregisterCommandHandler {
         let cmd = DeactivateUserCommand { social_user_id };
 
         let reply = match self.executor.execute(&cmd).await {
-            Ok(_) => t!("telegram_bot.commands.unregister.success").to_string(),
+            Ok(response) => {
+                if response.new_state {
+                    t!("telegram_bot.commands.toggle_is_active.activated").to_string()
+                } else {
+                    t!("telegram_bot.commands.toggle_is_active.deactivated").to_string()
+                }
+            }
 
             Err(DeactivateUserExecutorError::SocialAccountNotFound) => {
-                t!("telegram_bot.commands.unregister.not_registered").to_string()
+                t!("telegram_bot.commands.toggle_is_active.not_registered").to_string()
             }
 
             Err(e) => {
-                tracing::error!(error = %e, "Failed to deactivate user");
-                t!("telegram_bot.commands.unregister.error").to_string()
+                tracing::error!(error = %e, "Failed to toggle account status");
+                t!("telegram_bot.commands.toggle_is_active.error").to_string()
             }
         };
 

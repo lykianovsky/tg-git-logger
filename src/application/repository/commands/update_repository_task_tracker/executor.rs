@@ -48,6 +48,7 @@ impl CommandExecutor for UpdateRepositoryTaskTrackerExecutor {
             Ok(mut tracker) => {
                 tracker.space_id = cmd.space_id;
                 tracker.qa_column_id = cmd.qa_column_id;
+                tracker.review_column_id = cmd.review_column_id;
                 tracker.extract_pattern_regexp = cmd.extract_pattern_regexp.clone();
                 tracker.path_to_card = cmd.path_to_card.clone();
                 tracker.updated_at = Utc::now();
@@ -62,6 +63,7 @@ impl CommandExecutor for UpdateRepositoryTaskTrackerExecutor {
                     repository_id: cmd.repository_id,
                     space_id: cmd.space_id,
                     qa_column_id: cmd.qa_column_id,
+                    review_column_id: cmd.review_column_id,
                     extract_pattern_regexp: cmd.extract_pattern_regexp.clone(),
                     path_to_card: cmd.path_to_card.clone(),
                     created_at: Utc::now(),

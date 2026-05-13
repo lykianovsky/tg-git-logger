@@ -9,7 +9,7 @@ use crate::domain::webhook::events::pull_request_review::{
     WebhookPullRequestReviewEvent, WebhookPullRequestReviewState,
 };
 use crate::infrastructure::drivers::message_broker::contracts::publisher::MessageBrokerPublisher;
-use crate::utils::builder::message::MessageBuilder;
+use crate::utils::builder::message::{MessageBuilder, build_repo_header};
 use async_trait::async_trait;
 use chrono::{Duration, Utc};
 use std::sync::Arc;
@@ -73,17 +73,15 @@ impl EventListener<WebhookPullRequestReviewEvent> for WebhookPrReadyToMergeListe
                 Err(_) => continue,
             };
 
+            let repo_line = build_repo_header(&payload.repo, None);
             let mut msg = MessageBuilder::new()
+                .bold(&repo_line)
                 .bold(&t!("telegram_bot.notifications.pr_ready_to_merge.title").to_string())
                 .empty_line()
                 .with_html_escape(true)
                 .section(
                     &t!("telegram_bot.notifications.pr_ready_to_merge.pr").to_string(),
                     &format!("#{} — {}", payload.pr_number, payload.pr_title),
-                )
-                .section(
-                    &t!("telegram_bot.notifications.pr_ready_to_merge.repository").to_string(),
-                    &payload.repo,
                 )
                 .section(
                     &t!("telegram_bot.notifications.pr_ready_to_merge.author").to_string(),

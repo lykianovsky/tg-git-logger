@@ -39,7 +39,10 @@ impl WebhookEvent for WebhookPrCommentEvent {
             "—".to_string()
         };
 
+        let safe_repo = MessageBuilder::escape_html(&self.repo);
+
         MessageBuilder::new()
+            .bold(&format!("📦 {}", safe_repo))
             .bold("💬 Новый комментарий к вашему PR")
             .empty_line()
             .section_bold("👤 От", &MessageBuilder::escape_html(&self.commenter))
@@ -51,7 +54,6 @@ impl WebhookEvent for WebhookPrCommentEvent {
                     MessageBuilder::escape_html(&self.pr_title),
                 ),
             )
-            .section("📦 Репозиторий", &MessageBuilder::escape_html(&self.repo))
             .empty_line()
             .bold("Комментарий:")
             .line(&MessageBuilder::escape_html(&self.comment_body))

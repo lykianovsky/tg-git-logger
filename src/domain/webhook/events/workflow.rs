@@ -52,8 +52,22 @@ impl WebhookEvent for WebhookWorkflowEvent {
         let short_sha = &self.head_sha[..7.min(self.head_sha.len())];
         let safe_repo = MessageBuilder::escape_html(&self.repo);
 
+        let repo_line = match &self.repo_url {
+            Some(url) if url.trim().starts_with("http://") || url.trim().starts_with("https://") => {
+                format!(
+                    "📦 <a href=\"{}\">{}</a>",
+                    MessageBuilder::escape_html(url.trim()),
+                    safe_repo
+                )
+            }
+            _ => format!("📦 {}", safe_repo),
+        };
+
         // ── Заголовок ──────────────────────────────────────
-        let mut builder = MessageBuilder::new().bold(title).empty_line();
+        let mut builder = MessageBuilder::new()
+            .bold(&repo_line)
+            .bold(title)
+            .empty_line();
 
         // ── Основная инфо ──────────────────────────────────
         builder = builder
@@ -112,20 +126,6 @@ impl WebhookEvent for WebhookWorkflowEvent {
                     ),
                 );
             }
-        }
-
-        match &self.repo_url {
-            Some(url) if url.trim().starts_with("http://") || url.trim().starts_with("https://") => {
-                builder = builder.section(
-                    "📦 Репозиторий",
-                    &format!(
-                        "<a href=\"{}\">{}</a>",
-                        MessageBuilder::escape_html(url.trim()),
-                        safe_repo
-                    ),
-                )
-            }
-            _ => builder = builder.section("📦 Репозиторий", &safe_repo),
         }
 
         builder.build()

@@ -11,7 +11,7 @@ use crate::domain::webhook::events::pull_request::{
     WebhookPullRequestEvent, WebhookPullRequestEventActionType,
 };
 use crate::infrastructure::drivers::message_broker::contracts::publisher::MessageBrokerPublisher;
-use crate::utils::builder::message::MessageBuilder;
+use crate::utils::builder::message::{MessageBuilder, build_repo_header};
 use crate::utils::security::crypto::reversible::ReversibleCipher;
 use async_trait::async_trait;
 use chrono::Utc;
@@ -103,7 +103,9 @@ impl EventListener<WebhookPullRequestEvent> for WebhookReviewRequestedDmListener
         }
 
         let pr_url = payload.pr_url.as_deref().unwrap_or("");
+        let repo_line = build_repo_header(&payload.repo, payload.repo_url.as_deref());
         let mut message = MessageBuilder::new()
+            .bold(&repo_line)
             .bold(&t!("telegram_bot.notifications.review_requested.title").to_string())
             .empty_line()
             .with_html_escape(true)
@@ -114,10 +116,6 @@ impl EventListener<WebhookPullRequestEvent> for WebhookReviewRequestedDmListener
             .section(
                 &t!("telegram_bot.notifications.review_requested.author").to_string(),
                 &payload.author,
-            )
-            .section(
-                &t!("telegram_bot.notifications.review_requested.repository").to_string(),
-                &payload.repo,
             )
             .with_html_escape(false);
 
@@ -219,7 +217,9 @@ impl WebhookReviewRequestedDmListener {
         };
 
         let pr_url = payload.pr_url.as_deref().unwrap_or("");
+        let repo_line = build_repo_header(&payload.repo, payload.repo_url.as_deref());
         let mut message = MessageBuilder::new()
+            .bold(&repo_line)
             .bold(&t!("telegram_bot.notifications.vacation_review_alert.title").to_string())
             .empty_line()
             .with_html_escape(true)
@@ -234,10 +234,6 @@ impl WebhookReviewRequestedDmListener {
             .section(
                 &t!("telegram_bot.notifications.vacation_review_alert.pr").to_string(),
                 &format!("#{} — {}", payload.number, payload.title),
-            )
-            .section(
-                &t!("telegram_bot.notifications.vacation_review_alert.repository").to_string(),
-                &payload.repo,
             )
             .with_html_escape(false);
 

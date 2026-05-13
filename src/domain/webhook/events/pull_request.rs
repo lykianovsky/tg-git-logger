@@ -117,8 +117,20 @@ impl WebhookEvent for WebhookPullRequestEvent {
         let safe_source = MessageBuilder::escape_html(&self.source);
         let safe_repo = MessageBuilder::escape_html(&self.repo);
 
+        let repo_line = match &self.repo_url {
+            Some(url) if url.trim().starts_with("http://") || url.trim().starts_with("https://") => {
+                format!(
+                    "📦 <a href=\"{}\">{}</a>",
+                    MessageBuilder::escape_html(url.trim()),
+                    safe_repo
+                )
+            }
+            _ => format!("📦 {}", safe_repo),
+        };
+
         // ── Заголовок ──────────────────────────────────────
         let mut builder = MessageBuilder::new()
+            .bold(&repo_line)
             .bold(&format!("{} #{}", title, self.number))
             .empty_line();
 
@@ -191,20 +203,6 @@ impl WebhookEvent for WebhookPullRequestEvent {
                     ),
                 );
             }
-        }
-
-        match &self.repo_url {
-            Some(url) if url.trim().starts_with("http://") || url.trim().starts_with("https://") => {
-                builder = builder.section(
-                    "📦 Репозиторий",
-                    &format!(
-                        "<a href=\"{}\">{}</a>",
-                        MessageBuilder::escape_html(url.trim()),
-                        safe_repo
-                    ),
-                )
-            }
-            _ => builder = builder.section("📦 Репозиторий", &safe_repo),
         }
 
         builder.build()

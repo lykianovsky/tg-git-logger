@@ -46,27 +46,26 @@ impl WebhookEvent for WebhookPushEvent {
         let short_after = &self.after[..7.min(self.after.len())];
         let safe_repo = MessageBuilder::escape_html(&self.repo);
 
-        // ── Заголовок ──────────────────────────────────────
-        let mut builder = MessageBuilder::new().bold(title).empty_line();
-
-        // ── Основная инфо ──────────────────────────────────
-        builder = builder.section_bold("👤 Автор", &MessageBuilder::escape_html(&self.source));
-
-        match &self.repo_url {
+        let repo_line = match &self.repo_url {
             Some(url) if url.trim().starts_with("http://") || url.trim().starts_with("https://") => {
-                builder = builder.section(
-                    "📦 Репозиторий",
-                    &format!(
-                        "<a href=\"{}\">{}</a>",
-                        MessageBuilder::escape_html(url.trim()),
-                        safe_repo
-                    ),
+                format!(
+                    "📦 <a href=\"{}\">{}</a>",
+                    MessageBuilder::escape_html(url.trim()),
+                    safe_repo
                 )
             }
-            _ => builder = builder.section("📦 Репозиторий", &safe_repo),
-        }
+            _ => format!("📦 {}", safe_repo),
+        };
 
+        // ── Заголовок ──────────────────────────────────────
+        let mut builder = MessageBuilder::new()
+            .bold(&repo_line)
+            .bold(title)
+            .empty_line();
+
+        // ── Основная инфо ──────────────────────────────────
         builder = builder
+            .section_bold("👤 Автор", &MessageBuilder::escape_html(&self.source))
             .section_code("🌿 Ветка", &MessageBuilder::escape_html(branch))
             .empty_line();
 

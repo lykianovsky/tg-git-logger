@@ -34,10 +34,14 @@ impl CommandExecutor for DeactivateUserExecutor {
             .find_by_social_user_id(&cmd.social_user_id)
             .await?;
 
+        let user = self.user_repo.find_by_id(social_account.user_id).await?;
+
+        let new_state = !user.is_active;
+
         self.user_repo
-            .set_active(social_account.user_id, false)
+            .set_active(social_account.user_id, new_state)
             .await?;
 
-        Ok(DeactivateUserResponse)
+        Ok(DeactivateUserResponse { new_state })
     }
 }

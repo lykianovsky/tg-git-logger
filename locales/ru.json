@@ -137,10 +137,11 @@
       "report": {
         "choose_for_who": "🎯  Выберите для кого:"
       },
-      "unregister": {
-        "success": "✅ Ваш аккаунт деактивирован. Для восстановления обратитесь к администратору.",
+      "toggle_is_active": {
+        "activated": "✅ Ваш аккаунт активирован — вы снова будете получать уведомления.",
+        "deactivated": "⏸ Ваш аккаунт деактивирован. Чтобы включить обратно — отправьте /toggle_is_active ещё раз.",
         "not_registered": "❌ Вы не зарегистрированы в системе.",
-        "error": "❌ Не удалось деактивировать аккаунт. Попробуйте позже."
+        "error": "❌ Не удалось переключить статус аккаунта. Попробуйте позже."
       },
       "digest": {
         "title": "📬 Ваши дайджест-подписки",
@@ -190,21 +191,18 @@
         "title": "👀 Вы назначены на ревью",
         "pr": "PR",
         "author": "Автор",
-        "repository": "Репозиторий",
         "open": "Открыть PR →"
       },
       "pr_mention": {
         "title": "👋 Вас упомянули в PR",
         "pr": "PR",
         "author": "Автор",
-        "repository": "Репозиторий",
         "open": "Открыть PR →"
       },
       "pr_opened_tag": {
         "title": "🆕 PR открыт — ждёт ревью",
         "pr": "PR",
         "author": "Автор",
-        "repository": "Репозиторий",
         "reviewers": "Ревьюеры",
         "no_reviewers": "⚠️ не указаны",
         "open": "Открыть PR →"
@@ -218,27 +216,29 @@
       "pr_conflict": {
         "title": "⚠️ В вашем PR появились конфликты",
         "pr": "PR",
-        "repository": "Репозиторий",
+        "open": "Открыть PR →"
+      },
+      "missing_task_id": {
+        "title": "⚠️ В title PR не найден ID задачи",
+        "pr": "PR",
+        "pattern": "Ожидаемый паттерн",
         "open": "Открыть PR →"
       },
       "pr_ready_to_merge": {
         "title": "🟢 PR готов к мерджу",
         "pr": "PR",
-        "repository": "Репозиторий",
         "author": "Автор",
         "open": "Открыть PR →"
       },
       "ci_fail": {
         "title": "🔴 Workflow упал",
         "workflow": "Workflow",
-        "repository": "Репозиторий",
         "open": "Открыть прогон →"
       },
       "re_review_nudge": {
         "title": "🔄 Автор обновил PR — посмотрите ещё раз",
         "pr": "PR",
         "author": "Автор",
-        "repository": "Репозиторий",
         "open": "Открыть PR →"
       },
       "registration": {
@@ -252,7 +252,6 @@
         "reviewer": "Ревьюер",
         "until": "В отпуске до",
         "pr": "PR",
-        "repository": "Репозиторий",
         "open": "Открыть PR →"
       },
       "release_plan": {
@@ -515,6 +514,7 @@
           "settings_title": "📋 Настройки таск-трекера",
           "space_id": "🏢 Space ID",
           "qa_column_id": "📋 QA Column ID",
+          "review_column_id": "👀 Review Column ID",
           "regex_pattern": "🔍 Regex паттерн",
           "card_path": "🗂 Путь к карточке",
           "what_to_edit": "✏️ Что хотите изменить?",
@@ -534,7 +534,8 @@
           "loading_columns": "⏳ Загружаю список колонок...",
           "columns_load_error": "❌ Не удалось загрузить список колонок.",
           "no_columns": "❌ На выбранной доске нет колонок.",
-          "select_qa_column": "🎯 Выберите колонку QA (куда перемещать задачи):",
+          "select_qa_column": "🎯 Выберите колонку QA (куда перемещать задачи при merge):",
+          "select_review_column": "👀 Выберите колонку Review (куда перемещать задачи при open PR):",
           "enter_pattern": "🔍 Введите regex-паттерн для извлечения ID задачи из PR:\n\nВводите как есть, без экранирования. Например: \\bZB-(\\d+)\\b",
           "saving": "⏳ Сохраняем настройки...",
           "saved": "✅ Настройки таск-трекера успешно сохранены.",

@@ -1,4 +1,4 @@
-use crate::domain::user::repositories::user_repository::SetUserActiveError;
+use crate::domain::user::repositories::user_repository::{FindUserByIdError, SetUserActiveError};
 use crate::domain::user::repositories::user_social_accounts_repository::FindSocialServiceByIdError;
 use thiserror::Error;
 
@@ -19,6 +19,15 @@ impl From<FindSocialServiceByIdError> for DeactivateUserExecutorError {
         match e {
             FindSocialServiceByIdError::NotFound => Self::SocialAccountNotFound,
             FindSocialServiceByIdError::DbError(msg) => Self::DbError(msg),
+        }
+    }
+}
+
+impl From<FindUserByIdError> for DeactivateUserExecutorError {
+    fn from(e: FindUserByIdError) -> Self {
+        match e {
+            FindUserByIdError::NotFound => Self::UserNotFound,
+            FindUserByIdError::DbError(msg) => Self::DbError(msg),
         }
     }
 }

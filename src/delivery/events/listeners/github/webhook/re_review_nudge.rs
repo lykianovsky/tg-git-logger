@@ -9,7 +9,7 @@ use crate::domain::webhook::events::pull_request::{
     WebhookPullRequestEvent, WebhookPullRequestEventActionType,
 };
 use crate::infrastructure::drivers::message_broker::contracts::publisher::MessageBrokerPublisher;
-use crate::utils::builder::message::MessageBuilder;
+use crate::utils::builder::message::{MessageBuilder, build_repo_header};
 use async_trait::async_trait;
 use chrono::{Duration, Utc};
 use std::sync::Arc;
@@ -95,7 +95,9 @@ impl EventListener<WebhookPullRequestEvent> for WebhookPrReReviewNudgeListener {
             }
 
             let pr_url = payload.pr_url.as_deref().unwrap_or("");
+            let repo_line = build_repo_header(&payload.repo, payload.repo_url.as_deref());
             let mut msg = MessageBuilder::new()
+                .bold(&repo_line)
                 .bold(&t!("telegram_bot.notifications.re_review_nudge.title").to_string())
                 .empty_line()
                 .with_html_escape(true)
@@ -106,10 +108,6 @@ impl EventListener<WebhookPullRequestEvent> for WebhookPrReReviewNudgeListener {
                 .section(
                     &t!("telegram_bot.notifications.re_review_nudge.author").to_string(),
                     &payload.author,
-                )
-                .section(
-                    &t!("telegram_bot.notifications.re_review_nudge.repository").to_string(),
-                    &payload.repo,
                 )
                 .with_html_escape(false);
 

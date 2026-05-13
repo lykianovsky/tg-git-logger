@@ -1,5 +1,7 @@
 use crate::application::user::queries::check_org_membership::query::CheckOrgMembershipQuery;
 use crate::application::user::queries::check_org_membership::response::CheckOrgMembershipResponse;
+use crate::application::user::queries::get_user_roles_by_telegram_id::query::GetUserRolesByTelegramIdQuery;
+use crate::domain::role::value_objects::role_name::RoleName;
 use crate::bootstrap::executors::ApplicationBoostrapExecutors;
 use crate::config::application::ApplicationConfig;
 use crate::delivery::bot::telegram::commands::admin::TelegramBotAdminCommandHandler;
@@ -61,8 +63,11 @@ pub enum TelegramBotCommand {
     )]
     SetupNotifications,
 
-    #[command(description = "Деактивировать аккаунт")]
-    Unregister,
+    #[command(
+        rename = "toggle_is_active",
+        description = "Включить/выключить аккаунт (toggle)"
+    )]
+    ToggleIsActive,
 
     #[command(description = "Настройка дайджест-уведомлений")]
     Digest,
@@ -114,17 +119,35 @@ pub async fn handle(
     {
         Ok(CheckOrgMembershipResponse::Allowed) => {}
         Ok(CheckOrgMembershipResponse::Deactivated) => {
-            tracing::warn!(
-                social_user_id = %social_user_id.0,
-                cmd = ?cmd,
-                "Command blocked: user is deactivated"
-            );
-            bot.send_message(
-                msg.chat.id,
-                t!("telegram_bot.commands.account_deactivated").to_string(),
-            )
-            .await?;
-            return Ok(());
+            // Деактивированному юзеру разрешаем /unregister (toggle включит обратно)
+            // и любые команды если он Admin — чтобы мог восстановить себя через /admin.
+            let is_self_toggle = matches!(cmd, TelegramBotCommand::ToggleIsActive);
+
+            let is_admin = if is_self_toggle {
+                false
+            } else {
+                executors
+                    .queries
+                    .get_user_roles_by_telegram_id
+                    .execute(&GetUserRolesByTelegramIdQuery { social_user_id })
+                    .await
+                    .map(|r| r.roles.contains(&RoleName::Admin))
+                    .unwrap_or(false)
+            };
+
+            if !is_self_toggle && !is_admin {
+                tracing::warn!(
+                    social_user_id = %social_user_id.0,
+                    cmd = ?cmd,
+                    "Command blocked: user is deactivated"
+                );
+                bot.send_message(
+                    msg.chat.id,
+                    t!("telegram_bot.commands.account_deactivated").to_string(),
+                )
+                .await?;
+                return Ok(());
+            }
         }
         Ok(CheckOrgMembershipResponse::Blocked { organization }) => {
             tracing::warn!(
@@ -282,7 +305,7 @@ pub async fn handle(
             .await?;
         }
 
-        TelegramBotCommand::Unregister => {
+        TelegramBotCommand::ToggleIsActive => {
             TelegramBotUnregisterCommandHandler::new(
                 context,
                 executors.commands.deactivate_user.clone(),

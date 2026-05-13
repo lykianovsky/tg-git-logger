@@ -2,6 +2,7 @@ pub mod ci_fail_dm;
 pub mod pr_comment;
 pub mod pr_conflict;
 pub mod pr_mentions;
+pub mod pr_move_to_review;
 pub mod pr_opened_tag_reviewers;
 pub mod pr_ready_to_merge;
 pub mod pull_request;

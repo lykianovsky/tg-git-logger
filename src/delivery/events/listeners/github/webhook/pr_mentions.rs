@@ -10,7 +10,7 @@ use crate::domain::webhook::events::pull_request::{
     WebhookPullRequestEvent, WebhookPullRequestEventActionType,
 };
 use crate::infrastructure::drivers::message_broker::contracts::publisher::MessageBrokerPublisher;
-use crate::utils::builder::message::MessageBuilder;
+use crate::utils::builder::message::{MessageBuilder, build_repo_header};
 use crate::utils::parsing::mentions::extract_github_mentions;
 use async_trait::async_trait;
 use std::sync::Arc;
@@ -75,9 +75,11 @@ impl EventListener<WebhookPullRequestEvent> for WebhookPrMentionsListener {
         }
 
         let pr_url = payload.pr_url.as_deref().unwrap_or("");
+        let repo_line = build_repo_header(&payload.repo, payload.repo_url.as_deref());
 
         for (login, chat_id, _) in &bound {
             let mut dm = MessageBuilder::new()
+                .bold(&repo_line)
                 .bold(&t!("telegram_bot.notifications.pr_mention.title").to_string())
                 .empty_line()
                 .with_html_escape(true)
@@ -88,10 +90,6 @@ impl EventListener<WebhookPullRequestEvent> for WebhookPrMentionsListener {
                 .section(
                     &t!("telegram_bot.notifications.pr_mention.author").to_string(),
                     &payload.author,
-                )
-                .section(
-                    &t!("telegram_bot.notifications.pr_mention.repository").to_string(),
-                    &payload.repo,
                 )
                 .with_html_escape(false);
 
@@ -133,6 +131,7 @@ impl EventListener<WebhookPullRequestEvent> for WebhookPrMentionsListener {
             .await;
 
             let mut msg = MessageBuilder::new()
+                .bold(&repo_line)
                 .raw(&format!("👀 cc: {}", tags.join(" ")))
                 .empty_line()
                 .with_html_escape(true)

@@ -14,7 +14,7 @@ use crate::domain::version_control::ports::version_control_client::{
     OpenPullRequestSummary, VersionControlClient,
 };
 use crate::infrastructure::drivers::message_broker::contracts::publisher::MessageBrokerPublisher;
-use crate::utils::builder::message::MessageBuilder;
+use crate::utils::builder::message::{MessageBuilder, build_repo_header};
 use crate::utils::security::crypto::reversible::ReversibleCipher;
 use chrono::{Duration, Utc};
 use std::sync::Arc;
@@ -150,7 +150,9 @@ impl CommandExecutor for ScanStalePullRequestsExecutor {
             }
             stale_total += stale.len();
 
+            let repo_line = build_repo_header(&repo_full, None);
             let mut msg = MessageBuilder::new()
+                .bold(&repo_line)
                 .bold(&t!("telegram_bot.notifications.stale_pr_digest.title").to_string())
                 .empty_line();
 

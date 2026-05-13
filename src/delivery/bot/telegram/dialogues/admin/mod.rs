@@ -106,10 +106,17 @@ pub enum TelegramBotDialogueAdminState {
         space_id: i32,
         board_id: i32,
     },
+    ConfigureTaskTrackerSelectReviewColumn {
+        repository_id: i32,
+        space_id: i32,
+        board_id: i32,
+        qa_column_id: i32,
+    },
     ConfigureTaskTrackerEnterPattern {
         repository_id: i32,
         space_id: i32,
         qa_column_id: i32,
+        review_column_id: i32,
     },
 
     // ── Пинги ──────────────────────────────────────────────────────────────

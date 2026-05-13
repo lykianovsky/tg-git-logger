@@ -34,6 +34,7 @@ impl RepositoryTaskTrackerRepository for MySQLRepositoryTaskTrackerRepository {
             repository_id: Set(tracker.repository_id.0),
             space_id: Set(tracker.space_id),
             qa_column_id: Set(tracker.qa_column_id),
+            review_column_id: Set(tracker.review_column_id),
             extract_pattern_regexp: Set(tracker.extract_pattern_regexp.clone()),
             path_to_card: Set(tracker.path_to_card.clone()),
             ..Default::default()
@@ -57,6 +58,7 @@ impl RepositoryTaskTrackerRepository for MySQLRepositoryTaskTrackerRepository {
             repository_id: Set(tracker.repository_id.0),
             space_id: Set(tracker.space_id),
             qa_column_id: Set(tracker.qa_column_id),
+            review_column_id: Set(tracker.review_column_id),
             extract_pattern_regexp: Set(tracker.extract_pattern_regexp.clone()),
             path_to_card: Set(tracker.path_to_card.clone()),
             ..Default::default()
@@ -106,6 +108,7 @@ impl RepositoryTaskTracker {
             repository_id: RepositoryId(model.repository_id),
             space_id: model.space_id,
             qa_column_id: model.qa_column_id,
+            review_column_id: model.review_column_id,
             extract_pattern_regexp: model.extract_pattern_regexp,
             path_to_card: model.path_to_card,
             created_at: model.created_at,

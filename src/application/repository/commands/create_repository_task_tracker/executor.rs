@@ -45,6 +45,7 @@ impl CommandExecutor for CreateRepositoryTaskTrackerExecutor {
             repository_id: cmd.repository_id.clone(),
             space_id: cmd.space_id,
             qa_column_id: cmd.qa_column_id,
+            review_column_id: cmd.review_column_id,
             extract_pattern_regexp: cmd.extract_pattern_regexp.clone(),
             path_to_card: cmd.path_to_card.clone(),
             created_at: Utc::now(),

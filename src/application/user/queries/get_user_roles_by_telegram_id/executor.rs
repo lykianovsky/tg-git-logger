@@ -48,7 +48,7 @@ impl CommandExecutor for GetUserRolesByTelegramIdExecutor {
                 }
             })?;
 
-        let user = self
+        let _user = self
             .user_repo
             .find_by_id(social.user_id)
             .await
@@ -56,10 +56,6 @@ impl CommandExecutor for GetUserRolesByTelegramIdExecutor {
                 FindUserByIdError::NotFound => GetUserRolesByTelegramIdError::UserNotFound,
                 FindUserByIdError::DbError(msg) => GetUserRolesByTelegramIdError::DbError(msg),
             })?;
-
-        if !user.is_active {
-            return Err(GetUserRolesByTelegramIdError::UserNotFound);
-        }
 
         let roles = self
             .user_has_roles_repo

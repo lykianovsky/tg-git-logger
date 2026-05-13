@@ -8,6 +8,7 @@ use crate::delivery::contract::ApplicationDelivery;
 use crate::delivery::events::listeners::github::webhook::ci_fail_dm::WebhookCiFailDmListener;
 use crate::delivery::events::listeners::github::webhook::pr_conflict::WebhookPrConflictDetectedListener;
 use crate::delivery::events::listeners::github::webhook::pr_mentions::WebhookPrMentionsListener;
+use crate::delivery::events::listeners::github::webhook::pr_move_to_review::WebhookPrMoveToReviewListener;
 use crate::delivery::events::listeners::github::webhook::pr_opened_tag_reviewers::WebhookPrOpenedTagReviewersListener;
 use crate::delivery::events::listeners::github::webhook::pr_ready_to_merge::WebhookPrReadyToMergeListener;
 use crate::delivery::events::listeners::github::webhook::pull_request::WebhookPullRequestEventListener;
@@ -170,6 +171,23 @@ impl ApplicationDelivery for DeliveryEventListeners {
                 user_socials_repo: self.shared_dependency.user_socials_repo.clone(),
                 repository_repo: repository_repo.clone(),
                 default_chat_id,
+            })
+            .await;
+
+        // PR opened/ready_for_review/reopened → двигаем задачу в review-колонку.
+        // Если task_id не извлекается — DM автору.
+        self.shared_dependency
+            .event_bus
+            .on(WebhookPrMoveToReviewListener {
+                task_tracker_service: self.shared_dependency.task_tracker_service.clone(),
+                publisher: self.shared_dependency.publisher.clone(),
+                repository_repo: repository_repo.clone(),
+                repository_task_tracker_repo: self
+                    .shared_dependency
+                    .repository_task_tracker_repo
+                    .clone(),
+                user_vc_accounts_repo: self.shared_dependency.user_version_controls_repo.clone(),
+                user_socials_repo: self.shared_dependency.user_socials_repo.clone(),
             })
             .await;
 

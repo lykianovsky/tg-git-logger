@@ -24,6 +24,7 @@ mod m20260429_000005_create_release_plans;
 mod m20260429_000006_create_release_plan_repositories;
 mod m20260429_000007_add_notifications_chat_id_to_repositories;
 mod m20260429_000008_pending_notifications_user_id_nullable;
+mod m20260513_000001_add_review_column_to_repository_task_trackers;
 
 pub struct Migrator;
 
@@ -59,6 +60,9 @@ impl MigratorTrait for Migrator {
             Box::new(m20260429_000006_create_release_plan_repositories::Migration),
             Box::new(m20260429_000007_add_notifications_chat_id_to_repositories::Migration),
             Box::new(m20260429_000008_pending_notifications_user_id_nullable::Migration),
+            Box::new(
+                m20260513_000001_add_review_column_to_repository_task_trackers::Migration,
+            ),
         ]
     }
 }

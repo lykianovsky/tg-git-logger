@@ -6,7 +6,7 @@ use crate::domain::user::repositories::user_vc_accounts_repository::UserVersionC
 use crate::domain::user::value_objects::social_type::SocialType;
 use crate::domain::webhook::events::workflow::WebhookWorkflowEvent;
 use crate::infrastructure::drivers::message_broker::contracts::publisher::MessageBrokerPublisher;
-use crate::utils::builder::message::MessageBuilder;
+use crate::utils::builder::message::{MessageBuilder, build_repo_header};
 use async_trait::async_trait;
 use chrono::{Duration, Utc};
 use std::sync::Arc;
@@ -69,17 +69,15 @@ impl EventListener<WebhookWorkflowEvent> for WebhookCiFailDmListener {
         }
 
         let workflow_url = payload.html_url.as_deref().unwrap_or("");
+        let repo_line = build_repo_header(&payload.repo, payload.repo_url.as_deref());
         let mut msg = MessageBuilder::new()
+            .bold(&repo_line)
             .bold(&t!("telegram_bot.notifications.ci_fail.title").to_string())
             .empty_line()
             .with_html_escape(true)
             .section(
                 &t!("telegram_bot.notifications.ci_fail.workflow").to_string(),
                 &payload.name,
-            )
-            .section(
-                &t!("telegram_bot.notifications.ci_fail.repository").to_string(),
-                &payload.repo,
             )
             .with_html_escape(false);
 

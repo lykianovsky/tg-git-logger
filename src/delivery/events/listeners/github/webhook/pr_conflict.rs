@@ -8,7 +8,7 @@ use crate::domain::webhook::events::pull_request::{
     WebhookPullRequestEvent, WebhookPullRequestEventActionType,
 };
 use crate::infrastructure::drivers::message_broker::contracts::publisher::MessageBrokerPublisher;
-use crate::utils::builder::message::MessageBuilder;
+use crate::utils::builder::message::{MessageBuilder, build_repo_header};
 use async_trait::async_trait;
 use chrono::{Duration, Utc};
 use std::sync::Arc;
@@ -81,17 +81,15 @@ impl EventListener<WebhookPullRequestEvent> for WebhookPrConflictDetectedListene
         }
 
         let pr_url = payload.pr_url.as_deref().unwrap_or("");
+        let repo_line = build_repo_header(&payload.repo, payload.repo_url.as_deref());
         let mut msg = MessageBuilder::new()
+            .bold(&repo_line)
             .bold(&t!("telegram_bot.notifications.pr_conflict.title").to_string())
             .empty_line()
             .with_html_escape(true)
             .section(
                 &t!("telegram_bot.notifications.pr_conflict.pr").to_string(),
                 &format!("#{} — {}", payload.number, payload.title),
-            )
-            .section(
-                &t!("telegram_bot.notifications.pr_conflict.repository").to_string(),
-                &payload.repo,
             )
             .with_html_escape(false);
 

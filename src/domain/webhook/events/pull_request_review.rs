@@ -54,12 +54,14 @@ impl WebhookEvent for WebhookPullRequestReviewEvent {
             MessageBuilder::escape_html(&self.pr_title)
         };
 
+        let safe_repo = MessageBuilder::escape_html(&self.repo);
+
         let mut builder = MessageBuilder::new()
+            .bold(&format!("📦 {}", safe_repo))
             .bold(&format!("{} {} — PR #{}", icon, heading, self.pr_number))
             .empty_line()
             .section("📝 PR", &pr_link)
-            .section_bold("👤 Ревьюер", &MessageBuilder::escape_html(&self.reviewer))
-            .section("📦 Репозиторий", &MessageBuilder::escape_html(&self.repo));
+            .section_bold("👤 Ревьюер", &MessageBuilder::escape_html(&self.reviewer));
 
         if self.state == WebhookPullRequestReviewState::ChangesRequested {
             builder = builder.section(

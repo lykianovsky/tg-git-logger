@@ -77,6 +77,17 @@ impl TelegramBotDialogueAdminTaskTrackerDispatcher {
                 ]
                 .endpoint(Self::handle_select_column),
             )
+            .branch(
+                case![
+                    TelegramBotDialogueAdminState::ConfigureTaskTrackerSelectReviewColumn {
+                        repository_id,
+                        space_id,
+                        board_id,
+                        qa_column_id
+                    }
+                ]
+                .endpoint(Self::handle_select_review_column),
+            )
     }
 
     /// Ветки для текстовых сообщений (ввод паттерна).
@@ -88,7 +99,8 @@ impl TelegramBotDialogueAdminTaskTrackerDispatcher {
                     TelegramBotDialogueAdminState::ConfigureTaskTrackerEnterPattern {
                         repository_id,
                         space_id,
-                        qa_column_id
+                        qa_column_id,
+                        review_column_id
                     }
                 ]
                 .endpoint(Self::handle_enter_pattern),
@@ -229,6 +241,11 @@ impl TelegramBotDialogueAdminTaskTrackerDispatcher {
                                 t!("telegram_bot.dialogues.admin.task_tracker.qa_column_id")
                                     .as_ref(),
                                 &t.qa_column_id.to_string(),
+                            )
+                            .section_code(
+                                t!("telegram_bot.dialogues.admin.task_tracker.review_column_id")
+                                    .as_ref(),
+                                &t.review_column_id.to_string(),
                             )
                             .section_code(
                                 t!("telegram_bot.dialogues.admin.task_tracker.regex_pattern")
@@ -402,6 +419,7 @@ impl TelegramBotDialogueAdminTaskTrackerDispatcher {
             repository_id: RepositoryId(repository_id),
             space_id: tracker.space_id,
             qa_column_id: tracker.qa_column_id,
+            review_column_id: tracker.review_column_id,
             extract_pattern_regexp: tracker.extract_pattern_regexp,
             path_to_card: tracker.path_to_card,
         };
@@ -687,8 +705,9 @@ impl TelegramBotDialogueAdminTaskTrackerDispatcher {
     async fn handle_select_column(
         bot: Bot,
         dialogue: TelegramBotDialogueType,
+        shared_dependency: Arc<ApplicationSharedDependency>,
         query: CallbackQuery,
-        (repository_id, space_id, _board_id): (i32, i32, i32),
+        (repository_id, space_id, board_id): (i32, i32, i32),
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         bot.answer_callback_query(query.id.clone()).await?;
 
@@ -706,12 +725,113 @@ impl TelegramBotDialogueAdminTaskTrackerDispatcher {
             None => return Ok(()),
         };
 
+        let loading = bot
+            .edit_message_text(
+                msg.chat().id,
+                msg.id(),
+                t!("telegram_bot.dialogues.admin.task_tracker.loading_columns").to_string(),
+            )
+            .reply_markup(InlineKeyboardMarkup::default())
+            .await?;
+
+        let columns = match shared_dependency
+            .task_tracker_client
+            .list_columns(board_id)
+            .await
+        {
+            Ok(c) => c,
+            Err(e) => {
+                tracing::error!(error = %e, board_id = board_id, "Failed to load columns for review");
+                bot.edit_message_text(
+                    msg.chat().id,
+                    loading.id,
+                    t!("telegram_bot.dialogues.admin.task_tracker.columns_load_error").to_string(),
+                )
+                .await?;
+                dialogue.exit().await.ok();
+                return Ok(());
+            }
+        };
+
+        if columns.is_empty() {
+            bot.edit_message_text(
+                msg.chat().id,
+                loading.id,
+                t!("telegram_bot.dialogues.admin.task_tracker.no_columns").to_string(),
+            )
+            .await?;
+            dialogue.exit().await.ok();
+            return Ok(());
+        }
+
+        let buttons: Vec<Vec<InlineKeyboardButton>> = columns
+            .into_iter()
+            .filter(|c| c.id != qa_column_id)
+            .map(|c| vec![InlineKeyboardButton::callback(c.title, c.id.to_string())])
+            .collect();
+
+        if buttons.is_empty() {
+            bot.edit_message_text(
+                msg.chat().id,
+                loading.id,
+                t!("telegram_bot.dialogues.admin.task_tracker.no_columns").to_string(),
+            )
+            .await?;
+            dialogue.exit().await.ok();
+            return Ok(());
+        }
+
+        dialogue
+            .update(TelegramBotDialogueState::Admin(
+                TelegramBotDialogueAdminState::ConfigureTaskTrackerSelectReviewColumn {
+                    repository_id,
+                    space_id,
+                    board_id,
+                    qa_column_id,
+                },
+            ))
+            .await?;
+
+        bot.edit_message_text(
+            msg.chat().id,
+            loading.id,
+            t!("telegram_bot.dialogues.admin.task_tracker.select_review_column").to_string(),
+        )
+        .reply_markup(InlineKeyboardMarkup::new(buttons))
+        .await?;
+
+        Ok(())
+    }
+
+    async fn handle_select_review_column(
+        bot: Bot,
+        dialogue: TelegramBotDialogueType,
+        query: CallbackQuery,
+        (repository_id, space_id, _board_id, qa_column_id): (i32, i32, i32, i32),
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        bot.answer_callback_query(query.id.clone()).await?;
+
+        let data = query.data.as_deref().unwrap_or("");
+        let review_column_id: i32 = match data.parse() {
+            Ok(v) => v,
+            Err(_) => {
+                tracing::error!(data = %data, "Invalid review column_id in callback");
+                return Ok(());
+            }
+        };
+
+        let msg = match query.message {
+            Some(m) => m,
+            None => return Ok(()),
+        };
+
         dialogue
             .update(TelegramBotDialogueState::Admin(
                 TelegramBotDialogueAdminState::ConfigureTaskTrackerEnterPattern {
                     repository_id,
                     space_id,
                     qa_column_id,
+                    review_column_id,
                 },
             ))
             .await?;
@@ -734,7 +854,7 @@ impl TelegramBotDialogueAdminTaskTrackerDispatcher {
         dialogue: TelegramBotDialogueType,
         executors: Arc<ApplicationBoostrapExecutors>,
         msg: Message,
-        (repository_id, space_id, qa_column_id): (i32, i32, i32),
+        (repository_id, space_id, qa_column_id, review_column_id): (i32, i32, i32, i32),
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let extract_pattern = match extract_text(&msg) {
             Some(v) => v,
@@ -754,6 +874,7 @@ impl TelegramBotDialogueAdminTaskTrackerDispatcher {
             repository_id: RepositoryId(repository_id),
             space_id,
             qa_column_id,
+            review_column_id,
             extract_pattern_regexp: extract_pattern,
             path_to_card,
         };
