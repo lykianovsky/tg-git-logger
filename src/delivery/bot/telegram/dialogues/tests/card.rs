@@ -84,14 +84,9 @@ pub fn build_card_text(
     }
 
     if let Some(run_url) = run.run_url.as_deref() {
-        builder = builder.empty_line().section(
-            &t!("telegram_bot.dialogues.tests.ci_run").to_string(),
-            &format!(
-                "<a href=\"{}\">{}</a>",
-                MessageBuilder::escape_html(run_url),
-                t!("report.test_run.run_in_ci")
-            ),
-        );
+        builder = builder
+            .empty_line()
+            .link(&t!("report.test_run.run_in_ci").to_string(), run_url);
     }
 
     builder.build()

@@ -5,7 +5,7 @@ use strum_macros::{AsRefStr, EnumString};
 
 /// Кнопки карточки прогона. Запуск блока присылает путь блока отдельной кнопкой,
 /// поэтому в наборе его нет — только переход к выбору
-#[derive(Clone, Debug, EnumString, AsRefStr)]
+#[derive(Clone, Debug, PartialEq, Eq, EnumString, AsRefStr)]
 pub enum TelegramBotTestsAction {
     #[strum(serialize = "refresh")]
     Refresh,

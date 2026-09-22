@@ -130,7 +130,36 @@ impl GithubActionsTestRunner {
         let mut zip = zip::ZipArchive::new(reader)
             .map_err(|error| FetchTestRunError::ProviderError(error.to_string()))?;
 
-        let mut entry = match zip.by_name(&suite.summary_path) {
+        // В архиве путь может быть коротким: upload-artifact кладёт содержимое папки в корень
+        let file_name = suite
+            .summary_path
+            .rsplit('/')
+            .next()
+            .unwrap_or(&suite.summary_path)
+            .to_string();
+        let path_in_archive = (0..zip.len())
+            .filter_map(|index| {
+                zip.by_index(index)
+                    .ok()
+                    .and_then(|entry| entry.enclosed_name())
+            })
+            .map(|path| path.to_string_lossy().to_string())
+            .find(|path| {
+                path == &suite.summary_path
+                    || path.ends_with(&format!("/{file_name}"))
+                    || path == &file_name
+            });
+
+        let Some(path_in_archive) = path_in_archive else {
+            tracing::warn!(
+                summary_path = %suite.summary_path,
+                "Summary file is missing in artifact"
+            );
+
+            return Ok(None);
+        };
+
+        let mut entry = match zip.by_name(&path_in_archive) {
             Ok(entry) => entry,
             Err(_) => return Ok(None),
         };

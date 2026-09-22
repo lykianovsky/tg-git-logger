@@ -40,14 +40,9 @@ pub fn build_test_run_message(run: &TestRun, report_url: Option<&str>) -> Messag
     );
 
     if let Some(url) = report_url {
-        builder = builder.empty_line().section(
-            &t!("telegram_bot.test_run.report").to_string(),
-            &format!(
-                "<a href=\"{}\">{}</a>",
-                MessageBuilder::escape_html(url),
-                t!("telegram_bot.test_run.report_link")
-            ),
-        );
+        builder = builder
+            .empty_line()
+            .link(&t!("telegram_bot.test_run.report").to_string(), url);
     }
 
     builder

@@ -198,6 +198,8 @@ async fn choose_repository(
         return Ok(());
     };
 
+    show_loading(&bot, chat_id, message_id).await;
+
     dialogue
         .update(TelegramBotDialogueState::Tests(
             TelegramBotTestsState::Card { repository_id },
@@ -235,6 +237,8 @@ async fn handle_card(
             return Ok(());
         };
 
+        show_loading(&bot, chat_id, message_id).await;
+
         return ask_card_assignee(
             &bot,
             &executors,
@@ -250,6 +254,10 @@ async fn handle_card(
     let Ok(action) = TelegramBotTestsAction::from_callback_data(data) else {
         return Ok(());
     };
+
+    if action != TelegramBotTestsAction::Close {
+        show_loading(&bot, chat_id, message_id).await;
+    }
 
     match action {
         TelegramBotTestsAction::Refresh => {
@@ -357,6 +365,8 @@ async fn choose_block(
             TelegramBotTestsState::Card { repository_id },
         ))
         .await?;
+
+    show_loading(&bot, chat_id, message_id).await;
 
     let Some(block) = data.strip_prefix(BLOCK_CALLBACK_PREFIX) else {
         return render_card(
@@ -747,6 +757,8 @@ async fn handle_connect(
         return Ok(());
     };
 
+    show_loading(&bot, chat_id, message_id).await;
+
     match step {
         ConnectStep::Workflow => {
             let options = match load_ci_options(
@@ -976,6 +988,8 @@ async fn choose_card_assignee(
         return Ok(());
     };
 
+    show_loading(&bot, chat_id, message_id).await;
+
     let options = match load_tracker_options(&executors, ListTaskTrackerOptionsQuery::Tags).await {
         Ok(options) => options,
         Err(error) => {
@@ -1040,6 +1054,8 @@ async fn choose_card_tag(
     }
 
     // Тег необязателен: карточку можно завести и без него
+    show_loading(&bot, chat_id, message_id).await;
+
     let tag = data
         .strip_prefix(TAG_CALLBACK_PREFIX)
         .filter(|tag| !tag.is_empty())
@@ -1268,6 +1284,18 @@ fn refresh_keyboard() -> InlineKeyboardMarkup {
             .to_callback_data()
             .to_string(),
     )]])
+}
+
+/// Поход в GitHub или трекер занимает секунды: показываем, что кнопка сработала
+async fn show_loading(bot: &Bot, chat_id: ChatId, message_id: MessageId) {
+    bot.edit_message_text(
+        chat_id,
+        message_id,
+        t!("telegram_bot.dialogues.tests.loading").to_string(),
+    )
+    .reply_markup(InlineKeyboardMarkup::default())
+    .await
+    .ok();
 }
 
 fn message_target(query: &CallbackQuery) -> Option<(ChatId, MessageId)> {
