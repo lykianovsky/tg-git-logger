@@ -1,0 +1,52 @@
+# Демонстрационный прогон тестов: нужен, чтобы проверять управление тестами из бота
+# без доступа к рабочему репозиторию. Настоящих тестов не запускает — собирает такой
+# же отчёт, какой отдаёт Playwright (json-репортёр), и кладёт его артефактом.
+name: E2E
+
+on:
+  workflow_dispatch:
+    inputs:
+      e2e:
+        description: 'Блок тестов или аргументы прогона; пусто — все тесты'
+        required: false
+        default: ''
+      ref:
+        description: 'Ветка или commit, который тестируем'
+        required: false
+        default: 'main'
+      run_tag:
+        description: 'Метка запуска (её ставит бот, руками не заполняем)'
+        required: false
+        default: ''
+
+# Метка попадает в имя прогона: по нему бот находит свой запуск
+run-name: >-
+  E2E · ${{ inputs.ref || 'main' }}${{ inputs.run_tag && format(' · {0}', inputs.run_tag) || '' }}
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || 'main' }}
+
+      - name: Run tests
+        id: run
+        env:
+          E2E: ${{ inputs.e2e }}
+        run: |
+          mkdir -p test-results
+          python3 .github/workflows/scripts/build-demo-summary.py > test-results/summary.json
+          cat test-results/summary.json
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-report-${{ github.run_id }}
+          path: test-results
+          retention-days: 7
