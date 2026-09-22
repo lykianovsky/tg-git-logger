@@ -2,6 +2,11 @@ use crate::config::environment::ENV;
 use chrono::{NaiveTime, Weekday};
 use chrono_tz::Tz;
 
+/// Значения по умолчанию для управления тестами, если в окружении задано некорректное число
+const DEFAULT_REPORT_LINK_TTL_MINUTES: i64 = 120;
+const DEFAULT_REPORT_RETENTION_DAYS: i64 = 7;
+const DEFAULT_REPORT_MAX_SIZE_MB: u64 = 200;
+
 pub struct ApplicationNotificationsConfig {
     pub default_dnd_start: NaiveTime,
     pub default_dnd_end: NaiveTime,
@@ -17,6 +22,16 @@ pub struct ApplicationReleasePlanConfig {
 
 pub struct ApplicationTaskTrackerConfig {
     pub extract_pattern: String,
+}
+
+/// Управление тестами из бота: доступ к CI, хранение и раздача HTML-отчётов
+pub struct ApplicationTestControlConfig {
+    /// Токен с правом запускать workflow и читать артефакты — отдельно от OAuth пользователей
+    pub github_actions_token: String,
+    pub reports_dir: String,
+    pub report_link_ttl_minutes: i64,
+    pub report_retention_days: i64,
+    pub report_max_size_mb: u64,
 }
 
 pub struct ApplicationKaitenConfig {
@@ -81,6 +96,7 @@ pub struct ApplicationConfig {
     pub task_tracker: ApplicationTaskTrackerConfig,
     pub notifications: ApplicationNotificationsConfig,
     pub release_plan: ApplicationReleasePlanConfig,
+    pub test_control: ApplicationTestControlConfig,
 }
 
 impl ApplicationConfig {
@@ -98,6 +114,7 @@ impl ApplicationConfig {
         let task_tracker = Self::build_task_tracker_config();
         let notifications = Self::build_notifications_config();
         let release_plan = Self::build_release_plan_config();
+        let test_control = Self::build_test_control_config();
 
         Self {
             port,
@@ -113,6 +130,39 @@ impl ApplicationConfig {
             task_tracker,
             notifications,
             release_plan,
+            test_control,
+        }
+    }
+
+    pub fn build_test_control_config() -> ApplicationTestControlConfig {
+        let github_actions_token = ENV.get_or("TEST_CONTROL_GITHUB_TOKEN", "");
+        let reports_dir = ENV.get_or("TEST_CONTROL_REPORTS_DIR", "storage/test-reports");
+        let report_link_ttl_minutes = ENV
+            .get_or("TEST_CONTROL_REPORT_LINK_TTL_MINUTES", "120")
+            .parse()
+            .unwrap_or(DEFAULT_REPORT_LINK_TTL_MINUTES);
+        let report_retention_days = ENV
+            .get_or("TEST_CONTROL_REPORT_RETENTION_DAYS", "7")
+            .parse()
+            .unwrap_or(DEFAULT_REPORT_RETENTION_DAYS);
+        let report_max_size_mb = ENV
+            .get_or("TEST_CONTROL_REPORT_MAX_SIZE_MB", "200")
+            .parse()
+            .unwrap_or(DEFAULT_REPORT_MAX_SIZE_MB);
+
+        if github_actions_token.is_empty() {
+            tracing::warn!(
+                "TEST_CONTROL_GITHUB_TOKEN is not set. \
+                 Running tests from chat will be disabled."
+            )
+        }
+
+        ApplicationTestControlConfig {
+            github_actions_token,
+            reports_dir,
+            report_link_ttl_minutes,
+            report_retention_days,
+            report_max_size_mb,
         }
     }
 
