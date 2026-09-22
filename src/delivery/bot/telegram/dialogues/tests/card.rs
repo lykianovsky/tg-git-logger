@@ -133,6 +133,7 @@ pub fn build_card_keyboard(run: Option<&TestRun>, is_configured: bool) -> Inline
         button(TelegramBotTestsAction::RunAll),
         button(TelegramBotTestsAction::ChooseBlock),
     ]);
+    rows.push(vec![button(TelegramBotTestsAction::Readiness)]);
     rows.push(vec![
         button(TelegramBotTestsAction::Refresh),
         button(TelegramBotTestsAction::Close),

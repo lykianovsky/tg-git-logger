@@ -17,6 +17,7 @@ use crate::application::test_run::commands::rerun_failed_tests::command::RerunFa
 use crate::application::test_run::commands::rerun_failed_tests::error::RerunFailedTestsError;
 use crate::application::test_run::queries::build_test_report::query::BuildTestReportQuery;
 use crate::application::test_run::queries::get_last_test_run::query::GetLastTestRunQuery;
+use crate::application::test_run::queries::get_release_readiness::query::GetReleaseReadinessQuery;
 use crate::application::test_run::queries::get_run_failures::query::GetRunFailuresQuery;
 use crate::application::test_run::queries::list_ci_options::error::ListCiOptionsError;
 use crate::application::test_run::queries::list_ci_options::query::{
@@ -65,6 +66,8 @@ const OPTION_CALLBACK_PREFIX: &str = "opt:";
 const TAG_CALLBACK_PREFIX: &str = "tag:";
 /// Сколько вариантов показываем на шаге выбора
 const MAX_OPTION_BUTTONS: usize = 30;
+/// Сколько мешающих тестов показываем в ответе про релиз
+const MAX_READINESS_BLOCKERS: usize = 10;
 
 #[derive(Debug, Clone, Default)]
 pub enum TelegramBotTestsState {
@@ -295,6 +298,10 @@ async fn handle_card(
                 social_user_id,
             )
             .await?
+        }
+
+        TelegramBotTestsAction::Readiness => {
+            show_readiness(&bot, &executors, chat_id, message_id, repository_id).await?
         }
 
         TelegramBotTestsAction::RerunFailed => {
@@ -719,6 +726,98 @@ async fn show_failures(
     bot.edit_message_text(chat_id, message_id, builder.build())
         .parse_mode(ParseMode::Html)
         .reply_markup(InlineKeyboardMarkup::new(rows))
+        .await?;
+
+    Ok(())
+}
+
+/// Ответ на вопрос «можно ли релизить» — словами, а не цифрами
+async fn show_readiness(
+    bot: &Bot,
+    executors: &Arc<ApplicationBoostrapExecutors>,
+    chat_id: ChatId,
+    message_id: MessageId,
+    repository_id: i32,
+) -> Result<(), Box<dyn Error + Send + Sync>> {
+    let response = match executors
+        .queries
+        .get_release_readiness
+        .execute(&GetReleaseReadinessQuery {
+            repository_id: RepositoryId(repository_id),
+        })
+        .await
+    {
+        Ok(response) => response,
+        Err(error) => {
+            tracing::error!(%error, "Failed to get release readiness");
+
+            return edit_with_back(
+                bot,
+                chat_id,
+                message_id,
+                t!("telegram_bot.dialogues.tests.readiness_error").to_string(),
+            )
+            .await;
+        }
+    };
+
+    let verdict_key = format!(
+        "telegram_bot.dialogues.tests.readiness.{}",
+        response.verdict.as_str()
+    );
+    let mut builder = MessageBuilder::new()
+        .bold(&t!(&verdict_key).to_string())
+        .empty_line()
+        .with_html_escape(true);
+
+    if let Some(run) = response.run.as_ref() {
+        let totals = run.totals.unwrap_or_default();
+
+        builder = builder.section_code(
+            &t!("telegram_bot.test_run.branch").to_string(),
+            &run.git_ref,
+        );
+
+        if run.totals.is_some() {
+            builder = builder.section(
+                &t!("telegram_bot.test_run.totals").to_string(),
+                &t!(
+                    "telegram_bot.test_run.totals_value",
+                    passed = totals.passed,
+                    failed = totals.failed,
+                    flaky = totals.flaky,
+                    skipped = totals.skipped
+                )
+                .to_string(),
+            );
+        }
+
+        if let Some(finished_at) = run.finished_at {
+            builder = builder.section(
+                &t!("telegram_bot.dialogues.tests.finished").to_string(),
+                &finished_at.format("%d.%m.%Y, %H:%M UTC").to_string(),
+            );
+        }
+    }
+
+    // Показываем, что именно мешает релизу, а не только вердикт
+    if !response.failures.is_empty() {
+        builder = builder.empty_line().bold(
+            &t!(
+                "telegram_bot.dialogues.tests.readiness_blockers",
+                count = response.failures.len()
+            )
+            .to_string(),
+        );
+
+        for failure in response.failures.iter().take(MAX_READINESS_BLOCKERS) {
+            builder = builder.line(&format!("• {}", failure.title));
+        }
+    }
+
+    bot.edit_message_text(chat_id, message_id, builder.build())
+        .parse_mode(ParseMode::Html)
+        .reply_markup(back_keyboard())
         .await?;
 
     Ok(())
