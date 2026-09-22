@@ -15,6 +15,8 @@ pub enum TelegramBotTestsAction {
     Report,
     #[strum(serialize = "run_all")]
     RunAll,
+    #[strum(serialize = "rerun_failed")]
+    RerunFailed,
     #[strum(serialize = "choose_block")]
     ChooseBlock,
     #[strum(serialize = "cancel_run")]
@@ -34,6 +36,7 @@ impl KeyboardActionLabel for TelegramBotTestsAction {
             Self::Failures => "❌ Упавшие",
             Self::Report => "📄 Отчёт",
             Self::RunAll => "▶️ Запустить все",
+            Self::RerunFailed => "🔁 Прогнать упавшие",
             Self::ChooseBlock => "🧩 Запустить блок",
             Self::CancelRun => "🛑 Отменить прогон",
             Self::Connect => "🔌 Подключить тесты",

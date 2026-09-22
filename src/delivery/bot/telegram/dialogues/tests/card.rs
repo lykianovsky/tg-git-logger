@@ -122,6 +122,11 @@ pub fn build_card_keyboard(run: Option<&TestRun>, is_configured: bool) -> Inline
         }
 
         rows.push(result_row);
+
+        // Гонять весь набор ради двух упавших незачем
+        if run.has_failures() {
+            rows.push(vec![button(TelegramBotTestsAction::RerunFailed)]);
+        }
     }
 
     rows.push(vec![

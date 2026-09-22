@@ -42,6 +42,7 @@ use crate::application::test_run::commands::connect_test_suite::executor::Connec
 use crate::application::test_run::commands::create_test_failure_card::executor::CreateTestFailureCardExecutor;
 use crate::application::test_run::commands::dispatch_test_run::executor::DispatchTestRunExecutor;
 use crate::application::test_run::commands::ingest_test_run_result::executor::IngestTestRunResultExecutor;
+use crate::application::test_run::commands::rerun_failed_tests::executor::RerunFailedTestsExecutor;
 use crate::application::test_run::commands::sync_stale_test_runs::executor::SyncStaleTestRunsExecutor;
 use crate::application::test_run::queries::build_test_report::executor::BuildTestReportExecutor;
 use crate::application::test_run::queries::get_last_test_run::executor::GetLastTestRunExecutor;
@@ -105,6 +106,7 @@ pub struct ApplicationBoostrapExecutorsCommands {
     pub connect_test_suite: Arc<ConnectTestSuiteExecutor>,
     pub create_test_failure_card: Arc<CreateTestFailureCardExecutor>,
     pub dispatch_test_run: Arc<DispatchTestRunExecutor>,
+    pub rerun_failed_tests: Arc<RerunFailedTestsExecutor>,
     pub ingest_test_run_result: Arc<IngestTestRunResultExecutor>,
     pub sync_stale_test_runs: Arc<SyncStaleTestRunsExecutor>,
     pub register_user_via_oauth: Arc<RegisterUserViaOAuthExecutor>,
@@ -307,6 +309,14 @@ impl ApplicationBoostrapExecutors {
             )),
         };
 
+        // Запуск прогона нужен и команде из чата, и перезапуску упавших
+        let dispatch_test_run = Arc::new(DispatchTestRunExecutor::new(
+            shared_dependency.test_suite_repo.clone(),
+            shared_dependency.test_run_repo.clone(),
+            shared_dependency.test_runner.clone(),
+            ci_token_resolver.clone(),
+        ));
+
         // Итоги прогона добирает и вебхук, и подстраховка по расписанию
         let ingest_test_run_result = Arc::new(IngestTestRunResultExecutor::new(
             shared_dependency.test_suite_repo.clone(),
@@ -336,11 +346,10 @@ impl ApplicationBoostrapExecutors {
                 shared_dependency.task_tracker_client.clone(),
                 config.kaiten.base.clone(),
             )),
-            dispatch_test_run: Arc::new(DispatchTestRunExecutor::new(
-                shared_dependency.test_suite_repo.clone(),
+            dispatch_test_run: dispatch_test_run.clone(),
+            rerun_failed_tests: Arc::new(RerunFailedTestsExecutor::new(
                 shared_dependency.test_run_repo.clone(),
-                shared_dependency.test_runner.clone(),
-                ci_token_resolver.clone(),
+                dispatch_test_run,
             )),
             ingest_test_run_result: ingest_test_run_result.clone(),
             sync_stale_test_runs: Arc::new(SyncStaleTestRunsExecutor::new(

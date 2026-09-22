@@ -13,6 +13,8 @@ use crate::application::test_run::commands::create_test_failure_card::response::
 use crate::application::test_run::commands::dispatch_test_run::command::DispatchTestRunCommand;
 use crate::application::test_run::commands::dispatch_test_run::error::DispatchTestRunError;
 use crate::application::test_run::commands::ingest_test_run_result::command::IngestTestRunResultCommand;
+use crate::application::test_run::commands::rerun_failed_tests::command::RerunFailedTestsCommand;
+use crate::application::test_run::commands::rerun_failed_tests::error::RerunFailedTestsError;
 use crate::application::test_run::queries::build_test_report::query::BuildTestReportQuery;
 use crate::application::test_run::queries::get_last_test_run::query::GetLastTestRunQuery;
 use crate::application::test_run::queries::get_run_failures::query::GetRunFailuresQuery;
@@ -295,6 +297,18 @@ async fn handle_card(
             .await?
         }
 
+        TelegramBotTestsAction::RerunFailed => {
+            rerun_failed(
+                &bot,
+                &executors,
+                chat_id,
+                message_id,
+                repository_id,
+                social_user_id,
+            )
+            .await?
+        }
+
         TelegramBotTestsAction::ChooseBlock => {
             show_blocks(
                 &bot,
@@ -542,22 +556,31 @@ async fn run_tests(
 
     // Запоминаем карточку: пока прогон идёт, бот обновляет это же сообщение
     if let Ok(response) = result {
-        let attached = executors
-            .commands
-            .attach_test_run_message
-            .execute(&AttachTestRunMessageCommand {
-                test_run_id: response.run.id,
-                chat_id: SocialChatId(chat_id.0),
-                message_id: message_id.0,
-            })
-            .await;
-
-        if let Err(error) = attached {
-            tracing::warn!(%error, "Failed to attach test run message");
-        }
+        attach_card_message(executors, &response.run, chat_id, message_id).await;
     }
 
     Ok(())
+}
+
+async fn attach_card_message(
+    executors: &Arc<ApplicationBoostrapExecutors>,
+    run: &TestRun,
+    chat_id: ChatId,
+    message_id: MessageId,
+) {
+    let attached = executors
+        .commands
+        .attach_test_run_message
+        .execute(&AttachTestRunMessageCommand {
+            test_run_id: run.id,
+            chat_id: SocialChatId(chat_id.0),
+            message_id: message_id.0,
+        })
+        .await;
+
+    if let Err(error) = attached {
+        tracing::warn!(%error, "Failed to attach test run message");
+    }
 }
 
 fn started_text(run: &TestRun) -> String {
@@ -697,6 +720,77 @@ async fn show_failures(
         .parse_mode(ParseMode::Html)
         .reply_markup(InlineKeyboardMarkup::new(rows))
         .await?;
+
+    Ok(())
+}
+
+/// Гоняем только то, что упало: аргументы собираются из сохранённых названий
+async fn rerun_failed(
+    bot: &Bot,
+    executors: &Arc<ApplicationBoostrapExecutors>,
+    chat_id: ChatId,
+    message_id: MessageId,
+    repository_id: i32,
+    social_user_id: SocialUserId,
+) -> Result<(), Box<dyn Error + Send + Sync>> {
+    let result = executors
+        .commands
+        .rerun_failed_tests
+        .execute(&RerunFailedTestsCommand {
+            repository_id: RepositoryId(repository_id),
+            social_user_id,
+            chat_id: SocialChatId(chat_id.0),
+        })
+        .await;
+
+    let response = match result {
+        Ok(response) => response,
+        Err(error) => {
+            let text = match error {
+                RerunFailedTestsError::NothingToRerun => {
+                    t!("telegram_bot.dialogues.tests.nothing_to_rerun").to_string()
+                }
+                RerunFailedTestsError::AlreadyRunning(run) => t!(
+                    "telegram_bot.dialogues.tests.already_running",
+                    branch = MessageBuilder::escape_html(&run.git_ref)
+                )
+                .to_string(),
+                RerunFailedTestsError::NoVersionControlAccount => {
+                    t!("telegram_bot.dialogues.tests.no_github_account").to_string()
+                }
+                error => {
+                    tracing::error!(%error, "Failed to rerun failed tests");
+
+                    t!("telegram_bot.dialogues.tests.dispatch_error").to_string()
+                }
+            };
+
+            return edit_with_back(bot, chat_id, message_id, text).await;
+        }
+    };
+
+    let text = MessageBuilder::new()
+        .bold(
+            &t!(
+                "telegram_bot.dialogues.tests.rerun_started",
+                count = response.failures_count
+            )
+            .to_string(),
+        )
+        .empty_line()
+        .with_html_escape(true)
+        .section_code(
+            &t!("telegram_bot.test_run.branch").to_string(),
+            &response.run.git_ref,
+        )
+        .build();
+
+    bot.edit_message_text(chat_id, message_id, text)
+        .parse_mode(ParseMode::Html)
+        .reply_markup(refresh_keyboard())
+        .await?;
+
+    attach_card_message(executors, &response.run, chat_id, message_id).await;
 
     Ok(())
 }
