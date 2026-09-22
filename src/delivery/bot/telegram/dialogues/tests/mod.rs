@@ -50,10 +50,11 @@ use std::error::Error;
 use std::sync::Arc;
 use teloxide::dispatching::{DpHandlerDescription, UpdateFilterExt};
 use teloxide::dptree::{Handler, case};
-use teloxide::payloads::EditMessageTextSetters;
+use teloxide::payloads::{EditMessageTextSetters, SendMessageSetters};
 use teloxide::prelude::{Requester, Update};
 use teloxide::types::{
-    CallbackQuery, ChatId, InlineKeyboardButton, InlineKeyboardMarkup, MessageId, ParseMode,
+    CallbackQuery, ChatId, InlineKeyboardButton, InlineKeyboardMarkup, Message, MessageId,
+    ParseMode,
 };
 use teloxide::{Bot, dptree};
 
@@ -82,12 +83,20 @@ pub enum TelegramBotTestsState {
 
     SelectBlock {
         repository_id: i32,
+        /// Сами пути блоков: в кнопку влезает только номер (ограничение мессенджера)
+        blocks: Vec<String>,
     },
 
-    /// Подключение тестов: шаг мастера и всё, что уже выбрано
+    /// Подключение тестов: выбор процесса CI
     Connect {
         step: ConnectStep,
         draft: ConnectDraft,
+    },
+
+    /// Ветку вводят текстом — как в отчётах по репозиторию
+    EnterDefaultRef {
+        repository_id: i32,
+        workflow_file: String,
     },
 
     /// Шаг 1 формы карточки: на кого её повесить
@@ -101,6 +110,8 @@ pub enum TelegramBotTestsState {
         repository_id: i32,
         test_failure_id: i32,
         responsible_id: u64,
+        /// Названия тегов: в кнопку уходит номер, а не само название
+        tags: Vec<String>,
     },
 }
 
@@ -109,13 +120,13 @@ pub enum TelegramBotTestsState {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConnectStep {
     Workflow,
-    Branch,
 }
 
 #[derive(Debug, Clone, Default)]
 pub struct ConnectDraft {
     pub repository_id: i32,
-    pub workflow_file: String,
+    /// Варианты шага: кнопка несёт номер, значение берём отсюда
+    pub options: Vec<String>,
 }
 
 pub struct TelegramBotTestsDispatcher {}
@@ -127,7 +138,11 @@ impl TelegramBotTestsDispatcher {
             .branch(case![TelegramBotTestsState::SelectRepository].endpoint(choose_repository))
             .branch(case![TelegramBotTestsState::Card { repository_id }].endpoint(handle_card))
             .branch(
-                case![TelegramBotTestsState::SelectBlock { repository_id }].endpoint(choose_block),
+                case![TelegramBotTestsState::SelectBlock {
+                    repository_id,
+                    blocks
+                }]
+                .endpoint(choose_block),
             )
             .branch(
                 case![TelegramBotTestsState::SelectCardAssignee {
@@ -140,13 +155,23 @@ impl TelegramBotTestsDispatcher {
                 case![TelegramBotTestsState::SelectCardTag {
                     repository_id,
                     test_failure_id,
-                    responsible_id
+                    responsible_id,
+                    tags
                 }]
                 .endpoint(choose_card_tag),
             )
             .branch(case![TelegramBotTestsState::Connect { step, draft }].endpoint(handle_connect));
 
-        dptree::entry().branch(callbacks)
+        // Ветку вводят текстом, поэтому у диалога есть и ветка сообщений
+        let messages = Update::filter_message().branch(
+            case![TelegramBotTestsState::EnterDefaultRef {
+                repository_id,
+                workflow_file
+            }]
+            .endpoint(enter_default_ref),
+        );
+
+        dptree::entry().branch(callbacks).branch(messages)
     }
 }
 
@@ -403,7 +428,7 @@ async fn choose_block(
     dialogue: TelegramBotDialogueType,
     executors: Arc<ApplicationBoostrapExecutors>,
     query: CallbackQuery,
-    repository_id: i32,
+    (repository_id, blocks): (i32, Vec<String>),
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     bot.answer_callback_query(query.id.clone()).await?;
 
@@ -421,7 +446,11 @@ async fn choose_block(
 
     show_loading(&bot, chat_id, message_id).await;
 
-    let Some(block) = data.strip_prefix(BLOCK_CALLBACK_PREFIX) else {
+    let Some(block) = data
+        .strip_prefix(BLOCK_CALLBACK_PREFIX)
+        .and_then(|index| index.parse::<usize>().ok())
+        .and_then(|index| blocks.get(index))
+    else {
         return render_card(
             &bot,
             &executors,
@@ -438,7 +467,7 @@ async fn choose_block(
         chat_id,
         message_id,
         repository_id,
-        block.to_string(),
+        block.clone(),
         SocialUserId(query.from.id.0 as i32),
     )
     .await
@@ -500,16 +529,20 @@ async fn show_blocks(
 
     dialogue
         .update(TelegramBotDialogueState::Tests(
-            TelegramBotTestsState::SelectBlock { repository_id },
+            TelegramBotTestsState::SelectBlock {
+                repository_id,
+                blocks: blocks.clone(),
+            },
         ))
         .await?;
 
     let mut rows: Vec<Vec<InlineKeyboardButton>> = blocks
         .iter()
-        .map(|block| {
+        .enumerate()
+        .map(|(index, block)| {
             vec![InlineKeyboardButton::callback(
                 block.clone(),
-                format!("{BLOCK_CALLBACK_PREFIX}{block}"),
+                format!("{BLOCK_CALLBACK_PREFIX}{index}"),
             )]
         })
         .collect();
@@ -1004,7 +1037,7 @@ async fn start_connect(
                 step: ConnectStep::Workflow,
                 draft: ConnectDraft {
                     repository_id,
-                    workflow_file: String::new(),
+                    options: options.iter().map(|option| option.value.clone()).collect(),
                 },
             },
         ))
@@ -1049,46 +1082,22 @@ async fn handle_connect(
         .await;
     }
 
-    let Some(value) = data.strip_prefix(OPTION_CALLBACK_PREFIX) else {
+    // Кнопка несёт номер: имя процесса в 64 байта данных кнопки не помещается
+    let Some(workflow_file) = data
+        .strip_prefix(OPTION_CALLBACK_PREFIX)
+        .and_then(|index| index.parse::<usize>().ok())
+        .and_then(|index| draft.options.get(index))
+    else {
         return Ok(());
     };
 
-    show_loading(&bot, chat_id, message_id).await;
-
     match step {
         ConnectStep::Workflow => {
-            let options = match load_ci_options(
-                &executors,
-                draft.repository_id,
-                social_user_id,
-                CiOptionKind::Branches,
-            )
-            .await
-            {
-                Ok(options) => options,
-                Err(error) => {
-                    return show_ci_options_error(&bot, chat_id, message_id, error).await;
-                }
-            };
-
-            if options.is_empty() {
-                return edit_with_back(
-                    &bot,
-                    chat_id,
-                    message_id,
-                    t!("telegram_bot.dialogues.tests.no_branches").to_string(),
-                )
-                .await;
-            }
-
             dialogue
                 .update(TelegramBotDialogueState::Tests(
-                    TelegramBotTestsState::Connect {
-                        step: ConnectStep::Branch,
-                        draft: ConnectDraft {
-                            repository_id: draft.repository_id,
-                            workflow_file: value.to_string(),
-                        },
+                    TelegramBotTestsState::EnterDefaultRef {
+                        repository_id: draft.repository_id,
+                        workflow_file: workflow_file.clone(),
                     },
                 ))
                 .await?;
@@ -1096,48 +1105,81 @@ async fn handle_connect(
             bot.edit_message_text(
                 chat_id,
                 message_id,
-                t!("telegram_bot.dialogues.tests.select_branch").to_string(),
+                t!("telegram_bot.dialogues.tests.enter_default_ref").to_string(),
             )
-            .reply_markup(ci_options_keyboard(&options))
-            .await?;
-        }
-
-        ConnectStep::Branch => {
-            let connected = executors
-                .commands
-                .connect_test_suite
-                .execute(&ConnectTestSuiteCommand {
-                    repository_id: RepositoryId(draft.repository_id),
-                    workflow_file: draft.workflow_file.clone(),
-                    default_ref: value.to_string(),
-                })
-                .await;
-
-            if let Err(error) = connected {
-                tracing::error!(%error, "Failed to connect test suite");
-
-                return edit_with_back(
-                    &bot,
-                    chat_id,
-                    message_id,
-                    t!("telegram_bot.dialogues.tests.connect_error").to_string(),
-                )
-                .await;
-            }
-
-            back_to_card(
-                &bot,
-                &executors,
-                &dialogue,
-                chat_id,
-                message_id,
-                draft.repository_id,
-            )
+            .reply_markup(InlineKeyboardMarkup::default())
             .await?;
         }
     }
 
     Ok(())
+}
+
+/// Ветку вводят текстом — веток в репозитории сотни, списком их не покажешь
+async fn enter_default_ref(
+    bot: Bot,
+    dialogue: TelegramBotDialogueType,
+    executors: Arc<ApplicationBoostrapExecutors>,
+    message: Message,
+    (repository_id, workflow_file): (i32, String),
+) -> Result<(), Box<dyn Error + Send + Sync>> {
+    let Some(default_ref) = message
+        .text()
+        .map(str::trim)
+        .filter(|text| !text.is_empty())
+    else {
+        bot.send_message(
+            message.chat.id,
+            t!("telegram_bot.dialogues.tests.branch_required").to_string(),
+        )
+        .await?;
+
+        return Ok(());
+    };
+
+    let connected = executors
+        .commands
+        .connect_test_suite
+        .execute(&ConnectTestSuiteCommand {
+            repository_id: RepositoryId(repository_id),
+            workflow_file,
+            default_ref: default_ref.to_string(),
+        })
+        .await;
+
+    if let Err(error) = connected {
+        tracing::error!(%error, "Failed to connect test suite");
+
+        bot.send_message(
+            message.chat.id,
+            t!("telegram_bot.dialogues.tests.connect_error").to_string(),
+        )
+        .await?;
+
+        return Ok(());
+    }
+
+    dialogue
+        .update(TelegramBotDialogueState::Tests(
+            TelegramBotTestsState::Card { repository_id },
+        ))
+        .await?;
+
+    let sent = bot
+        .send_message(
+            message.chat.id,
+            t!("telegram_bot.dialogues.tests.loading").to_string(),
+        )
+        .await?;
+
+    render_card(
+        &bot,
+        &executors,
+        sent.chat.id,
+        sent.id,
+        RepositoryId(repository_id),
+    )
+    .await
 }
 
 async fn load_ci_options(
@@ -1179,13 +1221,15 @@ async fn show_ci_options_error(
 }
 
 fn ci_options_keyboard(options: &[CiOption]) -> InlineKeyboardMarkup {
+    // В данные кнопки влезает 64 байта — имя ветки туда не помещается, шлём номер
     let mut rows: Vec<Vec<InlineKeyboardButton>> = options
         .iter()
         .take(MAX_OPTION_BUTTONS)
-        .map(|option| {
+        .enumerate()
+        .map(|(index, option)| {
             vec![InlineKeyboardButton::callback(
                 option.label.clone(),
-                format!("{OPTION_CALLBACK_PREFIX}{}", option.value),
+                format!("{OPTION_CALLBACK_PREFIX}{index}"),
             )]
         })
         .collect();
@@ -1307,6 +1351,7 @@ async fn choose_card_assignee(
                 repository_id,
                 test_failure_id,
                 responsible_id,
+                tags: options.iter().map(|option| option.name.clone()).collect(),
             },
         ))
         .await?;
@@ -1327,7 +1372,7 @@ async fn choose_card_tag(
     dialogue: TelegramBotDialogueType,
     executors: Arc<ApplicationBoostrapExecutors>,
     query: CallbackQuery,
-    (repository_id, test_failure_id, responsible_id): (i32, i32, u64),
+    (repository_id, test_failure_id, responsible_id, tags): (i32, i32, u64, Vec<String>),
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     bot.answer_callback_query(query.id.clone()).await?;
 
@@ -1496,10 +1541,11 @@ fn tag_keyboard(options: &[TaskTrackerOption]) -> InlineKeyboardMarkup {
     let mut rows: Vec<Vec<InlineKeyboardButton>> = options
         .iter()
         .take(MAX_OPTION_BUTTONS)
-        .map(|option| {
+        .enumerate()
+        .map(|(index, option)| {
             vec![InlineKeyboardButton::callback(
                 option.name.clone(),
-                format!("{TAG_CALLBACK_PREFIX}{}", option.name),
+                format!("{TAG_CALLBACK_PREFIX}{index}"),
             )]
         })
         .collect();

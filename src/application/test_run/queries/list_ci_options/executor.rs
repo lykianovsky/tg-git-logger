@@ -47,11 +47,6 @@ impl CommandExecutor for ListCiOptionsExecutor {
                     .list_workflows(&actor.token, &repository.owner, &repository.name)
                     .await?
             }
-            CiOptionKind::Branches => {
-                self.test_runner
-                    .list_branches(&actor.token, &repository.owner, &repository.name)
-                    .await?
-            }
         };
 
         Ok(ListCiOptionsResponse { options })

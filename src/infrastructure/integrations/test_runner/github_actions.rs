@@ -16,7 +16,6 @@ const RUNS_LOOKUP_LIMIT: u32 = 30;
 const GITHUB_API_VERSION: &str = "2022-11-28";
 /// Сколько процессов CI и веток показываем при подключении тестов
 const WORKFLOWS_LIMIT: u32 = 50;
-const BRANCHES_LIMIT: u32 = 50;
 const USER_AGENT: &str = "tg-bot-logger";
 
 pub struct GithubActionsTestRunner {
@@ -220,34 +219,6 @@ impl TestRunner for GithubActionsTestRunner {
                     .to_string();
 
                 Some(CiOption { value: file, label })
-            })
-            .collect())
-    }
-
-    async fn list_branches(
-        &self,
-        token: &str,
-        owner: &str,
-        name: &str,
-    ) -> Result<Vec<CiOption>, ListTestBlocksError> {
-        let body = self
-            .get_json(
-                token,
-                self.url(owner, name, &format!("branches?per_page={BRANCHES_LIMIT}")),
-            )
-            .await?;
-
-        let branches = body.as_array().cloned().unwrap_or_default();
-
-        Ok(branches
-            .iter()
-            .filter_map(|branch| {
-                let name = branch.get("name").and_then(Value::as_str)?.to_string();
-
-                Some(CiOption {
-                    value: name.clone(),
-                    label: name,
-                })
             })
             .collect())
     }

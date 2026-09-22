@@ -4,7 +4,6 @@ use crate::domain::user::value_objects::social_user_id::SocialUserId;
 /// Что показываем на шаге подключения тестов
 pub enum CiOptionKind {
     Workflows,
-    Branches,
 }
 
 pub struct ListCiOptionsQuery {

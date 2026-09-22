@@ -70,14 +70,6 @@ pub trait TestRunner: Send + Sync {
         name: &str,
     ) -> Result<Vec<CiOption>, ListTestBlocksError>;
 
-    /// Ветки репозитория — из них выбирается тестируемая по умолчанию
-    async fn list_branches(
-        &self,
-        token: &str,
-        owner: &str,
-        name: &str,
-    ) -> Result<Vec<CiOption>, ListTestBlocksError>;
-
     /// Отправляет запуск в CI. Идентификатор прогона появится позже — его находят по метке.
     /// Токен передаётся вызовом: в CI ходим правами того, кто запустил прогон
     async fn dispatch(
