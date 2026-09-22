@@ -153,8 +153,8 @@ impl GithubActionsTestRunner {
 
 #[async_trait]
 impl TestRunner for GithubActionsTestRunner {
-    /// GitHub отдаёт процессы CI из ветки по умолчанию — и запускает `workflow_dispatch`
-    /// тоже только из неё, поэтому список здесь не зависит от тестируемой ветки
+    /// Список процессов CI репозитория. Запустить через `workflow_dispatch` можно только
+    /// тот, чей файл есть в ветке по умолчанию, — это ограничение GitHub
     async fn list_workflows(
         &self,
         token: &str,
@@ -177,6 +177,13 @@ impl TestRunner for GithubActionsTestRunner {
             .and_then(Value::as_array)
             .cloned()
             .unwrap_or_default();
+
+        tracing::debug!(
+            owner = %owner,
+            repository = %name,
+            count = workflows.len(),
+            "GitHub workflows fetched"
+        );
 
         Ok(workflows
             .iter()
