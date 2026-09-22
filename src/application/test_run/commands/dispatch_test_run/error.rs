@@ -1,3 +1,4 @@
+use crate::application::test_run::service::ci_token::ResolveCiTokenError;
 use crate::domain::test_run::entities::test_run::TestRun;
 use crate::domain::test_run::ports::test_runner::DispatchTestRunError as RunnerDispatchError;
 use crate::domain::test_run::repositories::test_run_repository::{
@@ -8,6 +9,10 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum DispatchTestRunError {
+    /// У пользователя не привязан аккаунт GitHub — запускать прогон нечем
+    #[error("No linked version control account")]
+    NoVersionControlAccount,
+
     #[error("Database error: {0}")]
     DbError(String),
 
@@ -56,6 +61,15 @@ impl From<RunnerDispatchError> for DispatchTestRunError {
         match error {
             RunnerDispatchError::ProviderError(message) => Self::ProviderError(message),
             RunnerDispatchError::WorkflowNotFound(file) => Self::WorkflowNotFound(file),
+        }
+    }
+}
+
+impl From<ResolveCiTokenError> for DispatchTestRunError {
+    fn from(error: ResolveCiTokenError) -> Self {
+        match error {
+            ResolveCiTokenError::NoVersionControlAccount => Self::NoVersionControlAccount,
+            ResolveCiTokenError::DecryptError(message) => Self::DbError(message),
         }
     }
 }

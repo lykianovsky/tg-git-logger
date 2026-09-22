@@ -12,6 +12,7 @@ use crate::application::test_run::commands::dispatch_test_run::error::DispatchTe
 use crate::application::test_run::queries::build_test_report::query::BuildTestReportQuery;
 use crate::application::test_run::queries::get_last_test_run::query::GetLastTestRunQuery;
 use crate::application::test_run::queries::get_run_failures::query::GetRunFailuresQuery;
+use crate::application::test_run::queries::list_test_blocks::error::ListTestBlocksError;
 use crate::application::test_run::queries::list_test_blocks::query::ListTestBlocksQuery;
 use crate::bootstrap::executors::ApplicationBoostrapExecutors;
 use crate::delivery::bot::telegram::dialogues::tests::card::{
@@ -27,6 +28,7 @@ use crate::domain::shared::command::CommandExecutor;
 use crate::domain::test_run::entities::test_run::TestRun;
 use crate::domain::test_run::value_objects::test_run_trigger::TestRunTrigger;
 use crate::domain::user::value_objects::social_chat_id::SocialChatId;
+use crate::domain::user::value_objects::social_user_id::SocialUserId;
 use crate::utils::builder::message::MessageBuilder;
 use rust_i18n::t;
 use std::error::Error;
@@ -216,6 +218,7 @@ async fn handle_card(
         return Ok(());
     };
 
+    let social_user_id = SocialUserId(query.from.id.0 as i32);
     let data = query.data.as_deref().unwrap_or("");
 
     if let Some(raw_failure_id) = data.strip_prefix(CARD_CALLBACK_PREFIX) {
@@ -267,6 +270,7 @@ async fn handle_card(
                 message_id,
                 repository_id,
                 String::new(),
+                social_user_id,
             )
             .await?
         }
@@ -279,6 +283,7 @@ async fn handle_card(
                 chat_id,
                 message_id,
                 repository_id,
+                social_user_id,
             )
             .await?
         }
@@ -365,6 +370,7 @@ async fn choose_block(
         message_id,
         repository_id,
         block.to_string(),
+        SocialUserId(query.from.id.0 as i32),
     )
     .await
 }
@@ -376,16 +382,27 @@ async fn show_blocks(
     chat_id: ChatId,
     message_id: MessageId,
     repository_id: i32,
+    social_user_id: SocialUserId,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     let blocks = match executors
         .queries
         .list_test_blocks
         .execute(&ListTestBlocksQuery {
             repository_id: RepositoryId(repository_id),
+            social_user_id,
         })
         .await
     {
         Ok(response) => response.blocks,
+        Err(ListTestBlocksError::NoVersionControlAccount) => {
+            return edit_with_back(
+                bot,
+                chat_id,
+                message_id,
+                t!("telegram_bot.dialogues.tests.no_github_account").to_string(),
+            )
+            .await;
+        }
         Err(error) => {
             tracing::error!(%error, "Failed to list test blocks");
 
@@ -440,6 +457,7 @@ async fn run_tests(
     message_id: MessageId,
     repository_id: i32,
     args: String,
+    social_user_id: SocialUserId,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     let result = executors
         .commands
@@ -449,7 +467,7 @@ async fn run_tests(
             git_ref: None,
             args,
             trigger: TestRunTrigger::Chat,
-            requested_by_user_id: None,
+            requested_by_social_user_id: Some(social_user_id),
             chat_id: Some(SocialChatId(chat_id.0)),
         })
         .await;
@@ -463,6 +481,10 @@ async fn run_tests(
         .to_string(),
         Err(DispatchTestRunError::NotConfigured) => {
             t!("telegram_bot.dialogues.tests.not_configured").to_string()
+        }
+        // Без привязанного GitHub запускать нечем: прогон идёт правами пользователя
+        Err(DispatchTestRunError::NoVersionControlAccount) => {
+            t!("telegram_bot.dialogues.tests.no_github_account").to_string()
         }
         Err(error) => {
             tracing::error!(%error, "Failed to dispatch test run");

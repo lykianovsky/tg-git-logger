@@ -1,6 +1,7 @@
 use crate::application::test_run::commands::dispatch_test_run::command::DispatchTestRunCommand;
 use crate::application::test_run::commands::dispatch_test_run::error::DispatchTestRunError;
 use crate::application::test_run::commands::dispatch_test_run::response::DispatchTestRunResponse;
+use crate::application::test_run::service::ci_token::CiTokenResolver;
 use crate::domain::shared::command::CommandExecutor;
 use crate::domain::test_run::entities::test_run::NewTestRun;
 use crate::domain::test_run::ports::test_runner::TestRunner;
@@ -13,6 +14,7 @@ pub struct DispatchTestRunExecutor {
     test_suite_repo: Arc<dyn TestSuiteRepository>,
     test_run_repo: Arc<dyn TestRunRepository>,
     test_runner: Arc<dyn TestRunner>,
+    ci_token_resolver: Arc<CiTokenResolver>,
 }
 
 impl DispatchTestRunExecutor {
@@ -20,11 +22,13 @@ impl DispatchTestRunExecutor {
         test_suite_repo: Arc<dyn TestSuiteRepository>,
         test_run_repo: Arc<dyn TestRunRepository>,
         test_runner: Arc<dyn TestRunner>,
+        ci_token_resolver: Arc<CiTokenResolver>,
     ) -> Self {
         Self {
             test_suite_repo,
             test_run_repo,
             test_runner,
+            ci_token_resolver,
         }
     }
 }
@@ -45,6 +49,15 @@ impl CommandExecutor for DispatchTestRunExecutor {
             return Err(DispatchTestRunError::AlreadyRunning(Box::new(active)));
         }
 
+        let actor = match cmd.requested_by_social_user_id.as_ref() {
+            Some(social_user_id) => {
+                self.ci_token_resolver
+                    .resolve_by_social_user_id(social_user_id)
+                    .await?
+            }
+            None => self.ci_token_resolver.resolve_for_background().await?,
+        };
+
         let git_ref = cmd
             .git_ref
             .clone()
@@ -63,13 +76,13 @@ impl CommandExecutor for DispatchTestRunExecutor {
                     true => None,
                     false => Some(cmd.args.clone()),
                 },
-                requested_by_user_id: cmd.requested_by_user_id,
+                requested_by_user_id: Some(actor.user_id),
                 chat_id: cmd.chat_id,
             })
             .await?;
 
         self.test_runner
-            .dispatch(&suite, &git_ref, &cmd.args, &run_tag)
+            .dispatch(&actor.token, &suite, &git_ref, &cmd.args, &run_tag)
             .await?;
 
         tracing::info!(

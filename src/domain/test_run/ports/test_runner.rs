@@ -44,9 +44,11 @@ pub struct ParsedTestFailure {
 
 #[async_trait::async_trait]
 pub trait TestRunner: Send + Sync {
-    /// Отправляет запуск в CI. Идентификатор прогона появится позже — его находят по метке
+    /// Отправляет запуск в CI. Идентификатор прогона появится позже — его находят по метке.
+    /// Токен передаётся вызовом: в CI ходим правами того, кто запустил прогон
     async fn dispatch(
         &self,
+        token: &str,
         suite: &TestSuite,
         git_ref: &str,
         args: &str,
@@ -55,16 +57,22 @@ pub trait TestRunner: Send + Sync {
 
     async fn find_run_by_tag(
         &self,
+        token: &str,
         suite: &TestSuite,
         tag: &RunTag,
     ) -> Result<TestRunOutcome, FetchTestRunError>;
 
     async fn fetch_artifacts(
         &self,
+        token: &str,
         suite: &TestSuite,
         provider_run_id: u64,
     ) -> Result<TestRunArtifacts, FetchTestRunError>;
 
     /// Блоки тестов — каталоги внутри `tests_root` тестируемой ветки
-    async fn list_blocks(&self, suite: &TestSuite) -> Result<Vec<String>, ListTestBlocksError>;
+    async fn list_blocks(
+        &self,
+        token: &str,
+        suite: &TestSuite,
+    ) -> Result<Vec<String>, ListTestBlocksError>;
 }

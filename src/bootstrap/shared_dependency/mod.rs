@@ -208,10 +208,8 @@ impl ApplicationSharedDependency {
         let test_failure_card_repo: Arc<dyn TestFailureCardRepository> =
             Arc::new(MySQLTestFailureCardRepository::new(mysql_pool.clone()));
 
-        let test_runner: Arc<dyn TestRunner> = Arc::new(GithubActionsTestRunner::new(
-            config.github.api_base.clone(),
-            config.test_control.github_actions_token.clone(),
-        ));
+        let test_runner: Arc<dyn TestRunner> =
+            Arc::new(GithubActionsTestRunner::new(config.github.api_base.clone()));
 
         Ok(Self {
             event_bus,

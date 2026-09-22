@@ -1,6 +1,7 @@
 use crate::application::test_run::commands::ingest_test_run_result::command::IngestTestRunResultCommand;
 use crate::application::test_run::commands::ingest_test_run_result::error::IngestTestRunResultError;
 use crate::application::test_run::commands::ingest_test_run_result::response::IngestTestRunResultResponse;
+use crate::application::test_run::service::ci_token::CiTokenResolver;
 use crate::domain::repository::value_objects::repository_id::RepositoryId;
 use crate::domain::shared::command::CommandExecutor;
 use crate::domain::test_run::entities::test_failure::NewTestFailure;
@@ -16,6 +17,7 @@ pub struct IngestTestRunResultExecutor {
     test_suite_repo: Arc<dyn TestSuiteRepository>,
     test_run_repo: Arc<dyn TestRunRepository>,
     test_runner: Arc<dyn TestRunner>,
+    ci_token_resolver: Arc<CiTokenResolver>,
 }
 
 impl IngestTestRunResultExecutor {
@@ -23,11 +25,13 @@ impl IngestTestRunResultExecutor {
         test_suite_repo: Arc<dyn TestSuiteRepository>,
         test_run_repo: Arc<dyn TestRunRepository>,
         test_runner: Arc<dyn TestRunner>,
+        ci_token_resolver: Arc<CiTokenResolver>,
     ) -> Self {
         Self {
             test_suite_repo,
             test_run_repo,
             test_runner,
+            ci_token_resolver,
         }
     }
 
@@ -79,9 +83,15 @@ impl CommandExecutor for IngestTestRunResultExecutor {
             .find_by_repository(run.repository_id)
             .await?;
 
+        // Итоги читаем правами того, кто запустил прогон; ночной — правами администратора
+        let actor = self
+            .ci_token_resolver
+            .resolve_or_background(run.requested_by_user_id)
+            .await?;
+
         let mut outcome = self
             .test_runner
-            .find_run_by_tag(&suite, &cmd.run_tag)
+            .find_run_by_tag(&actor.token, &suite, &cmd.run_tag)
             .await?;
 
         // Прогон ещё идёт: запоминаем ссылку на него, итоги придут следующим вебхуком
@@ -107,7 +117,7 @@ impl CommandExecutor for IngestTestRunResultExecutor {
         if let Some(provider_run_id) = outcome.provider_run_id {
             let artifacts = self
                 .test_runner
-                .fetch_artifacts(&suite, provider_run_id)
+                .fetch_artifacts(&actor.token, &suite, provider_run_id)
                 .await?;
 
             outcome.totals = artifacts.totals;

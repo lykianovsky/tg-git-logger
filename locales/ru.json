@@ -605,7 +605,8 @@
         "enter_workflow_file": "Пришлите имя workflow-файла в .github/workflows (например e2e.yml):",
         "enter_default_ref": "Пришлите ветку, которую тестируем по умолчанию (например dev):",
         "connected": "🔌 Тесты подключены",
-        "connect_error": "Не удалось подключить тесты."
+        "connect_error": "Не удалось подключить тесты.",
+        "no_github_account": "Сначала привяжите аккаунт GitHub — прогон запускается вашими правами."
       }
     },
     "test_run": {

@@ -45,6 +45,7 @@ use crate::application::test_run::queries::build_test_report::executor::BuildTes
 use crate::application::test_run::queries::get_last_test_run::executor::GetLastTestRunExecutor;
 use crate::application::test_run::queries::get_run_failures::executor::GetRunFailuresExecutor;
 use crate::application::test_run::queries::list_test_blocks::executor::ListTestBlocksExecutor;
+use crate::application::test_run::service::ci_token::CiTokenResolver;
 use crate::application::user::commands::assign_user_role::executor::AssignUserRoleExecutor;
 use crate::application::user::commands::bind_repository::executor::BindRepositoryExecutor;
 use crate::application::user::commands::deactivate_user::executor::DeactivateUserExecutor;
@@ -159,6 +160,14 @@ impl ApplicationBoostrapExecutors {
         shared_dependency: Arc<ApplicationSharedDependency>,
         stats_provider: Arc<dyn WorkersStatsProvider>,
     ) -> Self {
+        // В CI ходим токеном пользователя: у привязанных аккаунтов доступы уже есть
+        let ci_token_resolver = Arc::new(CiTokenResolver::new(
+            shared_dependency.user_socials_repo.clone(),
+            shared_dependency.user_version_controls_repo.clone(),
+            shared_dependency.reversible_cipher.clone(),
+            SocialUserId(config.telegram.admin_user_id as i32),
+        ));
+
         // Отчёт по прогону строится поверх списка упавших — исполнитель общий
         let get_run_failures = Arc::new(GetRunFailuresExecutor::new(
             shared_dependency.test_run_repo.clone(),
@@ -271,6 +280,7 @@ impl ApplicationBoostrapExecutors {
             list_test_blocks: Arc::new(ListTestBlocksExecutor::new(
                 shared_dependency.test_suite_repo.clone(),
                 shared_dependency.test_runner.clone(),
+                ci_token_resolver.clone(),
             )),
             build_test_report: Arc::new(BuildTestReportExecutor::new(
                 shared_dependency.test_run_repo.clone(),
@@ -290,6 +300,7 @@ impl ApplicationBoostrapExecutors {
             shared_dependency.test_suite_repo.clone(),
             shared_dependency.test_run_repo.clone(),
             shared_dependency.test_runner.clone(),
+            ci_token_resolver.clone(),
         ));
 
         let commands = ApplicationBoostrapExecutorsCommands {
@@ -308,6 +319,7 @@ impl ApplicationBoostrapExecutors {
                 shared_dependency.test_suite_repo.clone(),
                 shared_dependency.test_run_repo.clone(),
                 shared_dependency.test_runner.clone(),
+                ci_token_resolver.clone(),
             )),
             ingest_test_run_result: ingest_test_run_result.clone(),
             sync_stale_test_runs: Arc::new(SyncStaleTestRunsExecutor::new(

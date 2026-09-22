@@ -18,22 +18,25 @@ const USER_AGENT: &str = "tg-bot-logger";
 pub struct GithubActionsTestRunner {
     http: reqwest::Client,
     api_base: String,
-    token: String,
 }
 
 impl GithubActionsTestRunner {
-    pub fn new(api_base: String, token: String) -> Self {
+    pub fn new(api_base: String) -> Self {
         Self {
             http: reqwest::Client::new(),
             api_base,
-            token,
         }
     }
 
-    fn request(&self, method: reqwest::Method, url: String) -> reqwest::RequestBuilder {
+    fn request(
+        &self,
+        token: &str,
+        method: reqwest::Method,
+        url: String,
+    ) -> reqwest::RequestBuilder {
         self.http
             .request(method, url)
-            .bearer_auth(&self.token)
+            .bearer_auth(token)
             .header(reqwest::header::ACCEPT, "application/vnd.github+json")
             .header(reqwest::header::USER_AGENT, USER_AGENT)
             .header("X-GitHub-Api-Version", GITHUB_API_VERSION)
@@ -119,6 +122,7 @@ impl GithubActionsTestRunner {
 impl TestRunner for GithubActionsTestRunner {
     async fn dispatch(
         &self,
+        token: &str,
         suite: &TestSuite,
         git_ref: &str,
         args: &str,
@@ -138,7 +142,7 @@ impl TestRunner for GithubActionsTestRunner {
         });
 
         let response = self
-            .request(reqwest::Method::POST, url)
+            .request(token, reqwest::Method::POST, url)
             .json(&body)
             .send()
             .await
@@ -164,6 +168,7 @@ impl TestRunner for GithubActionsTestRunner {
 
     async fn find_run_by_tag(
         &self,
+        token: &str,
         suite: &TestSuite,
         tag: &RunTag,
     ) -> Result<TestRunOutcome, FetchTestRunError> {
@@ -176,7 +181,7 @@ impl TestRunner for GithubActionsTestRunner {
         );
 
         let response = self
-            .request(reqwest::Method::GET, url)
+            .request(token, reqwest::Method::GET, url)
             .send()
             .await
             .map_err(|error| FetchTestRunError::ProviderError(error.to_string()))?;
@@ -213,6 +218,7 @@ impl TestRunner for GithubActionsTestRunner {
 
     async fn fetch_artifacts(
         &self,
+        token: &str,
         suite: &TestSuite,
         provider_run_id: u64,
     ) -> Result<TestRunArtifacts, FetchTestRunError> {
@@ -220,7 +226,7 @@ impl TestRunner for GithubActionsTestRunner {
             self.repository_url(suite, &format!("actions/runs/{provider_run_id}/artifacts"));
 
         let response = self
-            .request(reqwest::Method::GET, list_url)
+            .request(token, reqwest::Method::GET, list_url)
             .send()
             .await
             .map_err(|error| FetchTestRunError::ProviderError(error.to_string()))?;
@@ -263,7 +269,7 @@ impl TestRunner for GithubActionsTestRunner {
             .ok_or_else(|| FetchTestRunError::ProviderError("No download url".to_string()))?;
 
         let archive = self
-            .request(reqwest::Method::GET, download_url.to_string())
+            .request(token, reqwest::Method::GET, download_url.to_string())
             .send()
             .await
             .map_err(|error| FetchTestRunError::ProviderError(error.to_string()))?
@@ -281,12 +287,19 @@ impl TestRunner for GithubActionsTestRunner {
         })
     }
 
-    async fn list_blocks(&self, suite: &TestSuite) -> Result<Vec<String>, ListTestBlocksError> {
+    async fn list_blocks(
+        &self,
+        token: &str,
+        suite: &TestSuite,
+    ) -> Result<Vec<String>, ListTestBlocksError> {
         let mut blocks = Vec::new();
 
-        for application in self.list_directories(suite, &suite.tests_root).await? {
+        for application in self
+            .list_directories(token, suite, &suite.tests_root)
+            .await?
+        {
             let nested_path = format!("{}/{}", suite.tests_root, application);
-            let nested = self.list_directories(suite, &nested_path).await?;
+            let nested = self.list_directories(token, suite, &nested_path).await?;
 
             // Блок — каталог второго уровня (accounts/setup); если вложенных нет,
             // блоком считается само приложение
@@ -310,6 +323,7 @@ impl TestRunner for GithubActionsTestRunner {
 impl GithubActionsTestRunner {
     async fn list_directories(
         &self,
+        token: &str,
         suite: &TestSuite,
         path: &str,
     ) -> Result<Vec<String>, ListTestBlocksError> {
@@ -319,7 +333,7 @@ impl GithubActionsTestRunner {
         );
 
         let response = self
-            .request(reqwest::Method::GET, url)
+            .request(token, reqwest::Method::GET, url)
             .send()
             .await
             .map_err(|error| ListTestBlocksError::ProviderError(error.to_string()))?;

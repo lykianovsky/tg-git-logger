@@ -1,3 +1,4 @@
+use crate::application::test_run::service::ci_token::ResolveCiTokenError;
 use crate::domain::test_run::ports::test_runner::FetchTestRunError;
 use crate::domain::test_run::repositories::test_run_repository::{
     FindTestRunError, UpdateTestRunError,
@@ -18,6 +19,18 @@ pub enum IngestTestRunResultError {
 
     #[error("CI error: {0}")]
     ProviderError(String),
+
+    #[error("No linked version control account")]
+    NoVersionControlAccount,
+}
+
+impl From<ResolveCiTokenError> for IngestTestRunResultError {
+    fn from(error: ResolveCiTokenError) -> Self {
+        match error {
+            ResolveCiTokenError::NoVersionControlAccount => Self::NoVersionControlAccount,
+            ResolveCiTokenError::DecryptError(message) => Self::DbError(message),
+        }
+    }
 }
 
 impl From<FindTestRunError> for IngestTestRunResultError {
