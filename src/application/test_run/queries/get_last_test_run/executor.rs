@@ -1,6 +1,7 @@
 use crate::application::test_run::queries::get_last_test_run::error::GetLastTestRunError;
 use crate::application::test_run::queries::get_last_test_run::query::GetLastTestRunQuery;
 use crate::application::test_run::queries::get_last_test_run::response::GetLastTestRunResponse;
+use crate::domain::repository::repositories::repository_repository::RepositoryRepository;
 use crate::domain::shared::command::CommandExecutor;
 use crate::domain::test_run::repositories::test_run_repository::TestRunRepository;
 use crate::domain::test_run::repositories::test_suite_repository::TestSuiteRepository;
@@ -9,16 +10,19 @@ use std::sync::Arc;
 pub struct GetLastTestRunExecutor {
     test_run_repo: Arc<dyn TestRunRepository>,
     test_suite_repo: Arc<dyn TestSuiteRepository>,
+    repository_repo: Arc<dyn RepositoryRepository>,
 }
 
 impl GetLastTestRunExecutor {
     pub fn new(
         test_run_repo: Arc<dyn TestRunRepository>,
         test_suite_repo: Arc<dyn TestSuiteRepository>,
+        repository_repo: Arc<dyn RepositoryRepository>,
     ) -> Self {
         Self {
             test_run_repo,
             test_suite_repo,
+            repository_repo,
         }
     }
 }
@@ -36,6 +40,17 @@ impl CommandExecutor for GetLastTestRunExecutor {
             .await
             .is_ok();
 
-        Ok(GetLastTestRunResponse { run, is_configured })
+        let repository_title = self
+            .repository_repo
+            .find_by_id(query.repository_id)
+            .await
+            .map(|repository| format!("{}/{}", repository.owner, repository.name))
+            .unwrap_or_default();
+
+        Ok(GetLastTestRunResponse {
+            run,
+            is_configured,
+            repository_title,
+        })
     }
 }

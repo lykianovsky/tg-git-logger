@@ -29,6 +29,7 @@ mod m20260922_000001_create_test_suites;
 mod m20260922_000002_create_test_runs;
 mod m20260922_000003_create_test_run_failures;
 mod m20260922_000004_create_test_failure_cards;
+mod m20260922_000005_add_board_id_to_repository_task_trackers;
 
 pub struct Migrator;
 
@@ -71,6 +72,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260922_000002_create_test_runs::Migration),
             Box::new(m20260922_000003_create_test_run_failures::Migration),
             Box::new(m20260922_000004_create_test_failure_cards::Migration),
+            Box::new(m20260922_000005_add_board_id_to_repository_task_trackers::Migration),
         ]
     }
 }

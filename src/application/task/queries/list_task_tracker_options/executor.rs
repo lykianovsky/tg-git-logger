@@ -32,7 +32,7 @@ impl CommandExecutor for ListTaskTrackerOptionsExecutor {
                 .await?
                 .into_iter()
                 .map(|user| TaskTrackerOption {
-                    id: user.id,
+                    id: user.id as i64,
                     name: user.name,
                 })
                 .collect(),
@@ -42,8 +42,38 @@ impl CommandExecutor for ListTaskTrackerOptionsExecutor {
                 .await?
                 .into_iter()
                 .map(|tag| TaskTrackerOption {
-                    id: tag.id,
+                    id: tag.id as i64,
                     name: tag.name,
+                })
+                .collect(),
+            ListTaskTrackerOptionsQuery::Spaces => self
+                .task_tracker_client
+                .list_spaces()
+                .await?
+                .into_iter()
+                .map(|space| TaskTrackerOption {
+                    id: space.id as i64,
+                    name: space.title,
+                })
+                .collect(),
+            ListTaskTrackerOptionsQuery::Boards { space_id } => self
+                .task_tracker_client
+                .list_boards(*space_id)
+                .await?
+                .into_iter()
+                .map(|board| TaskTrackerOption {
+                    id: board.id as i64,
+                    name: board.title,
+                })
+                .collect(),
+            ListTaskTrackerOptionsQuery::Columns { board_id } => self
+                .task_tracker_client
+                .list_columns(*board_id)
+                .await?
+                .into_iter()
+                .map(|column| TaskTrackerOption {
+                    id: column.id as i64,
+                    name: column.title,
                 })
                 .collect(),
         };

@@ -12,6 +12,10 @@ use crate::application::test_run::commands::dispatch_test_run::error::DispatchTe
 use crate::application::test_run::queries::build_test_report::query::BuildTestReportQuery;
 use crate::application::test_run::queries::get_last_test_run::query::GetLastTestRunQuery;
 use crate::application::test_run::queries::get_run_failures::query::GetRunFailuresQuery;
+use crate::application::test_run::queries::list_ci_options::error::ListCiOptionsError;
+use crate::application::test_run::queries::list_ci_options::query::{
+    CiOptionKind, ListCiOptionsQuery,
+};
 use crate::application::test_run::queries::list_test_blocks::error::ListTestBlocksError;
 use crate::application::test_run::queries::list_test_blocks::query::ListTestBlocksQuery;
 use crate::bootstrap::executors::ApplicationBoostrapExecutors;
@@ -26,6 +30,7 @@ use crate::delivery::bot::telegram::keyboards::actions::tests::TelegramBotTestsA
 use crate::domain::repository::value_objects::repository_id::RepositoryId;
 use crate::domain::shared::command::CommandExecutor;
 use crate::domain::test_run::entities::test_run::TestRun;
+use crate::domain::test_run::ports::test_runner::CiOption;
 use crate::domain::test_run::value_objects::test_run_trigger::TestRunTrigger;
 use crate::domain::user::value_objects::social_chat_id::SocialChatId;
 use crate::domain::user::value_objects::social_user_id::SocialUserId;
@@ -36,7 +41,6 @@ use std::sync::Arc;
 use teloxide::dispatching::{DpHandlerDescription, UpdateFilterExt};
 use teloxide::dptree::{Handler, case};
 use teloxide::payloads::EditMessageTextSetters;
-use teloxide::payloads::SendMessageSetters;
 use teloxide::prelude::{Requester, Update};
 use teloxide::types::{
     CallbackQuery, ChatId, InlineKeyboardButton, InlineKeyboardMarkup, Message, MessageId,
@@ -69,15 +73,10 @@ pub enum TelegramBotTestsState {
         repository_id: i32,
     },
 
-    /// Шаг 1 подключения: файл процесса CI
-    EnterWorkflowFile {
-        repository_id: i32,
-    },
-
-    /// Шаг 2 подключения: ветка, которую тестируем по умолчанию
-    EnterDefaultRef {
-        repository_id: i32,
-        workflow_file: String,
+    /// Подключение тестов: шаг мастера и всё, что уже выбрано
+    Connect {
+        step: ConnectStep,
+        draft: ConnectDraft,
     },
 
     /// Шаг 1 формы карточки: на кого её повесить
@@ -94,24 +93,25 @@ pub enum TelegramBotTestsState {
     },
 }
 
+/// Шаги подключения. Куда класть карточки по упавшим тестам, бот берёт из настроек
+/// трекера репозитория — второй раз спейс и колонку не спрашиваем
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConnectStep {
+    Workflow,
+    Branch,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct ConnectDraft {
+    pub repository_id: i32,
+    pub workflow_file: String,
+}
+
 pub struct TelegramBotTestsDispatcher {}
 
 impl TelegramBotTestsDispatcher {
     pub fn new() -> Handler<'static, Result<(), Box<dyn Error + Send + Sync>>, DpHandlerDescription>
     {
-        let messages = Update::filter_message()
-            .branch(
-                case![TelegramBotTestsState::EnterWorkflowFile { repository_id }]
-                    .endpoint(enter_workflow_file),
-            )
-            .branch(
-                case![TelegramBotTestsState::EnterDefaultRef {
-                    repository_id,
-                    workflow_file
-                }]
-                .endpoint(enter_default_ref),
-            );
-
         let callbacks = Update::filter_callback_query()
             .branch(case![TelegramBotTestsState::SelectRepository].endpoint(choose_repository))
             .branch(case![TelegramBotTestsState::Card { repository_id }].endpoint(handle_card))
@@ -132,9 +132,10 @@ impl TelegramBotTestsDispatcher {
                     responsible_id
                 }]
                 .endpoint(choose_card_tag),
-            );
+            )
+            .branch(case![TelegramBotTestsState::Connect { step, draft }].endpoint(handle_connect));
 
-        dptree::entry().branch(callbacks).branch(messages)
+        dptree::entry().branch(callbacks)
     }
 }
 
@@ -152,19 +153,23 @@ pub async fn render_card(
         .execute(&GetLastTestRunQuery { repository_id })
         .await;
 
-    let (run, is_configured) = match response {
-        Ok(response) => (response.run, response.is_configured),
+    let (run, is_configured, repository_title) = match response {
+        Ok(response) => (
+            response.run,
+            response.is_configured,
+            response.repository_title,
+        ),
         Err(error) => {
             tracing::error!(%error, "Failed to load last test run");
 
-            (None, true)
+            (None, true, String::new())
         }
     };
 
     bot.edit_message_text(
         chat_id,
         message_id,
-        build_card_text(run.as_ref(), is_configured),
+        build_card_text(run.as_ref(), is_configured, &repository_title),
     )
     .parse_mode(ParseMode::Html)
     .reply_markup(build_card_keyboard(run.as_ref(), is_configured))
@@ -289,19 +294,16 @@ async fn handle_card(
         }
 
         TelegramBotTestsAction::Connect => {
-            dialogue
-                .update(TelegramBotDialogueState::Tests(
-                    TelegramBotTestsState::EnterWorkflowFile { repository_id },
-                ))
-                .await?;
-
-            bot.edit_message_text(
+            start_connect(
+                &bot,
+                &executors,
+                &dialogue,
                 chat_id,
                 message_id,
-                t!("telegram_bot.dialogues.tests.enter_workflow_file").to_string(),
+                repository_id,
+                social_user_id,
             )
-            .reply_markup(InlineKeyboardMarkup::default())
-            .await?;
+            .await?
         }
 
         TelegramBotTestsAction::Back => {
@@ -642,96 +644,211 @@ async fn show_failures(
     Ok(())
 }
 
-async fn enter_workflow_file(
-    bot: Bot,
-    dialogue: TelegramBotDialogueType,
-    message: Message,
+/// Подключение начинается со списка процессов CI репозитория — руками ничего не вводим
+async fn start_connect(
+    bot: &Bot,
+    executors: &Arc<ApplicationBoostrapExecutors>,
+    dialogue: &TelegramBotDialogueType,
+    chat_id: ChatId,
+    message_id: MessageId,
     repository_id: i32,
+    social_user_id: SocialUserId,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
-    let Some(workflow_file) = message
-        .text()
-        .map(str::trim)
-        .filter(|text| !text.is_empty())
-    else {
-        return Ok(());
+    let options = match load_ci_options(
+        executors,
+        repository_id,
+        social_user_id,
+        CiOptionKind::Workflows,
+    )
+    .await
+    {
+        Ok(options) => options,
+        Err(error) => return show_ci_options_error(bot, chat_id, message_id, error).await,
     };
 
     dialogue
         .update(TelegramBotDialogueState::Tests(
-            TelegramBotTestsState::EnterDefaultRef {
-                repository_id,
-                workflow_file: workflow_file.to_string(),
+            TelegramBotTestsState::Connect {
+                step: ConnectStep::Workflow,
+                draft: ConnectDraft {
+                    repository_id,
+                    workflow_file: String::new(),
+                },
             },
         ))
         .await?;
 
-    bot.send_message(
-        message.chat.id,
-        t!("telegram_bot.dialogues.tests.enter_default_ref").to_string(),
+    bot.edit_message_text(
+        chat_id,
+        message_id,
+        t!("telegram_bot.dialogues.tests.select_workflow").to_string(),
     )
+    .reply_markup(ci_options_keyboard(&options))
     .await?;
 
     Ok(())
 }
 
-async fn enter_default_ref(
+async fn handle_connect(
     bot: Bot,
     dialogue: TelegramBotDialogueType,
     executors: Arc<ApplicationBoostrapExecutors>,
-    message: Message,
-    (repository_id, workflow_file): (i32, String),
+    query: CallbackQuery,
+    (step, draft): (ConnectStep, ConnectDraft),
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
-    let Some(default_ref) = message
-        .text()
-        .map(str::trim)
-        .filter(|text| !text.is_empty())
-    else {
+    bot.answer_callback_query(query.id.clone()).await?;
+
+    let Some((chat_id, message_id)) = message_target(&query) else {
         return Ok(());
     };
 
-    let connected = executors
-        .commands
-        .connect_test_suite
-        .execute(&ConnectTestSuiteCommand {
-            repository_id: RepositoryId(repository_id),
-            workflow_file,
-            default_ref: default_ref.to_string(),
-        })
-        .await;
+    let social_user_id = SocialUserId(query.from.id.0 as i32);
+    let data = query.data.as_deref().unwrap_or("");
 
-    if let Err(error) = connected {
-        tracing::error!(%error, "Failed to connect test suite");
-
-        bot.send_message(
-            message.chat.id,
-            t!("telegram_bot.dialogues.tests.connect_error").to_string(),
+    if data == TelegramBotTestsAction::Back.to_callback_data() {
+        return back_to_card(
+            &bot,
+            &executors,
+            &dialogue,
+            chat_id,
+            message_id,
+            draft.repository_id,
         )
-        .await?;
-
-        return Ok(());
+        .await;
     }
 
-    dialogue
-        .update(TelegramBotDialogueState::Tests(
-            TelegramBotTestsState::Card { repository_id },
-        ))
-        .await?;
+    let Some(value) = data.strip_prefix(OPTION_CALLBACK_PREFIX) else {
+        return Ok(());
+    };
 
-    let sent = bot
-        .send_message(
-            message.chat.id,
-            t!("telegram_bot.dialogues.tests.connected").to_string(),
-        )
-        .await?;
+    match step {
+        ConnectStep::Workflow => {
+            let options = match load_ci_options(
+                &executors,
+                draft.repository_id,
+                social_user_id,
+                CiOptionKind::Branches,
+            )
+            .await
+            {
+                Ok(options) => options,
+                Err(error) => {
+                    return show_ci_options_error(&bot, chat_id, message_id, error).await;
+                }
+            };
 
-    render_card(
-        &bot,
-        &executors,
-        sent.chat.id,
-        sent.id,
-        RepositoryId(repository_id),
-    )
-    .await
+            dialogue
+                .update(TelegramBotDialogueState::Tests(
+                    TelegramBotTestsState::Connect {
+                        step: ConnectStep::Branch,
+                        draft: ConnectDraft {
+                            repository_id: draft.repository_id,
+                            workflow_file: value.to_string(),
+                        },
+                    },
+                ))
+                .await?;
+
+            bot.edit_message_text(
+                chat_id,
+                message_id,
+                t!("telegram_bot.dialogues.tests.select_branch").to_string(),
+            )
+            .reply_markup(ci_options_keyboard(&options))
+            .await?;
+        }
+
+        ConnectStep::Branch => {
+            let connected = executors
+                .commands
+                .connect_test_suite
+                .execute(&ConnectTestSuiteCommand {
+                    repository_id: RepositoryId(draft.repository_id),
+                    workflow_file: draft.workflow_file.clone(),
+                    default_ref: value.to_string(),
+                })
+                .await;
+
+            if let Err(error) = connected {
+                tracing::error!(%error, "Failed to connect test suite");
+
+                return edit_with_back(
+                    &bot,
+                    chat_id,
+                    message_id,
+                    t!("telegram_bot.dialogues.tests.connect_error").to_string(),
+                )
+                .await;
+            }
+
+            back_to_card(
+                &bot,
+                &executors,
+                &dialogue,
+                chat_id,
+                message_id,
+                draft.repository_id,
+            )
+            .await?;
+        }
+    }
+
+    Ok(())
+}
+
+async fn load_ci_options(
+    executors: &Arc<ApplicationBoostrapExecutors>,
+    repository_id: i32,
+    social_user_id: SocialUserId,
+    kind: CiOptionKind,
+) -> Result<Vec<CiOption>, ListCiOptionsError> {
+    executors
+        .queries
+        .list_ci_options
+        .execute(&ListCiOptionsQuery {
+            repository_id: RepositoryId(repository_id),
+            social_user_id,
+            kind,
+        })
+        .await
+        .map(|response| response.options)
+}
+
+async fn show_ci_options_error(
+    bot: &Bot,
+    chat_id: ChatId,
+    message_id: MessageId,
+    error: ListCiOptionsError,
+) -> Result<(), Box<dyn Error + Send + Sync>> {
+    let text = match error {
+        ListCiOptionsError::NoVersionControlAccount => {
+            t!("telegram_bot.dialogues.tests.no_github_account").to_string()
+        }
+        error => {
+            tracing::error!(%error, "Failed to load CI options");
+
+            t!("telegram_bot.dialogues.tests.ci_options_error").to_string()
+        }
+    };
+
+    edit_with_back(bot, chat_id, message_id, text).await
+}
+
+fn ci_options_keyboard(options: &[CiOption]) -> InlineKeyboardMarkup {
+    let mut rows: Vec<Vec<InlineKeyboardButton>> = options
+        .iter()
+        .take(MAX_OPTION_BUTTONS)
+        .map(|option| {
+            vec![InlineKeyboardButton::callback(
+                option.label.clone(),
+                format!("{OPTION_CALLBACK_PREFIX}{}", option.value),
+            )]
+        })
+        .collect();
+
+    rows.push(vec![back_button()]);
+
+    InlineKeyboardMarkup::new(rows)
 }
 
 /// Шаг 1: список людей из трекера. Ничего не зашиваем — состав команды меняется

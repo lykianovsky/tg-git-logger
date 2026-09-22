@@ -41,30 +41,6 @@ impl CreateTestFailureCardExecutor {
         }
     }
 
-    /// Карточки создаются в колонке QA, а доску к ней приходится искать:
-    /// в настройках трекера хранится только колонка
-    async fn resolve_board_id(
-        &self,
-        tracker: &RepositoryTaskTracker,
-    ) -> Result<i32, CreateTestFailureCardError> {
-        for board in self
-            .task_tracker_client
-            .list_boards(tracker.space_id)
-            .await?
-        {
-            let columns = self.task_tracker_client.list_columns(board.id).await?;
-
-            if columns
-                .iter()
-                .any(|column| column.id == tracker.qa_column_id)
-            {
-                return Ok(board.id);
-            }
-        }
-
-        Err(CreateTestFailureCardError::TrackerNotConfigured)
-    }
-
     fn build_card_url(&self, tracker: &RepositoryTaskTracker, card_id: u64) -> String {
         format!(
             "{}{}",
@@ -119,7 +95,11 @@ impl CommandExecutor for CreateTestFailureCardExecutor {
                 CreateTestFailureCardError::TrackerNotConfigured
             })?;
 
-        let board_id = self.resolve_board_id(&tracker).await?;
+        // Доска и колонка берутся из настройки трекера репозитория — той же, по которой
+        // карточки переезжают при мерже
+        let board_id = tracker
+            .board_id
+            .ok_or(CreateTestFailureCardError::TrackerNotConfigured)?;
 
         let created = self
             .task_tracker_client

@@ -1,6 +1,6 @@
 /// Вариант выбора в форме: идентификатор уходит в карточку, название — на кнопку
 pub struct TaskTrackerOption {
-    pub id: u64,
+    pub id: i64,
     pub name: String,
 }
 

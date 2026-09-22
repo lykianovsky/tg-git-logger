@@ -5,4 +5,6 @@ pub struct GetLastTestRunResponse {
     pub run: Option<TestRun>,
     /// Тесты к репозиторию не подключены — карточка предлагает подключить
     pub is_configured: bool,
+    /// `owner/name` — карточка всегда называет репозиторий, о котором говорит
+    pub repository_title: String,
 }

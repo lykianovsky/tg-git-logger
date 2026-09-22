@@ -99,6 +99,7 @@ impl TelegramBotDialogueAdminTaskTrackerDispatcher {
                     TelegramBotDialogueAdminState::ConfigureTaskTrackerEnterPattern {
                         repository_id,
                         space_id,
+                        board_id,
                         qa_column_id,
                         review_column_id
                     }
@@ -418,6 +419,7 @@ impl TelegramBotDialogueAdminTaskTrackerDispatcher {
         let cmd = UpdateRepositoryTaskTrackerCommand {
             repository_id: RepositoryId(repository_id),
             space_id: tracker.space_id,
+            board_id: tracker.board_id,
             qa_column_id: tracker.qa_column_id,
             review_column_id: tracker.review_column_id,
             extract_pattern_regexp: tracker.extract_pattern_regexp,
@@ -807,7 +809,7 @@ impl TelegramBotDialogueAdminTaskTrackerDispatcher {
         bot: Bot,
         dialogue: TelegramBotDialogueType,
         query: CallbackQuery,
-        (repository_id, space_id, _board_id, qa_column_id): (i32, i32, i32, i32),
+        (repository_id, space_id, board_id, qa_column_id): (i32, i32, i32, i32),
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         bot.answer_callback_query(query.id.clone()).await?;
 
@@ -830,6 +832,7 @@ impl TelegramBotDialogueAdminTaskTrackerDispatcher {
                 TelegramBotDialogueAdminState::ConfigureTaskTrackerEnterPattern {
                     repository_id,
                     space_id,
+                    board_id,
                     qa_column_id,
                     review_column_id,
                 },
@@ -854,7 +857,13 @@ impl TelegramBotDialogueAdminTaskTrackerDispatcher {
         dialogue: TelegramBotDialogueType,
         executors: Arc<ApplicationBoostrapExecutors>,
         msg: Message,
-        (repository_id, space_id, qa_column_id, review_column_id): (i32, i32, i32, i32),
+        (repository_id, space_id, board_id, qa_column_id, review_column_id): (
+            i32,
+            i32,
+            i32,
+            i32,
+            i32,
+        ),
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let extract_pattern = match extract_text(&msg) {
             Some(v) => v,
@@ -873,6 +882,7 @@ impl TelegramBotDialogueAdminTaskTrackerDispatcher {
         let cmd = UpdateRepositoryTaskTrackerCommand {
             repository_id: RepositoryId(repository_id),
             space_id,
+            board_id: Some(board_id),
             qa_column_id,
             review_column_id,
             extract_pattern_regexp: extract_pattern,

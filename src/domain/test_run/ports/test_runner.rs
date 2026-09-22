@@ -42,8 +42,33 @@ pub struct ParsedTestFailure {
     pub error_excerpt: Option<String>,
 }
 
+/// Вариант для подключения тестов: процесс CI или ветка репозитория
+#[derive(Debug, Clone)]
+pub struct CiOption {
+    /// Значение, которое сохраняем (файл workflow или имя ветки)
+    pub value: String,
+    /// Подпись на кнопке
+    pub label: String,
+}
+
 #[async_trait::async_trait]
 pub trait TestRunner: Send + Sync {
+    /// Процессы CI репозитория — из них человек выбирает тот, что гоняет тесты
+    async fn list_workflows(
+        &self,
+        token: &str,
+        owner: &str,
+        name: &str,
+    ) -> Result<Vec<CiOption>, ListTestBlocksError>;
+
+    /// Ветки репозитория — из них выбирается тестируемая по умолчанию
+    async fn list_branches(
+        &self,
+        token: &str,
+        owner: &str,
+        name: &str,
+    ) -> Result<Vec<CiOption>, ListTestBlocksError>;
+
     /// Отправляет запуск в CI. Идентификатор прогона появится позже — его находят по метке.
     /// Токен передаётся вызовом: в CI ходим правами того, кто запустил прогон
     async fn dispatch(

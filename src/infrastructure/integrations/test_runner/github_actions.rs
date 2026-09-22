@@ -1,7 +1,8 @@
 use crate::domain::test_run::entities::test_run::TestRunOutcome;
 use crate::domain::test_run::entities::test_suite::TestSuite;
 use crate::domain::test_run::ports::test_runner::{
-    DispatchTestRunError, FetchTestRunError, ListTestBlocksError, TestRunArtifacts, TestRunner,
+    CiOption, DispatchTestRunError, FetchTestRunError, ListTestBlocksError, TestRunArtifacts,
+    TestRunner,
 };
 use crate::domain::test_run::value_objects::run_tag::RunTag;
 use crate::domain::test_run::value_objects::test_run_status::TestRunStatus;
@@ -13,6 +14,9 @@ use serde_json::{Value, json};
 /// Сколько последних прогонов просматриваем, разыскивая свой по метке
 const RUNS_LOOKUP_LIMIT: u32 = 30;
 const GITHUB_API_VERSION: &str = "2022-11-28";
+/// Сколько процессов CI и веток показываем при подключении тестов
+const WORKFLOWS_LIMIT: u32 = 50;
+const BRANCHES_LIMIT: u32 = 50;
 const USER_AGENT: &str = "tg-bot-logger";
 
 pub struct GithubActionsTestRunner {
@@ -40,6 +44,35 @@ impl GithubActionsTestRunner {
             .header(reqwest::header::ACCEPT, "application/vnd.github+json")
             .header(reqwest::header::USER_AGENT, USER_AGENT)
             .header("X-GitHub-Api-Version", GITHUB_API_VERSION)
+    }
+
+    fn url(&self, owner: &str, name: &str, path: &str) -> String {
+        format!(
+            "{}/repos/{}/{}/{}",
+            self.api_base.trim_end_matches('/'),
+            owner,
+            name,
+            path
+        )
+    }
+
+    async fn get_json(&self, token: &str, url: String) -> Result<Value, ListTestBlocksError> {
+        let response = self
+            .request(token, reqwest::Method::GET, url)
+            .send()
+            .await
+            .map_err(|error| ListTestBlocksError::ProviderError(error.to_string()))?;
+
+        if !response.status().is_success() {
+            return Err(ListTestBlocksError::ProviderError(
+                response.status().to_string(),
+            ));
+        }
+
+        response
+            .json()
+            .await
+            .map_err(|error| ListTestBlocksError::ProviderError(error.to_string()))
     }
 
     fn repository_url(&self, suite: &TestSuite, path: &str) -> String {
@@ -120,6 +153,74 @@ impl GithubActionsTestRunner {
 
 #[async_trait]
 impl TestRunner for GithubActionsTestRunner {
+    async fn list_workflows(
+        &self,
+        token: &str,
+        owner: &str,
+        name: &str,
+    ) -> Result<Vec<CiOption>, ListTestBlocksError> {
+        let body = self
+            .get_json(
+                token,
+                self.url(
+                    owner,
+                    name,
+                    &format!("actions/workflows?per_page={WORKFLOWS_LIMIT}"),
+                ),
+            )
+            .await?;
+
+        let workflows = body
+            .get("workflows")
+            .and_then(Value::as_array)
+            .cloned()
+            .unwrap_or_default();
+
+        Ok(workflows
+            .iter()
+            .filter_map(|workflow| {
+                // В списке нужен файл: именно его принимает запуск workflow_dispatch
+                let path = workflow.get("path").and_then(Value::as_str)?;
+                let file = path.rsplit('/').next()?.to_string();
+                let label = workflow
+                    .get("name")
+                    .and_then(Value::as_str)
+                    .unwrap_or(&file)
+                    .to_string();
+
+                Some(CiOption { value: file, label })
+            })
+            .collect())
+    }
+
+    async fn list_branches(
+        &self,
+        token: &str,
+        owner: &str,
+        name: &str,
+    ) -> Result<Vec<CiOption>, ListTestBlocksError> {
+        let body = self
+            .get_json(
+                token,
+                self.url(owner, name, &format!("branches?per_page={BRANCHES_LIMIT}")),
+            )
+            .await?;
+
+        let branches = body.as_array().cloned().unwrap_or_default();
+
+        Ok(branches
+            .iter()
+            .filter_map(|branch| {
+                let name = branch.get("name").and_then(Value::as_str)?.to_string();
+
+                Some(CiOption {
+                    value: name.clone(),
+                    label: name,
+                })
+            })
+            .collect())
+    }
+
     async fn dispatch(
         &self,
         token: &str,

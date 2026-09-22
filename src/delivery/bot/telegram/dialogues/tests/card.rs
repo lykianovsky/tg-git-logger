@@ -6,22 +6,34 @@ use rust_i18n::t;
 use teloxide::types::{InlineKeyboardButton, InlineKeyboardMarkup};
 
 /// Карточка последнего прогона: один и тот же вид для команды, обновления и итогов
-pub fn build_card_text(run: Option<&TestRun>, is_configured: bool) -> String {
+pub fn build_card_text(
+    run: Option<&TestRun>,
+    is_configured: bool,
+    repository_title: &str,
+) -> String {
+    // Карточка всегда называет репозиторий: у пользователя их может быть несколько
+    let header = MessageBuilder::new()
+        .bold(&t!("telegram_bot.dialogues.tests.title").to_string())
+        .with_html_escape(true)
+        .line(repository_title)
+        .empty_line();
+
     if !is_configured {
-        return t!("telegram_bot.dialogues.tests.not_connected").to_string();
+        return header
+            .line(&t!("telegram_bot.dialogues.tests.not_connected").to_string())
+            .build();
     }
 
     let Some(run) = run else {
-        return t!("telegram_bot.dialogues.tests.no_runs").to_string();
+        return header
+            .line(&t!("telegram_bot.dialogues.tests.no_runs").to_string())
+            .build();
     };
 
     let status_key = format!("report.test_run.status.{}", run.status.as_str());
     let totals = run.totals.unwrap_or_default();
 
-    let mut builder = MessageBuilder::new()
-        .bold(&t!("telegram_bot.dialogues.tests.title").to_string())
-        .empty_line()
-        .with_html_escape(true)
+    let mut builder = header
         .section(
             &t!("telegram_bot.dialogues.tests.status").to_string(),
             &t!(&status_key).to_string(),

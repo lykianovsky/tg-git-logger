@@ -44,6 +44,7 @@ use crate::application::test_run::commands::sync_stale_test_runs::executor::Sync
 use crate::application::test_run::queries::build_test_report::executor::BuildTestReportExecutor;
 use crate::application::test_run::queries::get_last_test_run::executor::GetLastTestRunExecutor;
 use crate::application::test_run::queries::get_run_failures::executor::GetRunFailuresExecutor;
+use crate::application::test_run::queries::list_ci_options::executor::ListCiOptionsExecutor;
 use crate::application::test_run::queries::list_test_blocks::executor::ListTestBlocksExecutor;
 use crate::application::test_run::service::ci_token::CiTokenResolver;
 use crate::application::user::commands::assign_user_role::executor::AssignUserRoleExecutor;
@@ -91,6 +92,7 @@ pub struct ApplicationBoostrapExecutorsQueries {
     pub get_last_test_run: Arc<GetLastTestRunExecutor>,
     pub get_run_failures: Arc<GetRunFailuresExecutor>,
     pub list_test_blocks: Arc<ListTestBlocksExecutor>,
+    pub list_ci_options: Arc<ListCiOptionsExecutor>,
     pub build_test_report: Arc<BuildTestReportExecutor>,
     pub list_task_tracker_options: Arc<ListTaskTrackerOptionsExecutor>,
 }
@@ -275,10 +277,16 @@ impl ApplicationBoostrapExecutors {
             get_last_test_run: Arc::new(GetLastTestRunExecutor::new(
                 shared_dependency.test_run_repo.clone(),
                 shared_dependency.test_suite_repo.clone(),
+                shared_dependency.repository_repo.clone(),
             )),
             get_run_failures: get_run_failures.clone(),
             list_test_blocks: Arc::new(ListTestBlocksExecutor::new(
                 shared_dependency.test_suite_repo.clone(),
+                shared_dependency.test_runner.clone(),
+                ci_token_resolver.clone(),
+            )),
+            list_ci_options: Arc::new(ListCiOptionsExecutor::new(
+                shared_dependency.repository_repo.clone(),
                 shared_dependency.test_runner.clone(),
                 ci_token_resolver.clone(),
             )),
