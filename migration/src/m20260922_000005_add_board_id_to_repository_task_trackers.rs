@@ -36,6 +36,7 @@ impl MigrationTrait for Migration {
 
 #[derive(DeriveIden)]
 enum RepositoryTaskTrackers {
+    #[sea_orm(iden = "repository_task_tracker")]
     Table,
     BoardId,
 }
