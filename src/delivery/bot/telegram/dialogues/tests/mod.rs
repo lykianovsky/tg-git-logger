@@ -3,6 +3,7 @@ pub mod card;
 use crate::application::task::queries::list_task_tracker_options::error::ListTaskTrackerOptionsError;
 use crate::application::task::queries::list_task_tracker_options::query::ListTaskTrackerOptionsQuery;
 use crate::application::task::queries::list_task_tracker_options::response::TaskTrackerOption;
+use crate::application::test_run::commands::attach_test_run_message::command::AttachTestRunMessageCommand;
 use crate::application::test_run::commands::connect_test_suite::command::ConnectTestSuiteCommand;
 use crate::application::test_run::commands::create_test_failure_card::command::CreateTestFailureCardCommand;
 use crate::application::test_run::commands::create_test_failure_card::error::CreateTestFailureCardError;
@@ -499,7 +500,7 @@ async fn run_tests(
         })
         .await;
 
-    let text = match result {
+    let text = match &result {
         Ok(response) => started_text(&response.run),
         Err(DispatchTestRunError::AlreadyRunning(run)) => t!(
             "telegram_bot.dialogues.tests.already_running",
@@ -524,6 +525,23 @@ async fn run_tests(
         .parse_mode(ParseMode::Html)
         .reply_markup(refresh_keyboard())
         .await?;
+
+    // Запоминаем карточку: пока прогон идёт, бот обновляет это же сообщение
+    if let Ok(response) = result {
+        let attached = executors
+            .commands
+            .attach_test_run_message
+            .execute(&AttachTestRunMessageCommand {
+                test_run_id: response.run.id,
+                chat_id: SocialChatId(chat_id.0),
+                message_id: message_id.0,
+            })
+            .await;
+
+        if let Err(error) = attached {
+            tracing::warn!(%error, "Failed to attach test run message");
+        }
+    }
 
     Ok(())
 }

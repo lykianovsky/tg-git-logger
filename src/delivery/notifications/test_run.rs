@@ -1,9 +1,14 @@
 use crate::application::test_run::queries::build_test_report::executor::BuildTestReportExecutor;
 use crate::application::test_run::queries::build_test_report::query::BuildTestReportQuery;
+use crate::delivery::jobs::consumers::send_social_notify::payload::SendSocialNotifyJob;
+use crate::domain::notification::services::notification_service::NotificationService;
 use crate::domain::repository::repositories::repository_repository::RepositoryRepository;
 use crate::domain::shared::command::CommandExecutor;
 use crate::domain::test_run::entities::test_run::TestRun;
 use crate::domain::user::value_objects::social_chat_id::SocialChatId;
+use crate::domain::user::value_objects::social_message_id::SocialMessageId;
+use crate::domain::user::value_objects::social_type::SocialType;
+use crate::infrastructure::drivers::message_broker::contracts::publisher::MessageBrokerPublisher;
 use crate::utils::builder::message::MessageBuilder;
 use rust_i18n::t;
 use std::sync::Arc;
@@ -68,6 +73,43 @@ pub async fn resolve_test_run_chat_id(
                 .or(repository.social_chat_id)
         })
         .unwrap_or(default_chat_id)
+}
+
+/// Пока прогон идёт, бот переписывает свою карточку: жать «Обновить» не нужно.
+/// Если карточки нет (ночной прогон), отправляем обычное сообщение
+pub async fn deliver_test_run_update(
+    notification_service: &Arc<dyn NotificationService>,
+    publisher: &Arc<dyn MessageBrokerPublisher>,
+    run: &TestRun,
+    chat_id: SocialChatId,
+    message: MessageBuilder,
+) {
+    if let Some(message_id) = run.message_id {
+        let edited = notification_service
+            .edit_message(
+                &SocialType::Telegram,
+                &chat_id,
+                &SocialMessageId(message_id),
+                &message,
+            )
+            .await;
+
+        match edited {
+            Ok(()) => return,
+            Err(error) => {
+                tracing::warn!(%error, "Failed to update test run card, sending new message")
+            }
+        }
+    }
+
+    publisher
+        .publish(&SendSocialNotifyJob {
+            social_type: SocialType::Telegram,
+            chat_id,
+            message,
+        })
+        .await
+        .ok();
 }
 
 pub async fn build_test_run_report_url(

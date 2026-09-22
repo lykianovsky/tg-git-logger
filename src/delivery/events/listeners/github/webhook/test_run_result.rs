@@ -5,8 +5,10 @@ use crate::application::test_run::commands::ingest_test_run_result::executor::In
 use crate::application::test_run::queries::build_test_report::executor::BuildTestReportExecutor;
 use crate::delivery::jobs::consumers::send_social_notify::payload::SendSocialNotifyJob;
 use crate::delivery::notifications::test_run::{
-    build_test_run_message, build_test_run_report_url, resolve_test_run_chat_id,
+    build_test_run_message, build_test_run_report_url, deliver_test_run_update,
+    resolve_test_run_chat_id,
 };
+use crate::domain::notification::services::notification_service::NotificationService;
 use crate::domain::repository::repositories::repository_repository::RepositoryRepository;
 use crate::domain::shared::command::CommandExecutor;
 use crate::domain::shared::events::event_listener::EventListener;
@@ -29,6 +31,7 @@ pub struct WebhookTestRunResultListener {
     pub build_test_report: Arc<BuildTestReportExecutor>,
     pub repository_repo: Arc<dyn RepositoryRepository>,
     pub default_chat_id: SocialChatId,
+    pub notification_service: Arc<dyn NotificationService>,
 }
 
 /// Время в вебхуке приходит строкой RFC 3339
@@ -83,15 +86,19 @@ impl EventListener<WebhookWorkflowEvent> for WebhookTestRunResultListener {
         let chat_id =
             resolve_test_run_chat_id(&self.repository_repo, &response.run, self.default_chat_id)
                 .await;
-        let report_url = build_test_run_report_url(&self.build_test_report, &response.run).await;
+        // Пока прогон идёт, отчёта ещё нет — просто показываем, на каком он шаге
+        let report_url = match response.run.is_active() {
+            true => None,
+            false => build_test_run_report_url(&self.build_test_report, &response.run).await,
+        };
 
-        self.publisher
-            .publish(&SendSocialNotifyJob {
-                social_type: SocialType::Telegram,
-                chat_id,
-                message: build_test_run_message(&response.run, report_url.as_deref()),
-            })
-            .await
-            .ok();
+        deliver_test_run_update(
+            &self.notification_service,
+            &self.publisher,
+            &response.run,
+            chat_id,
+            build_test_run_message(&response.run, report_url.as_deref()),
+        )
+        .await;
     }
 }

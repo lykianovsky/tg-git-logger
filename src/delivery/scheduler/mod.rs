@@ -12,7 +12,8 @@ use crate::config::application::ApplicationConfig;
 use crate::delivery::contract::ApplicationDelivery;
 use crate::delivery::jobs::consumers::send_social_notify::payload::SendSocialNotifyJob;
 use crate::delivery::notifications::test_run::{
-    build_test_run_message, build_test_run_report_url, resolve_test_run_chat_id,
+    build_test_run_message, build_test_run_report_url, deliver_test_run_update,
+    resolve_test_run_chat_id,
 };
 use crate::domain::shared::command::CommandExecutor;
 use crate::domain::user::value_objects::social_chat_id::SocialChatId;
@@ -316,15 +317,14 @@ impl ApplicationDelivery for DeliveryScheduler {
                             )
                             .await;
 
-                            shared_dependency
-                                .publisher
-                                .publish(&SendSocialNotifyJob {
-                                    social_type: SocialType::Telegram,
-                                    chat_id,
-                                    message: build_test_run_message(&run, report_url.as_deref()),
-                                })
-                                .await
-                                .ok();
+                            deliver_test_run_update(
+                                &shared_dependency.notification_service,
+                                &shared_dependency.publisher,
+                                &run,
+                                chat_id,
+                                build_test_run_message(&run, report_url.as_deref()),
+                            )
+                            .await;
                         }
                     })
                 })

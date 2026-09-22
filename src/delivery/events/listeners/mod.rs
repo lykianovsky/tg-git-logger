@@ -101,6 +101,7 @@ impl ApplicationDelivery for DeliveryEventListeners {
                 build_test_report: self.executors.queries.build_test_report.clone(),
                 repository_repo: repository_repo.clone(),
                 default_chat_id,
+                notification_service: self.shared_dependency.notification_service.clone(),
             })
             .await;
 
