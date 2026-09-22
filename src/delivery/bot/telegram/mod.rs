@@ -18,6 +18,7 @@ use crate::delivery::bot::telegram::dialogues::release_plan_settings::TelegramBo
 use crate::delivery::bot::telegram::dialogues::report::TelegramBotDialogueReportByDateRangeDispatcher;
 use crate::delivery::bot::telegram::dialogues::setup_notifications::TelegramBotSetupNotificationsDispatcher;
 use crate::delivery::bot::telegram::dialogues::setup_webhook::TelegramBotSetupWebhookDispatcher;
+use crate::delivery::bot::telegram::dialogues::tests::TelegramBotTestsDispatcher;
 use crate::delivery::contract::ApplicationDelivery;
 use std::sync::Arc;
 use teloxide::Bot;
@@ -105,6 +106,10 @@ impl ApplicationDelivery for DeliveryBotMessengerTelegram {
             .branch(
                 case![TelegramBotDialogueState::ReleasePlanSettings(state)]
                     .branch(TelegramBotReleasePlanSettingsDispatcher::new()),
+            )
+            .branch(
+                case![TelegramBotDialogueState::Tests(state)]
+                    .branch(TelegramBotTestsDispatcher::new()),
             );
 
         Dispatcher::builder(bot, handler)

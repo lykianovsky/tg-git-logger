@@ -9,6 +9,7 @@ use crate::delivery::bot::telegram::dialogues::release_plan_settings::TelegramBo
 use crate::delivery::bot::telegram::dialogues::report::TelegramBotDialogueReportByDateRangeState;
 use crate::delivery::bot::telegram::dialogues::setup_notifications::TelegramBotSetupNotificationsState;
 use crate::delivery::bot::telegram::dialogues::setup_webhook::TelegramBotSetupWebhookState;
+use crate::delivery::bot::telegram::dialogues::tests::TelegramBotTestsState;
 use teloxide::dispatching::dialogue::InMemStorage;
 use teloxide::prelude::Dialogue;
 
@@ -24,6 +25,7 @@ pub mod release_plan_settings;
 pub mod report;
 pub mod setup_notifications;
 pub mod setup_webhook;
+pub mod tests;
 
 #[derive(Debug, Clone, Default)]
 pub enum TelegramBotDialogueState {
@@ -40,6 +42,7 @@ pub enum TelegramBotDialogueState {
     Onboarding(TelegramBotOnboardingState),
     ReleasePlan(TelegramBotReleasePlanState),
     ReleasePlanSettings(TelegramBotReleasePlanSettingsState),
+    Tests(TelegramBotTestsState),
 }
 
 pub type TelegramBotDialogueType =

@@ -22,6 +22,7 @@ pub mod notifications_vacation;
 pub mod onboarding;
 pub mod release_plan;
 pub mod release_plan_settings;
+pub mod tests;
 
 pub trait TelegramBotKeyboardAction {
     fn to_callback_data(&self) -> &str;

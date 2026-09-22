@@ -19,6 +19,7 @@ use crate::delivery::bot::telegram::commands::setup_webhook::TelegramBotSetupWeb
 use crate::delivery::bot::telegram::commands::start::TelegramBotStartCommandHandler;
 use crate::delivery::bot::telegram::commands::status::TelegramBotStatusCommandHandler;
 use crate::delivery::bot::telegram::commands::task::TelegramBotTaskCommandHandler;
+use crate::delivery::bot::telegram::commands::tests::TelegramBotTestsCommandHandler;
 use crate::delivery::bot::telegram::commands::unregister::TelegramBotUnregisterCommandHandler;
 use crate::delivery::bot::telegram::commands::vacation::TelegramBotVacationCommandHandler;
 use crate::delivery::bot::telegram::commands::whoami::TelegramBotWhoamiCommandHandler;
@@ -98,6 +99,9 @@ pub enum TelegramBotCommand {
 
     #[command(rename = "pending_reviews", description = "PR, ожидающие моего ревью")]
     PendingReviews,
+
+    #[command(description = "E2E-тесты: последний прогон, отчёт и запуск")]
+    Tests,
 }
 
 pub async fn handle(
@@ -387,6 +391,12 @@ pub async fn handle(
 
         TelegramBotCommand::MyPrs => {
             TelegramBotMyPrsCommandHandler::new(context, executors.clone())
+                .execute()
+                .await?;
+        }
+
+        TelegramBotCommand::Tests => {
+            TelegramBotTestsCommandHandler::new(context, Arc::new(dialogue), executors.clone())
                 .execute()
                 .await?;
         }

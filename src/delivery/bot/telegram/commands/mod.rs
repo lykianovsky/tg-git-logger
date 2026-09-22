@@ -15,6 +15,7 @@ pub mod setup_webhook;
 pub mod start;
 pub mod status;
 pub mod task;
+pub mod tests;
 pub mod unregister;
 pub mod vacation;
 pub mod whoami;
