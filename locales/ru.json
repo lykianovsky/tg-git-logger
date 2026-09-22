@@ -614,7 +614,9 @@
         "elapsed": "⏱️ Идёт",
         "elapsed_value": "%{minutes} мин %{seconds} с",
         "ci_run": "🔗 Прогон",
-        "loading": "⏳ Загружаю…"
+        "loading": "⏳ Загружаю…",
+        "nothing_to_cancel": "Отменять нечего — прогон уже завершился.",
+        "cancel_error": "Не удалось отменить прогон."
       }
     },
     "test_run": {

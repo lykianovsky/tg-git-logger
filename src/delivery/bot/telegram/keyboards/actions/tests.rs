@@ -17,6 +17,8 @@ pub enum TelegramBotTestsAction {
     RunAll,
     #[strum(serialize = "choose_block")]
     ChooseBlock,
+    #[strum(serialize = "cancel_run")]
+    CancelRun,
     #[strum(serialize = "connect")]
     Connect,
     #[strum(serialize = "back")]
@@ -33,6 +35,7 @@ impl KeyboardActionLabel for TelegramBotTestsAction {
             Self::Report => "📄 Отчёт",
             Self::RunAll => "▶️ Запустить все",
             Self::ChooseBlock => "🧩 Запустить блок",
+            Self::CancelRun => "🛑 Отменить прогон",
             Self::Connect => "🔌 Подключить тесты",
             Self::Back => "⬅️ Назад",
             Self::Close => "✖️ Закрыть",

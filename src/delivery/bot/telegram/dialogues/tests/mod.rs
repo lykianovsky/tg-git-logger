@@ -4,6 +4,8 @@ use crate::application::task::queries::list_task_tracker_options::error::ListTas
 use crate::application::task::queries::list_task_tracker_options::query::ListTaskTrackerOptionsQuery;
 use crate::application::task::queries::list_task_tracker_options::response::TaskTrackerOption;
 use crate::application::test_run::commands::attach_test_run_message::command::AttachTestRunMessageCommand;
+use crate::application::test_run::commands::cancel_test_run::command::CancelTestRunCommand;
+use crate::application::test_run::commands::cancel_test_run::error::CancelTestRunError;
 use crate::application::test_run::commands::connect_test_suite::command::ConnectTestSuiteCommand;
 use crate::application::test_run::commands::create_test_failure_card::command::CreateTestFailureCardCommand;
 use crate::application::test_run::commands::create_test_failure_card::error::CreateTestFailureCardError;
@@ -298,6 +300,18 @@ async fn handle_card(
                 &bot,
                 &executors,
                 &dialogue,
+                chat_id,
+                message_id,
+                repository_id,
+                social_user_id,
+            )
+            .await?
+        }
+
+        TelegramBotTestsAction::CancelRun => {
+            cancel_run(
+                &bot,
+                &executors,
                 chat_id,
                 message_id,
                 repository_id,
@@ -685,6 +699,52 @@ async fn show_failures(
         .await?;
 
     Ok(())
+}
+
+async fn cancel_run(
+    bot: &Bot,
+    executors: &Arc<ApplicationBoostrapExecutors>,
+    chat_id: ChatId,
+    message_id: MessageId,
+    repository_id: i32,
+    social_user_id: SocialUserId,
+) -> Result<(), Box<dyn Error + Send + Sync>> {
+    let cancelled = executors
+        .commands
+        .cancel_test_run
+        .execute(&CancelTestRunCommand {
+            repository_id: RepositoryId(repository_id),
+            social_user_id,
+        })
+        .await;
+
+    if let Err(error) = cancelled {
+        let text = match error {
+            // Прогон закончился, пока человек жал кнопку — показываем итог
+            CancelTestRunError::NoActiveRun => {
+                t!("telegram_bot.dialogues.tests.nothing_to_cancel").to_string()
+            }
+            CancelTestRunError::NoVersionControlAccount => {
+                t!("telegram_bot.dialogues.tests.no_github_account").to_string()
+            }
+            error => {
+                tracing::error!(%error, "Failed to cancel test run");
+
+                t!("telegram_bot.dialogues.tests.cancel_error").to_string()
+            }
+        };
+
+        return edit_with_back(bot, chat_id, message_id, text).await;
+    }
+
+    render_card(
+        bot,
+        executors,
+        chat_id,
+        message_id,
+        RepositoryId(repository_id),
+    )
+    .await
 }
 
 /// Подключение начинается со списка процессов CI репозитория — руками ничего не вводим

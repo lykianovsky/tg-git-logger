@@ -1,4 +1,5 @@
 pub mod attach_test_run_message;
+pub mod cancel_test_run;
 pub mod connect_test_suite;
 pub mod create_test_failure_card;
 pub mod dispatch_test_run;

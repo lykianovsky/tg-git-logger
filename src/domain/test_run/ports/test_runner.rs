@@ -94,6 +94,14 @@ pub trait TestRunner: Send + Sync {
         provider_run_id: u64,
     ) -> Result<TestRunArtifacts, FetchTestRunError>;
 
+    /// Отмена прогона в CI: запустили не то — не ждём весь прогон
+    async fn cancel_run(
+        &self,
+        token: &str,
+        suite: &TestSuite,
+        provider_run_id: u64,
+    ) -> Result<(), DispatchTestRunError>;
+
     /// Блоки тестов — каталоги внутри `tests_root` тестируемой ветки
     async fn list_blocks(
         &self,

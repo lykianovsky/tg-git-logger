@@ -106,7 +106,10 @@ pub fn build_card_keyboard(run: Option<&TestRun>, is_configured: bool) -> Inline
     if let Some(run) = run {
         // Пока прогон идёт, итогов и отчёта ещё нет — показываем только обновление
         if run.is_active() {
-            rows.push(vec![button(TelegramBotTestsAction::Refresh)]);
+            rows.push(vec![
+                button(TelegramBotTestsAction::Refresh),
+                button(TelegramBotTestsAction::CancelRun),
+            ]);
             rows.push(vec![button(TelegramBotTestsAction::Close)]);
 
             return InlineKeyboardMarkup::new(rows);

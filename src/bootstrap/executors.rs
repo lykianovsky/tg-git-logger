@@ -37,6 +37,7 @@ use crate::application::task::commands::move_task_to_test::executor::MoveTaskToT
 use crate::application::task::queries::get_task_card::executor::GetTaskCardExecutor;
 use crate::application::task::queries::list_task_tracker_options::executor::ListTaskTrackerOptionsExecutor;
 use crate::application::test_run::commands::attach_test_run_message::executor::AttachTestRunMessageExecutor;
+use crate::application::test_run::commands::cancel_test_run::executor::CancelTestRunExecutor;
 use crate::application::test_run::commands::connect_test_suite::executor::ConnectTestSuiteExecutor;
 use crate::application::test_run::commands::create_test_failure_card::executor::CreateTestFailureCardExecutor;
 use crate::application::test_run::commands::dispatch_test_run::executor::DispatchTestRunExecutor;
@@ -100,6 +101,7 @@ pub struct ApplicationBoostrapExecutorsQueries {
 
 pub struct ApplicationBoostrapExecutorsCommands {
     pub attach_test_run_message: Arc<AttachTestRunMessageExecutor>,
+    pub cancel_test_run: Arc<CancelTestRunExecutor>,
     pub connect_test_suite: Arc<ConnectTestSuiteExecutor>,
     pub create_test_failure_card: Arc<CreateTestFailureCardExecutor>,
     pub dispatch_test_run: Arc<DispatchTestRunExecutor>,
@@ -316,6 +318,12 @@ impl ApplicationBoostrapExecutors {
         let commands = ApplicationBoostrapExecutorsCommands {
             attach_test_run_message: Arc::new(AttachTestRunMessageExecutor::new(
                 shared_dependency.test_run_repo.clone(),
+            )),
+            cancel_test_run: Arc::new(CancelTestRunExecutor::new(
+                shared_dependency.test_suite_repo.clone(),
+                shared_dependency.test_run_repo.clone(),
+                shared_dependency.test_runner.clone(),
+                ci_token_resolver.clone(),
             )),
             connect_test_suite: Arc::new(ConnectTestSuiteExecutor::new(
                 shared_dependency.test_suite_repo.clone(),

@@ -419,6 +419,29 @@ impl TestRunner for GithubActionsTestRunner {
         })
     }
 
+    async fn cancel_run(
+        &self,
+        token: &str,
+        suite: &TestSuite,
+        provider_run_id: u64,
+    ) -> Result<(), DispatchTestRunError> {
+        let url = self.repository_url(suite, &format!("actions/runs/{provider_run_id}/cancel"));
+
+        let response = self
+            .request(token, reqwest::Method::POST, url)
+            .send()
+            .await
+            .map_err(|error| DispatchTestRunError::ProviderError(error.to_string()))?;
+
+        if !response.status().is_success() {
+            return Err(DispatchTestRunError::ProviderError(
+                response.status().to_string(),
+            ));
+        }
+
+        Ok(())
+    }
+
     async fn list_blocks(
         &self,
         token: &str,
