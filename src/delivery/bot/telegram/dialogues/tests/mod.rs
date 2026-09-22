@@ -420,6 +420,17 @@ async fn show_blocks(
         }
     };
 
+    // Каталога тестов в ветке нет — запускать по блокам нечего
+    if blocks.is_empty() {
+        return edit_with_back(
+            bot,
+            chat_id,
+            message_id,
+            t!("telegram_bot.dialogues.tests.no_blocks").to_string(),
+        )
+        .await;
+    }
+
     dialogue
         .update(TelegramBotDialogueState::Tests(
             TelegramBotTestsState::SelectBlock { repository_id },
@@ -666,6 +677,17 @@ async fn start_connect(
         Err(error) => return show_ci_options_error(bot, chat_id, message_id, error).await,
     };
 
+    // В репозитории нет ни одного процесса CI — подключать нечего
+    if options.is_empty() {
+        return edit_with_back(
+            bot,
+            chat_id,
+            message_id,
+            t!("telegram_bot.dialogues.tests.no_workflows").to_string(),
+        )
+        .await;
+    }
+
     dialogue
         .update(TelegramBotDialogueState::Tests(
             TelegramBotTestsState::Connect {
@@ -736,6 +758,16 @@ async fn handle_connect(
                     return show_ci_options_error(&bot, chat_id, message_id, error).await;
                 }
             };
+
+            if options.is_empty() {
+                return edit_with_back(
+                    &bot,
+                    chat_id,
+                    message_id,
+                    t!("telegram_bot.dialogues.tests.no_branches").to_string(),
+                )
+                .await;
+            }
 
             dialogue
                 .update(TelegramBotDialogueState::Tests(
@@ -875,6 +907,16 @@ async fn ask_card_assignee(
             .await;
         }
     };
+
+    if options.is_empty() {
+        return edit_with_back(
+            bot,
+            chat_id,
+            message_id,
+            t!("telegram_bot.dialogues.tests.no_tracker_users").to_string(),
+        )
+        .await;
+    }
 
     dialogue
         .update(TelegramBotDialogueState::Tests(

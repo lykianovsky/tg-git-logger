@@ -153,6 +153,8 @@ impl GithubActionsTestRunner {
 
 #[async_trait]
 impl TestRunner for GithubActionsTestRunner {
+    /// GitHub отдаёт процессы CI из ветки по умолчанию — и запускает `workflow_dispatch`
+    /// тоже только из неё, поэтому список здесь не зависит от тестируемой ветки
     async fn list_workflows(
         &self,
         token: &str,
