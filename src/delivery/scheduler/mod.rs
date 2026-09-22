@@ -5,6 +5,7 @@ use crate::application::notification::commands::scan_pr_conflicts::command::Scan
 use crate::application::notification::commands::scan_stale_pull_requests::command::ScanStalePullRequestsExecutorCommand;
 use crate::application::release_plan::commands::send_call_reminders::command::SendCallRemindersExecutorCommand;
 use crate::application::release_plan::commands::send_release_day_reminders::command::SendReleaseDayRemindersExecutorCommand;
+use crate::application::test_run::commands::sync_stale_test_runs::command::SyncStaleTestRunsCommand;
 use crate::bootstrap::executors::ApplicationBoostrapExecutors;
 use crate::config::application::ApplicationConfig;
 use crate::delivery::contract::ApplicationDelivery;
@@ -261,6 +262,39 @@ impl ApplicationDelivery for DeliveryScheduler {
         scheduler.start().await.expect("JobScheduler start failed");
 
         tracing::info!("Scheduler started");
+
+        // Итоги прогонов тестов — подстраховка, если вебхук не дошёл
+        let test_runs_executors = self.executors.clone();
+
+        scheduler
+            .add(
+                Job::new_async("0 */5 * * * *", move |_uuid, _lock| {
+                    let executors = test_runs_executors.clone();
+
+                    Box::pin(async move {
+                        match executors
+                            .commands
+                            .sync_stale_test_runs
+                            .execute(&SyncStaleTestRunsCommand {})
+                            .await
+                        {
+                            Ok(response) if response.synced_count > 0 => {
+                                tracing::info!(
+                                    synced = response.synced_count,
+                                    "Stale test runs synced"
+                                );
+                            }
+                            Err(error) => {
+                                tracing::error!(error = %error, "Stale test runs sync failed");
+                            }
+                            _ => {}
+                        }
+                    })
+                })
+                .expect("Stale test runs job create error"),
+            )
+            .await
+            .expect("JobScheduler failed to add stale test runs job");
 
         // Keep the scheduler alive — dropping it stops all cron jobs
         loop {

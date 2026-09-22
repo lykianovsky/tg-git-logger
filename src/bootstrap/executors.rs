@@ -40,6 +40,7 @@ use crate::application::test_run::commands::connect_test_suite::executor::Connec
 use crate::application::test_run::commands::create_test_failure_card::executor::CreateTestFailureCardExecutor;
 use crate::application::test_run::commands::dispatch_test_run::executor::DispatchTestRunExecutor;
 use crate::application::test_run::commands::ingest_test_run_result::executor::IngestTestRunResultExecutor;
+use crate::application::test_run::commands::sync_stale_test_runs::executor::SyncStaleTestRunsExecutor;
 use crate::application::test_run::queries::build_test_report::executor::BuildTestReportExecutor;
 use crate::application::test_run::queries::get_last_test_run::executor::GetLastTestRunExecutor;
 use crate::application::test_run::queries::get_run_failures::executor::GetRunFailuresExecutor;
@@ -98,6 +99,7 @@ pub struct ApplicationBoostrapExecutorsCommands {
     pub create_test_failure_card: Arc<CreateTestFailureCardExecutor>,
     pub dispatch_test_run: Arc<DispatchTestRunExecutor>,
     pub ingest_test_run_result: Arc<IngestTestRunResultExecutor>,
+    pub sync_stale_test_runs: Arc<SyncStaleTestRunsExecutor>,
     pub register_user_via_oauth: Arc<RegisterUserViaOAuthExecutor>,
     pub create_oauth_link: Arc<CreateOAuthLinkExecutor>,
     pub dispatch_webhook_event: Arc<DispatchWebhookEventExecutor>,
@@ -283,6 +285,13 @@ impl ApplicationBoostrapExecutors {
             )),
         };
 
+        // Итоги прогона добирает и вебхук, и подстраховка по расписанию
+        let ingest_test_run_result = Arc::new(IngestTestRunResultExecutor::new(
+            shared_dependency.test_suite_repo.clone(),
+            shared_dependency.test_run_repo.clone(),
+            shared_dependency.test_runner.clone(),
+        ));
+
         let commands = ApplicationBoostrapExecutorsCommands {
             connect_test_suite: Arc::new(ConnectTestSuiteExecutor::new(
                 shared_dependency.test_suite_repo.clone(),
@@ -300,10 +309,10 @@ impl ApplicationBoostrapExecutors {
                 shared_dependency.test_run_repo.clone(),
                 shared_dependency.test_runner.clone(),
             )),
-            ingest_test_run_result: Arc::new(IngestTestRunResultExecutor::new(
-                shared_dependency.test_suite_repo.clone(),
+            ingest_test_run_result: ingest_test_run_result.clone(),
+            sync_stale_test_runs: Arc::new(SyncStaleTestRunsExecutor::new(
                 shared_dependency.test_run_repo.clone(),
-                shared_dependency.test_runner.clone(),
+                ingest_test_run_result,
             )),
             create_oauth_link: Arc::new(CreateOAuthLinkExecutor::new(
                 shared_dependency.user_repo.clone(),
