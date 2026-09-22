@@ -1,0 +1,15 @@
+use crate::domain::repository::value_objects::repository_id::RepositoryId;
+use crate::domain::test_run::value_objects::test_run_trigger::TestRunTrigger;
+use crate::domain::user::value_objects::social_chat_id::SocialChatId;
+use crate::domain::user::value_objects::user_id::UserId;
+
+pub struct DispatchTestRunCommand {
+    pub repository_id: RepositoryId,
+    /// Ветка или commit; пусто — ветка по умолчанию из набора тестов
+    pub git_ref: Option<String>,
+    /// Аргументы прогона: блок тестов, проект, фильтр. Пусто — все тесты
+    pub args: String,
+    pub trigger: TestRunTrigger,
+    pub requested_by_user_id: Option<UserId>,
+    pub chat_id: Option<SocialChatId>,
+}

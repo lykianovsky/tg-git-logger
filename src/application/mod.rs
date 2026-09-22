@@ -6,6 +6,7 @@ pub mod notification;
 pub mod release_plan;
 pub mod repository;
 pub mod task;
+pub mod test_run;
 pub mod user;
 pub mod user_preferences;
 pub mod version_control;
