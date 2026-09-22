@@ -640,7 +640,9 @@
         "readiness_error": "Не удалось оценить готовность.",
         "dashboard_ready": "📈 Состояние качества",
         "dashboard_link": "Открыть страницу →",
-        "dashboard_error": "Не удалось собрать страницу состояния."
+        "dashboard_error": "Не удалось собрать страницу состояния.",
+        "progress": "📶 Прогресс",
+        "current_step": "👉 Сейчас"
       }
     },
     "test_run": {

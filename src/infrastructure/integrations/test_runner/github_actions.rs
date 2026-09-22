@@ -2,7 +2,7 @@ use crate::domain::test_run::entities::test_run::TestRunOutcome;
 use crate::domain::test_run::entities::test_suite::TestSuite;
 use crate::domain::test_run::ports::test_runner::{
     CiOption, DispatchTestRunError, FetchTestRunError, ListTestBlocksError, TestRunArtifacts,
-    TestRunner,
+    TestRunProgress, TestRunner,
 };
 use crate::domain::test_run::value_objects::run_tag::RunTag;
 use crate::domain::test_run::value_objects::test_run_status::TestRunStatus;
@@ -417,6 +417,73 @@ impl TestRunner for GithubActionsTestRunner {
             totals: parsed.as_ref().map(|summary| summary.totals),
             failures: parsed.map(|summary| summary.failures).unwrap_or_default(),
         })
+    }
+
+    async fn fetch_progress(
+        &self,
+        token: &str,
+        suite: &TestSuite,
+        provider_run_id: u64,
+    ) -> Result<Option<TestRunProgress>, FetchTestRunError> {
+        let url = self.repository_url(suite, &format!("actions/runs/{provider_run_id}/jobs"));
+
+        let response = self
+            .request(token, reqwest::Method::GET, url)
+            .send()
+            .await
+            .map_err(|error| FetchTestRunError::ProviderError(error.to_string()))?;
+
+        if !response.status().is_success() {
+            return Err(FetchTestRunError::ProviderError(
+                response.status().to_string(),
+            ));
+        }
+
+        let body: Value = response
+            .json()
+            .await
+            .map_err(|error| FetchTestRunError::ProviderError(error.to_string()))?;
+
+        // Прогон тестов — одна задача; если задач несколько, берём ту, что идёт
+        let job = body
+            .get("jobs")
+            .and_then(Value::as_array)
+            .and_then(|jobs| {
+                jobs.iter()
+                    .find(|job| job.get("status").and_then(Value::as_str) == Some("in_progress"))
+                    .or_else(|| jobs.first())
+            })
+            .cloned();
+
+        let Some(job) = job else {
+            return Ok(None);
+        };
+
+        let steps = job
+            .get("steps")
+            .and_then(Value::as_array)
+            .cloned()
+            .unwrap_or_default();
+
+        if steps.is_empty() {
+            return Ok(None);
+        }
+
+        let completed_steps = steps
+            .iter()
+            .filter(|step| step.get("status").and_then(Value::as_str) == Some("completed"))
+            .count() as u32;
+        let current_step = steps
+            .iter()
+            .find(|step| step.get("status").and_then(Value::as_str) == Some("in_progress"))
+            .and_then(|step| step.get("name").and_then(Value::as_str))
+            .map(str::to_string);
+
+        Ok(Some(TestRunProgress {
+            completed_steps,
+            total_steps: steps.len() as u32,
+            current_step,
+        }))
     }
 
     async fn cancel_run(

@@ -20,6 +20,7 @@ use crate::application::test_run::queries::build_test_report::query::BuildTestRe
 use crate::application::test_run::queries::get_last_test_run::query::GetLastTestRunQuery;
 use crate::application::test_run::queries::get_release_readiness::query::GetReleaseReadinessQuery;
 use crate::application::test_run::queries::get_run_failures::query::GetRunFailuresQuery;
+use crate::application::test_run::queries::get_test_run_progress::query::GetTestRunProgressQuery;
 use crate::application::test_run::queries::list_ci_options::error::ListCiOptionsError;
 use crate::application::test_run::queries::list_ci_options::query::{
     CiOptionKind, ListCiOptionsQuery,
@@ -39,6 +40,7 @@ use crate::domain::repository::value_objects::repository_id::RepositoryId;
 use crate::domain::shared::command::CommandExecutor;
 use crate::domain::test_run::entities::test_run::TestRun;
 use crate::domain::test_run::ports::test_runner::CiOption;
+use crate::domain::test_run::ports::test_runner::TestRunProgress;
 use crate::domain::test_run::value_objects::test_run_trigger::TestRunTrigger;
 use crate::domain::user::value_objects::social_chat_id::SocialChatId;
 use crate::domain::user::value_objects::social_user_id::SocialUserId;
@@ -179,10 +181,21 @@ pub async fn render_card(
         }
     };
 
+    // Полосу прогресса показываем только у идущего прогона
+    let progress = match run.as_ref().filter(|run| run.is_active()) {
+        Some(run) => load_progress(executors, run).await,
+        None => None,
+    };
+
     bot.edit_message_text(
         chat_id,
         message_id,
-        build_card_text(run.as_ref(), is_configured, &repository_title),
+        build_card_text(
+            run.as_ref(),
+            is_configured,
+            &repository_title,
+            progress.as_ref(),
+        ),
     )
     .parse_mode(ParseMode::Html)
     .reply_markup(build_card_keyboard(run.as_ref(), is_configured))
@@ -1537,6 +1550,20 @@ fn back_button() -> InlineKeyboardButton {
         TelegramBotTestsAction::Back.label(),
         TelegramBotTestsAction::Back.to_callback_data().to_string(),
     )
+}
+
+async fn load_progress(
+    executors: &Arc<ApplicationBoostrapExecutors>,
+    run: &TestRun,
+) -> Option<TestRunProgress> {
+    executors
+        .queries
+        .get_test_run_progress
+        .execute(&GetTestRunProgressQuery { run: run.clone() })
+        .await
+        .inspect_err(|error| tracing::warn!(%error, "Failed to load test run progress"))
+        .ok()
+        .and_then(|response| response.progress)
 }
 
 /// Статус активного прогона в базе может отставать от CI: обновляем его перед показом

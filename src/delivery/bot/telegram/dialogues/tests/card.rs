@@ -1,15 +1,38 @@
 use crate::delivery::bot::telegram::keyboards::actions::TelegramBotKeyboardAction;
 use crate::delivery::bot::telegram::keyboards::actions::tests::TelegramBotTestsAction;
 use crate::domain::test_run::entities::test_run::TestRun;
+use crate::domain::test_run::ports::test_runner::TestRunProgress;
 use crate::utils::builder::message::MessageBuilder;
 use rust_i18n::t;
 use teloxide::types::{InlineKeyboardButton, InlineKeyboardMarkup};
+
+/// Длина полосы прогресса в символах
+const PROGRESS_BAR_WIDTH: u32 = 10;
+
+/// Полоса из символов: в мессенджере это единственный способ показать ход прогона
+pub fn build_progress_bar(progress: &TestRunProgress) -> String {
+    if progress.total_steps == 0 {
+        return String::new();
+    }
+
+    let filled = (progress.completed_steps * PROGRESS_BAR_WIDTH / progress.total_steps)
+        .min(PROGRESS_BAR_WIDTH);
+
+    format!(
+        "{}{} {}/{}",
+        "▓".repeat(filled as usize),
+        "░".repeat((PROGRESS_BAR_WIDTH - filled) as usize),
+        progress.completed_steps,
+        progress.total_steps
+    )
+}
 
 /// Карточка последнего прогона: один и тот же вид для команды, обновления и итогов
 pub fn build_card_text(
     run: Option<&TestRun>,
     is_configured: bool,
     repository_title: &str,
+    progress: Option<&TestRunProgress>,
 ) -> String {
     // Карточка всегда называет репозиторий: у пользователя их может быть несколько
     let header = MessageBuilder::new()
@@ -68,7 +91,21 @@ pub fn build_card_text(
         );
     }
 
-    // Пока прогон идёт, полезнее видеть, сколько он уже длится
+    // Пока прогон идёт, показываем, где он сейчас
+    if let Some(progress) = progress.filter(|_| run.is_active()) {
+        builder = builder.section(
+            &t!("telegram_bot.dialogues.tests.progress").to_string(),
+            &build_progress_bar(progress),
+        );
+
+        if let Some(current_step) = progress.current_step.as_deref() {
+            builder = builder.section(
+                &t!("telegram_bot.dialogues.tests.current_step").to_string(),
+                current_step,
+            );
+        }
+    }
+
     if run.is_active() {
         let elapsed = chrono::Utc::now() - run.started_at.unwrap_or(run.created_at);
 

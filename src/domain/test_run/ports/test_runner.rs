@@ -34,6 +34,15 @@ pub struct TestRunArtifacts {
     pub failures: Vec<ParsedTestFailure>,
 }
 
+/// Насколько прогон продвинулся: CI сообщает шаги, а не отдельные тесты
+#[derive(Debug, Clone)]
+pub struct TestRunProgress {
+    pub completed_steps: u32,
+    pub total_steps: u32,
+    /// Шаг, который выполняется прямо сейчас
+    pub current_step: Option<String>,
+}
+
 #[derive(Debug, Clone)]
 pub struct ParsedTestFailure {
     pub project: String,
@@ -93,6 +102,14 @@ pub trait TestRunner: Send + Sync {
         suite: &TestSuite,
         provider_run_id: u64,
     ) -> Result<TestRunArtifacts, FetchTestRunError>;
+
+    /// Ход прогона: по нему карточка показывает полосу прогресса
+    async fn fetch_progress(
+        &self,
+        token: &str,
+        suite: &TestSuite,
+        provider_run_id: u64,
+    ) -> Result<Option<TestRunProgress>, FetchTestRunError>;
 
     /// Отмена прогона в CI: запустили не то — не ждём весь прогон
     async fn cancel_run(
