@@ -76,5 +76,7 @@ pub trait TestRunRepository: Send + Sync {
         failures: &[NewTestFailure],
     ) -> Result<(), UpdateTestRunError>;
 
+    async fn find_failure(&self, id: i32) -> Result<TestFailure, FindTestRunError>;
+
     async fn list_failures(&self, id: TestRunId) -> Result<Vec<TestFailure>, FindTestRunError>;
 }

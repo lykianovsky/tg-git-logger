@@ -1,5 +1,11 @@
 pub mod card;
 
+use crate::application::task::queries::list_task_tracker_options::error::ListTaskTrackerOptionsError;
+use crate::application::task::queries::list_task_tracker_options::query::ListTaskTrackerOptionsQuery;
+use crate::application::task::queries::list_task_tracker_options::response::TaskTrackerOption;
+use crate::application::test_run::commands::create_test_failure_card::command::CreateTestFailureCardCommand;
+use crate::application::test_run::commands::create_test_failure_card::error::CreateTestFailureCardError;
+use crate::application::test_run::commands::create_test_failure_card::response::CreateTestFailureCardResponse;
 use crate::application::test_run::commands::dispatch_test_run::command::DispatchTestRunCommand;
 use crate::application::test_run::commands::dispatch_test_run::error::DispatchTestRunError;
 use crate::application::test_run::queries::build_test_report::query::BuildTestReportQuery;
@@ -24,6 +30,7 @@ use crate::utils::builder::message::MessageBuilder;
 use rust_i18n::t;
 use std::error::Error;
 use std::sync::Arc;
+use teloxide::Bot;
 use teloxide::dispatching::{DpHandlerDescription, UpdateFilterExt};
 use teloxide::dptree::{Handler, case};
 use teloxide::payloads::EditMessageTextSetters;
@@ -31,11 +38,18 @@ use teloxide::prelude::{Requester, Update};
 use teloxide::types::{
     CallbackQuery, ChatId, InlineKeyboardButton, InlineKeyboardMarkup, MessageId, ParseMode,
 };
-use teloxide::{Bot, dptree};
 
 /// Кнопка запуска блока несёт его путь, поэтому у неё свой префикс —
 /// иначе путь не отличить от имени действия
 const BLOCK_CALLBACK_PREFIX: &str = "block:";
+/// Кнопка заведения карточки несёт идентификатор упавшего теста
+const CARD_CALLBACK_PREFIX: &str = "card:";
+/// Кнопка выбора человека несёт его идентификатор в трекере
+const OPTION_CALLBACK_PREFIX: &str = "opt:";
+/// Кнопка тега несёт его название: именно им тег вешается на карточку
+const TAG_CALLBACK_PREFIX: &str = "tag:";
+/// Сколько вариантов показываем на шаге выбора
+const MAX_OPTION_BUTTONS: usize = 30;
 
 #[derive(Debug, Clone, Default)]
 pub enum TelegramBotTestsState {
@@ -49,6 +63,19 @@ pub enum TelegramBotTestsState {
     SelectBlock {
         repository_id: i32,
     },
+
+    /// Шаг 1 формы карточки: на кого её повесить
+    SelectCardAssignee {
+        repository_id: i32,
+        test_failure_id: i32,
+    },
+
+    /// Шаг 2: каким тегом пометить
+    SelectCardTag {
+        repository_id: i32,
+        test_failure_id: i32,
+        responsible_id: u64,
+    },
 }
 
 pub struct TelegramBotTestsDispatcher {}
@@ -61,6 +88,21 @@ impl TelegramBotTestsDispatcher {
             .branch(case![TelegramBotTestsState::Card { repository_id }].endpoint(handle_card))
             .branch(
                 case![TelegramBotTestsState::SelectBlock { repository_id }].endpoint(choose_block),
+            )
+            .branch(
+                case![TelegramBotTestsState::SelectCardAssignee {
+                    repository_id,
+                    test_failure_id
+                }]
+                .endpoint(choose_card_assignee),
+            )
+            .branch(
+                case![TelegramBotTestsState::SelectCardTag {
+                    repository_id,
+                    test_failure_id,
+                    responsible_id
+                }]
+                .endpoint(choose_card_tag),
             )
     }
 }
@@ -134,9 +176,26 @@ async fn handle_card(
         return Ok(());
     };
 
-    let Ok(action) =
-        TelegramBotTestsAction::from_callback_data(query.data.as_deref().unwrap_or(""))
-    else {
+    let data = query.data.as_deref().unwrap_or("");
+
+    if let Some(raw_failure_id) = data.strip_prefix(CARD_CALLBACK_PREFIX) {
+        let Ok(test_failure_id) = raw_failure_id.parse::<i32>() else {
+            return Ok(());
+        };
+
+        return ask_card_assignee(
+            &bot,
+            &executors,
+            &dialogue,
+            chat_id,
+            message_id,
+            repository_id,
+            test_failure_id,
+        )
+        .await;
+    }
+
+    let Ok(action) = TelegramBotTestsAction::from_callback_data(data) else {
         return Ok(());
     };
 
@@ -477,12 +536,343 @@ async fn show_failures(
         builder = builder.empty_line();
     }
 
+    let mut rows: Vec<Vec<InlineKeyboardButton>> = failures
+        .iter()
+        .filter(|item| item.card.is_none())
+        .map(|item| {
+            vec![InlineKeyboardButton::callback(
+                t!(
+                    "telegram_bot.dialogues.tests.create_card",
+                    title = &item.failure.title
+                )
+                .to_string(),
+                format!("{CARD_CALLBACK_PREFIX}{}", item.failure.id),
+            )]
+        })
+        .collect();
+
+    rows.push(vec![InlineKeyboardButton::callback(
+        TelegramBotTestsAction::Back.label(),
+        TelegramBotTestsAction::Back.to_callback_data().to_string(),
+    )]);
+
     bot.edit_message_text(chat_id, message_id, builder.build())
+        .parse_mode(ParseMode::Html)
+        .reply_markup(InlineKeyboardMarkup::new(rows))
+        .await?;
+
+    Ok(())
+}
+
+/// Шаг 1: список людей из трекера. Ничего не зашиваем — состав команды меняется
+async fn ask_card_assignee(
+    bot: &Bot,
+    executors: &Arc<ApplicationBoostrapExecutors>,
+    dialogue: &TelegramBotDialogueType,
+    chat_id: ChatId,
+    message_id: MessageId,
+    repository_id: i32,
+    test_failure_id: i32,
+) -> Result<(), Box<dyn Error + Send + Sync>> {
+    let options = match load_tracker_options(executors, ListTaskTrackerOptionsQuery::Users).await {
+        Ok(options) => options,
+        Err(error) => {
+            tracing::error!(%error, "Failed to load task tracker users");
+
+            return edit_with_back(
+                bot,
+                chat_id,
+                message_id,
+                t!("telegram_bot.dialogues.tests.tracker_options_error").to_string(),
+            )
+            .await;
+        }
+    };
+
+    dialogue
+        .update(TelegramBotDialogueState::Tests(
+            TelegramBotTestsState::SelectCardAssignee {
+                repository_id,
+                test_failure_id,
+            },
+        ))
+        .await?;
+
+    bot.edit_message_text(
+        chat_id,
+        message_id,
+        t!("telegram_bot.dialogues.tests.select_assignee").to_string(),
+    )
+    .reply_markup(options_keyboard(&options))
+    .await?;
+
+    Ok(())
+}
+
+async fn choose_card_assignee(
+    bot: Bot,
+    dialogue: TelegramBotDialogueType,
+    executors: Arc<ApplicationBoostrapExecutors>,
+    query: CallbackQuery,
+    (repository_id, test_failure_id): (i32, i32),
+) -> Result<(), Box<dyn Error + Send + Sync>> {
+    bot.answer_callback_query(query.id.clone()).await?;
+
+    let Some((chat_id, message_id)) = message_target(&query) else {
+        return Ok(());
+    };
+
+    let data = query.data.as_deref().unwrap_or("");
+
+    if data == TelegramBotTestsAction::Back.to_callback_data() {
+        return back_to_card(
+            &bot,
+            &executors,
+            &dialogue,
+            chat_id,
+            message_id,
+            repository_id,
+        )
+        .await;
+    }
+
+    let Some(responsible_id) = data
+        .strip_prefix(OPTION_CALLBACK_PREFIX)
+        .and_then(|raw| raw.parse::<u64>().ok())
+    else {
+        return Ok(());
+    };
+
+    let options = match load_tracker_options(&executors, ListTaskTrackerOptionsQuery::Tags).await {
+        Ok(options) => options,
+        Err(error) => {
+            tracing::error!(%error, "Failed to load task tracker tags");
+
+            return edit_with_back(
+                &bot,
+                chat_id,
+                message_id,
+                t!("telegram_bot.dialogues.tests.tracker_options_error").to_string(),
+            )
+            .await;
+        }
+    };
+
+    dialogue
+        .update(TelegramBotDialogueState::Tests(
+            TelegramBotTestsState::SelectCardTag {
+                repository_id,
+                test_failure_id,
+                responsible_id,
+            },
+        ))
+        .await?;
+
+    bot.edit_message_text(
+        chat_id,
+        message_id,
+        t!("telegram_bot.dialogues.tests.select_tag").to_string(),
+    )
+    .reply_markup(tag_keyboard(&options))
+    .await?;
+
+    Ok(())
+}
+
+async fn choose_card_tag(
+    bot: Bot,
+    dialogue: TelegramBotDialogueType,
+    executors: Arc<ApplicationBoostrapExecutors>,
+    query: CallbackQuery,
+    (repository_id, test_failure_id, responsible_id): (i32, i32, u64),
+) -> Result<(), Box<dyn Error + Send + Sync>> {
+    bot.answer_callback_query(query.id.clone()).await?;
+
+    let Some((chat_id, message_id)) = message_target(&query) else {
+        return Ok(());
+    };
+
+    let data = query.data.as_deref().unwrap_or("");
+
+    if data == TelegramBotTestsAction::Back.to_callback_data() {
+        return back_to_card(
+            &bot,
+            &executors,
+            &dialogue,
+            chat_id,
+            message_id,
+            repository_id,
+        )
+        .await;
+    }
+
+    // Тег необязателен: карточку можно завести и без него
+    let tag = data
+        .strip_prefix(TAG_CALLBACK_PREFIX)
+        .filter(|tag| !tag.is_empty())
+        .map(str::to_string);
+
+    dialogue
+        .update(TelegramBotDialogueState::Tests(
+            TelegramBotTestsState::Card { repository_id },
+        ))
+        .await?;
+
+    create_failure_card(
+        &bot,
+        &executors,
+        chat_id,
+        message_id,
+        test_failure_id,
+        responsible_id,
+        tag,
+    )
+    .await
+}
+
+async fn create_failure_card(
+    bot: &Bot,
+    executors: &Arc<ApplicationBoostrapExecutors>,
+    chat_id: ChatId,
+    message_id: MessageId,
+    test_failure_id: i32,
+    responsible_id: u64,
+    tag: Option<String>,
+) -> Result<(), Box<dyn Error + Send + Sync>> {
+    let result = executors
+        .commands
+        .create_test_failure_card
+        .execute(&CreateTestFailureCardCommand {
+            test_failure_id,
+            responsible_id: Some(responsible_id),
+            tag,
+            created_by_user_id: None,
+        })
+        .await;
+
+    let text = match result {
+        Ok(CreateTestFailureCardResponse::Created(card)) => MessageBuilder::new()
+            .bold(&t!("telegram_bot.dialogues.tests.card_created").to_string())
+            .empty_line()
+            .link(&card.title, &card.card_url)
+            .build(),
+        // Карточка по этому тесту уже есть — показываем её, вторую не заводим
+        Ok(CreateTestFailureCardResponse::AlreadyExists(card)) => MessageBuilder::new()
+            .bold(&t!("telegram_bot.dialogues.tests.card_already_exists").to_string())
+            .empty_line()
+            .link(&card.title, &card.card_url)
+            .build(),
+        Err(CreateTestFailureCardError::TrackerNotConfigured) => {
+            t!("telegram_bot.dialogues.tests.tracker_not_configured").to_string()
+        }
+        Err(error) => {
+            tracing::error!(%error, "Failed to create test failure card");
+
+            t!("telegram_bot.dialogues.tests.card_error").to_string()
+        }
+    };
+
+    bot.edit_message_text(chat_id, message_id, text)
         .parse_mode(ParseMode::Html)
         .reply_markup(back_keyboard())
         .await?;
 
     Ok(())
+}
+
+async fn load_tracker_options(
+    executors: &Arc<ApplicationBoostrapExecutors>,
+    query: ListTaskTrackerOptionsQuery,
+) -> Result<Vec<TaskTrackerOption>, ListTaskTrackerOptionsError> {
+    executors
+        .queries
+        .list_task_tracker_options
+        .execute(&query)
+        .await
+        .map(|response| response.options)
+}
+
+async fn back_to_card(
+    bot: &Bot,
+    executors: &Arc<ApplicationBoostrapExecutors>,
+    dialogue: &TelegramBotDialogueType,
+    chat_id: ChatId,
+    message_id: MessageId,
+    repository_id: i32,
+) -> Result<(), Box<dyn Error + Send + Sync>> {
+    dialogue
+        .update(TelegramBotDialogueState::Tests(
+            TelegramBotTestsState::Card { repository_id },
+        ))
+        .await?;
+
+    render_card(
+        bot,
+        executors,
+        chat_id,
+        message_id,
+        RepositoryId(repository_id),
+    )
+    .await
+}
+
+async fn edit_with_back(
+    bot: &Bot,
+    chat_id: ChatId,
+    message_id: MessageId,
+    text: String,
+) -> Result<(), Box<dyn Error + Send + Sync>> {
+    bot.edit_message_text(chat_id, message_id, text)
+        .reply_markup(back_keyboard())
+        .await?;
+
+    Ok(())
+}
+
+/// Людей в трекере много — режем список, иначе клавиатура не влезет в сообщение
+fn options_keyboard(options: &[TaskTrackerOption]) -> InlineKeyboardMarkup {
+    let mut rows: Vec<Vec<InlineKeyboardButton>> = options
+        .iter()
+        .take(MAX_OPTION_BUTTONS)
+        .map(|option| {
+            vec![InlineKeyboardButton::callback(
+                option.name.clone(),
+                format!("{OPTION_CALLBACK_PREFIX}{}", option.id),
+            )]
+        })
+        .collect();
+
+    rows.push(vec![back_button()]);
+
+    InlineKeyboardMarkup::new(rows)
+}
+
+fn tag_keyboard(options: &[TaskTrackerOption]) -> InlineKeyboardMarkup {
+    let mut rows: Vec<Vec<InlineKeyboardButton>> = options
+        .iter()
+        .take(MAX_OPTION_BUTTONS)
+        .map(|option| {
+            vec![InlineKeyboardButton::callback(
+                option.name.clone(),
+                format!("{TAG_CALLBACK_PREFIX}{}", option.name),
+            )]
+        })
+        .collect();
+
+    rows.push(vec![InlineKeyboardButton::callback(
+        t!("telegram_bot.dialogues.tests.without_tag").to_string(),
+        TAG_CALLBACK_PREFIX.to_string(),
+    )]);
+    rows.push(vec![back_button()]);
+
+    InlineKeyboardMarkup::new(rows)
+}
+
+fn back_button() -> InlineKeyboardButton {
+    InlineKeyboardButton::callback(
+        TelegramBotTestsAction::Back.label(),
+        TelegramBotTestsAction::Back.to_callback_data().to_string(),
+    )
 }
 
 async fn last_run(

@@ -319,6 +319,16 @@ impl TestRunRepository for MySQLTestRunRepository {
         Ok(())
     }
 
+    async fn find_failure(&self, id: i32) -> Result<TestFailure, FindTestRunError> {
+        let model = test_run_failures::Entity::find_by_id(id)
+            .one(self.db.as_ref())
+            .await
+            .map_err(|error| FindTestRunError::DbError(error.to_string()))?
+            .ok_or(FindTestRunError::NotFound)?;
+
+        Ok(Self::failure_from_mysql(model))
+    }
+
     async fn list_failures(&self, id: TestRunId) -> Result<Vec<TestFailure>, FindTestRunError> {
         let models = test_run_failures::Entity::find()
             .filter(test_run_failures::Column::TestRunId.eq(id.0))

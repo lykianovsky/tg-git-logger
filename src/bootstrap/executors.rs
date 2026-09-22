@@ -35,6 +35,8 @@ use crate::application::repository::commands::update_repository_task_tracker::ex
 use crate::application::repository::queries::get_all_repositories::executor::GetAllRepositoriesExecutor;
 use crate::application::task::commands::move_task_to_test::executor::MoveTaskToTestExecutor;
 use crate::application::task::queries::get_task_card::executor::GetTaskCardExecutor;
+use crate::application::task::queries::list_task_tracker_options::executor::ListTaskTrackerOptionsExecutor;
+use crate::application::test_run::commands::create_test_failure_card::executor::CreateTestFailureCardExecutor;
 use crate::application::test_run::commands::dispatch_test_run::executor::DispatchTestRunExecutor;
 use crate::application::test_run::commands::ingest_test_run_result::executor::IngestTestRunResultExecutor;
 use crate::application::test_run::queries::build_test_report::executor::BuildTestReportExecutor;
@@ -87,9 +89,11 @@ pub struct ApplicationBoostrapExecutorsQueries {
     pub get_run_failures: Arc<GetRunFailuresExecutor>,
     pub list_test_blocks: Arc<ListTestBlocksExecutor>,
     pub build_test_report: Arc<BuildTestReportExecutor>,
+    pub list_task_tracker_options: Arc<ListTaskTrackerOptionsExecutor>,
 }
 
 pub struct ApplicationBoostrapExecutorsCommands {
+    pub create_test_failure_card: Arc<CreateTestFailureCardExecutor>,
     pub dispatch_test_run: Arc<DispatchTestRunExecutor>,
     pub ingest_test_run_result: Arc<IngestTestRunResultExecutor>,
     pub register_user_via_oauth: Arc<RegisterUserViaOAuthExecutor>,
@@ -271,9 +275,20 @@ impl ApplicationBoostrapExecutors {
                 shared_dependency.cache.clone(),
                 config.secret.reversible_cipher_secret.clone(),
             )),
+            list_task_tracker_options: Arc::new(ListTaskTrackerOptionsExecutor::new(
+                shared_dependency.task_tracker_client.clone(),
+            )),
         };
 
         let commands = ApplicationBoostrapExecutorsCommands {
+            create_test_failure_card: Arc::new(CreateTestFailureCardExecutor::new(
+                shared_dependency.test_run_repo.clone(),
+                shared_dependency.test_failure_card_repo.clone(),
+                shared_dependency.repository_repo.clone(),
+                shared_dependency.repository_task_tracker_repo.clone(),
+                shared_dependency.task_tracker_client.clone(),
+                config.kaiten.base.clone(),
+            )),
             dispatch_test_run: Arc::new(DispatchTestRunExecutor::new(
                 shared_dependency.test_suite_repo.clone(),
                 shared_dependency.test_run_repo.clone(),
