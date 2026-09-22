@@ -34,8 +34,20 @@ jobs:
         with:
           ref: ${{ inputs.ref || 'main' }}
 
-      - name: Run tests
-        id: run
+      # Шаги разбиты по блокам: так в боте видно, где прогон сейчас
+      - name: Подготовка стенда
+        run: sleep 12
+
+      - name: Блок demo/smoke
+        run: sleep 20
+
+      - name: Блок demo/broken
+        run: sleep 20
+
+      - name: Блок api/health
+        run: sleep 12
+
+      - name: Сборка отчёта
         env:
           E2E: ${{ inputs.e2e }}
         run: |
