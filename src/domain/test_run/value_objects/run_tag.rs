@@ -6,6 +6,8 @@ pub struct RunTag(pub String);
 /// Длина случайной части метки: её достаточно, чтобы метки не совпали, и она
 /// помещается в имя прогона рядом с веткой
 const RANDOM_PART_BYTES: usize = 8;
+/// Дата в метке — `ГГГГММДД`
+const DATE_PART_LENGTH: usize = 8;
 
 impl RunTag {
     /// Метка вида `20260922-1a2b3c4d5e6f7a8b`: по дате её легко узнать в списке прогонов,
@@ -18,6 +20,26 @@ impl RunTag {
         rand::rngs::OsRng.fill_bytes(&mut random);
 
         Self(format!("{}-{}", now.format("%Y%m%d"), hex::encode(random)))
+    }
+
+    /// Метку вынимаем из имени прогона: CI подставляет её рядом с веткой,
+    /// а идентификатора запуска `workflow_dispatch` не возвращает
+    pub fn extract_from_run_name(name: &str) -> Option<Self> {
+        name.split_whitespace()
+            .map(|part| part.trim_matches(|symbol: char| !symbol.is_ascii_alphanumeric()))
+            .find(|part| Self::looks_like_tag(part))
+            .map(|part| Self(part.to_string()))
+    }
+
+    fn looks_like_tag(value: &str) -> bool {
+        let Some((date, random)) = value.split_once('-') else {
+            return false;
+        };
+
+        date.len() == DATE_PART_LENGTH
+            && date.chars().all(|symbol| symbol.is_ascii_digit())
+            && random.len() == RANDOM_PART_BYTES * 2
+            && random.chars().all(|symbol| symbol.is_ascii_hexdigit())
     }
 
     pub fn as_str(&self) -> &str {
@@ -42,6 +64,19 @@ mod tests {
         let second = RunTag::generate(now);
 
         assert_ne!(first, second);
+    }
+
+    #[test]
+    fn tag_is_extracted_from_run_name() {
+        let tag = RunTag::generate(chrono::Utc::now());
+        let name = format!("E2E · dev · {tag}");
+
+        assert_eq!(RunTag::extract_from_run_name(&name), Some(tag));
+    }
+
+    #[test]
+    fn run_name_without_tag_gives_nothing() {
+        assert_eq!(RunTag::extract_from_run_name("E2E · dev"), None);
     }
 
     #[test]
