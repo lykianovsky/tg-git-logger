@@ -4,7 +4,7 @@ use crate::delivery::bot::telegram::keyboards::actions::{
 use strum_macros::{AsRefStr, EnumString};
 
 /// Поля, доступные для ручного редактирования.
-/// SpaceId/QaColumnId/PathToCard теперь выбираются через API, не вручную.
+/// Спейс, доска и колонки выбираются через API — кнопкой «Перевыбрать».
 #[derive(EnumString, AsRefStr, Debug, Clone)]
 pub enum TelegramBotAdminTaskTrackerEditField {
     #[strum(serialize = "admin_tt_edit_extract_pattern")]
@@ -17,7 +17,9 @@ impl KeyboardActionLabel for TelegramBotAdminTaskTrackerEditField {
     fn label(&self) -> &'static str {
         match self {
             TelegramBotAdminTaskTrackerEditField::ExtractPattern => "✏️ Regex паттерн",
-            TelegramBotAdminTaskTrackerEditField::Reconfigure => "🔄 Перевыбрать колонку/спейс",
+            TelegramBotAdminTaskTrackerEditField::Reconfigure => {
+                "🔄 Перевыбрать спейс, доску и колонки"
+            }
         }
     }
 }

@@ -239,6 +239,13 @@ impl TelegramBotDialogueAdminTaskTrackerDispatcher {
                                 &t.space_id.to_string(),
                             )
                             .section_code(
+                                t!("telegram_bot.dialogues.admin.task_tracker.board_id").as_ref(),
+                                &t.board_id.map(|id| id.to_string()).unwrap_or_else(|| {
+                                    t!("telegram_bot.dialogues.admin.task_tracker.board_missing")
+                                        .to_string()
+                                }),
+                            )
+                            .section_code(
                                 t!("telegram_bot.dialogues.admin.task_tracker.qa_column_id")
                                     .as_ref(),
                                 &t.qa_column_id.to_string(),
