@@ -1,5 +1,5 @@
 use crate::domain::notification::services::notification_service::{
-    NotificationService, NotificationServiceDeleteMessageError,
+    NotificationKeyboard, NotificationService, NotificationServiceDeleteMessageError,
     NotificationServiceEditMessageError, NotificationServiceSendError,
 };
 use crate::domain::user::value_objects::social_chat_id::SocialChatId;
@@ -7,7 +7,7 @@ use crate::domain::user::value_objects::social_message_id::SocialMessageId;
 use crate::domain::user::value_objects::social_type::SocialType;
 use crate::utils::builder::message::MessageBuilder;
 use teloxide::prelude::*;
-use teloxide::types::{ChatId, MessageId, ParseMode};
+use teloxide::types::{ChatId, InlineKeyboardButton, InlineKeyboardMarkup, MessageId, ParseMode};
 
 pub struct TelegramNotificationClient {
     bot: Bot,
@@ -89,6 +89,7 @@ impl NotificationService for TelegramNotificationClient {
         chat_id: &SocialChatId,
         message_id: &SocialMessageId,
         message: &MessageBuilder,
+        keyboard: Option<&NotificationKeyboard>,
     ) -> Result<(), NotificationServiceEditMessageError> {
         if *social_type != SocialType::Telegram {
             return Err(NotificationServiceEditMessageError::UnsupportedSocialType(
@@ -96,22 +97,34 @@ impl NotificationService for TelegramNotificationClient {
             ));
         }
 
-        self.bot
-            .edit_message_text(
-                ChatId(chat_id.0),
-                MessageId(message_id.0),
-                message.to_string(),
-            )
-            .await
-            .map_err(|e| {
-                tracing::error!(
-                    error = %e,
-                    chat_id = chat_id.0,
-                    message_id = message_id.0,
-                    "Failed to delete message Telegram notification"
-                );
-                NotificationServiceEditMessageError::Transport(e.to_string())
-            })?;
+        let markup = keyboard.map(|rows| {
+            InlineKeyboardMarkup::new(rows.iter().map(|row| {
+                row.iter()
+                    .map(|button| {
+                        InlineKeyboardButton::callback(button.label.clone(), button.action.clone())
+                    })
+                    .collect::<Vec<_>>()
+            }))
+        });
+
+        let mut request = self.bot.edit_message_text(
+            ChatId(chat_id.0),
+            MessageId(message_id.0),
+            message.to_string(),
+        );
+
+        request.parse_mode = Some(ParseMode::Html);
+        request.reply_markup = markup;
+
+        request.await.map_err(|e| {
+            tracing::error!(
+                error = %e,
+                chat_id = chat_id.0,
+                message_id = message_id.0,
+                "Failed to delete message Telegram notification"
+            );
+            NotificationServiceEditMessageError::Transport(e.to_string())
+        })?;
 
         Ok(())
     }

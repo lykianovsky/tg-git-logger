@@ -15,7 +15,6 @@ use crate::domain::user::value_objects::social_user_id::SocialUserId;
 use crate::domain::user::value_objects::version_control_user_id::VersionControlUserId;
 use crate::domain::version_control::ports::version_control_client::VersionControlClient;
 use crate::infrastructure::drivers::cache::contract::CacheService;
-use crate::utils::builder::message::MessageBuilder;
 use crate::utils::mutex::key_locker::KeyLocker;
 use crate::utils::security::crypto::reversible::ReversibleCipher;
 use sea_orm::{DatabaseConnection, TransactionTrait};

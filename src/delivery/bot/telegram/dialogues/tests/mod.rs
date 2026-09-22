@@ -53,8 +53,7 @@ use teloxide::dptree::{Handler, case};
 use teloxide::payloads::EditMessageTextSetters;
 use teloxide::prelude::{Requester, Update};
 use teloxide::types::{
-    CallbackQuery, ChatId, InlineKeyboardButton, InlineKeyboardMarkup, Message, MessageId,
-    ParseMode,
+    CallbackQuery, ChatId, InlineKeyboardButton, InlineKeyboardMarkup, MessageId, ParseMode,
 };
 use teloxide::{Bot, dptree};
 
@@ -554,7 +553,7 @@ async fn run_tests(
         .await;
 
     let text = match &result {
-        Ok(response) => started_text(&response.run),
+        Ok(_) => String::new(),
         Err(DispatchTestRunError::AlreadyRunning(run)) => t!(
             "telegram_bot.dialogues.tests.already_running",
             branch = MessageBuilder::escape_html(&run.git_ref)
@@ -574,17 +573,21 @@ async fn run_tests(
         }
     };
 
-    bot.edit_message_text(chat_id, message_id, text)
-        .parse_mode(ParseMode::Html)
-        .reply_markup(refresh_keyboard())
-        .await?;
+    // Ошибку показываем текстом, успешный запуск — сразу карточкой прогона
+    let Ok(response) = result else {
+        return edit_with_back(bot, chat_id, message_id, text).await;
+    };
 
-    // Запоминаем карточку: пока прогон идёт, бот обновляет это же сообщение
-    if let Ok(response) = result {
-        attach_card_message(executors, &response.run, chat_id, message_id).await;
-    }
+    attach_card_message(executors, &response.run, chat_id, message_id).await;
 
-    Ok(())
+    render_card(
+        bot,
+        executors,
+        chat_id,
+        message_id,
+        RepositoryId(repository_id),
+    )
+    .await
 }
 
 async fn attach_card_message(
@@ -606,27 +609,6 @@ async fn attach_card_message(
     if let Err(error) = attached {
         tracing::warn!(%error, "Failed to attach test run message");
     }
-}
-
-fn started_text(run: &TestRun) -> String {
-    let scope = match run.args.as_deref() {
-        Some(args) if !args.is_empty() => args.to_string(),
-        _ => t!("telegram_bot.dialogues.tests.all_tests").to_string(),
-    };
-
-    MessageBuilder::new()
-        .bold(&t!("telegram_bot.dialogues.tests.started").to_string())
-        .empty_line()
-        .with_html_escape(true)
-        .section_code(
-            &t!("telegram_bot.test_run.branch").to_string(),
-            &run.git_ref,
-        )
-        .section_code(
-            &t!("telegram_bot.dialogues.tests.scope").to_string(),
-            &scope,
-        )
-        .build()
 }
 
 async fn show_report(
@@ -925,30 +907,16 @@ async fn rerun_failed(
         }
     };
 
-    let text = MessageBuilder::new()
-        .bold(
-            &t!(
-                "telegram_bot.dialogues.tests.rerun_started",
-                count = response.failures_count
-            )
-            .to_string(),
-        )
-        .empty_line()
-        .with_html_escape(true)
-        .section_code(
-            &t!("telegram_bot.test_run.branch").to_string(),
-            &response.run.git_ref,
-        )
-        .build();
-
-    bot.edit_message_text(chat_id, message_id, text)
-        .parse_mode(ParseMode::Html)
-        .reply_markup(refresh_keyboard())
-        .await?;
-
     attach_card_message(executors, &response.run, chat_id, message_id).await;
 
-    Ok(())
+    render_card(
+        bot,
+        executors,
+        chat_id,
+        message_id,
+        RepositoryId(repository_id),
+    )
+    .await
 }
 
 async fn cancel_run(
@@ -1616,15 +1584,6 @@ fn back_keyboard() -> InlineKeyboardMarkup {
     InlineKeyboardMarkup::new(vec![vec![InlineKeyboardButton::callback(
         TelegramBotTestsAction::Back.label(),
         TelegramBotTestsAction::Back.to_callback_data().to_string(),
-    )]])
-}
-
-fn refresh_keyboard() -> InlineKeyboardMarkup {
-    InlineKeyboardMarkup::new(vec![vec![InlineKeyboardButton::callback(
-        TelegramBotTestsAction::Refresh.label(),
-        TelegramBotTestsAction::Refresh
-            .to_callback_data()
-            .to_string(),
     )]])
 }
 

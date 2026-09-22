@@ -10,15 +10,12 @@ use crate::bootstrap::executors::ApplicationBoostrapExecutors;
 use crate::bootstrap::shared_dependency::ApplicationSharedDependency;
 use crate::config::application::ApplicationConfig;
 use crate::delivery::contract::ApplicationDelivery;
-use crate::delivery::jobs::consumers::send_social_notify::payload::SendSocialNotifyJob;
 use crate::delivery::notifications::test_run::{
-    build_test_run_message, build_test_run_report_url, deliver_test_run_update,
-    resolve_test_run_chat_id,
+    build_test_run_card, deliver_test_run_update, resolve_test_run_chat_id,
 };
 use crate::domain::notification::services::notification_service::NotificationService;
 use crate::domain::shared::command::CommandExecutor;
 use crate::domain::user::value_objects::social_chat_id::SocialChatId;
-use crate::domain::user::value_objects::social_type::SocialType;
 use async_trait::async_trait;
 use chrono::{Timelike, Utc};
 use std::error::Error;
@@ -285,7 +282,7 @@ impl ApplicationDelivery for DeliveryScheduler {
 
         scheduler
             .add(
-                Job::new_async("30 * * * * *", move |_uuid, _lock| {
+                Job::new_async("*/20 * * * * *", move |_uuid, _lock| {
                     let executors = test_runs_executors.clone();
                     let shared_dependency = test_runs_shared.clone();
 
@@ -307,26 +304,28 @@ impl ApplicationDelivery for DeliveryScheduler {
                             }
                         };
 
-                        // Прогон завершился, а вебхука не было — сообщаем сами
-                        for run in response.finished {
+                        // Карточку держим живой: пока прогон идёт, обновляем её сами
+                        for run in response.active.iter().chain(response.finished.iter()) {
                             let chat_id = resolve_test_run_chat_id(
                                 &shared_dependency.repository_repo,
-                                &run,
+                                run,
                                 test_runs_default_chat_id,
                             )
                             .await;
-                            let report_url = build_test_run_report_url(
-                                &executors.queries.build_test_report,
-                                &run,
+                            let (message, keyboard) = build_test_run_card(
+                                &shared_dependency.repository_repo,
+                                &executors.queries.get_test_run_progress,
+                                run,
                             )
                             .await;
 
                             deliver_test_run_update(
                                 &notification_service,
                                 &shared_dependency.publisher,
-                                &run,
+                                run,
                                 chat_id,
-                                build_test_run_message(&run, report_url.as_deref()),
+                                message,
+                                Some(keyboard),
                             )
                             .await;
                         }

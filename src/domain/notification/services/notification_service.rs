@@ -28,6 +28,15 @@ pub enum NotificationServiceEditMessageError {
     Transport(String),
 }
 
+/// Кнопка сообщения: текст и действие, которое уйдёт обратно в бота
+pub struct NotificationButton {
+    pub label: String,
+    pub action: String,
+}
+
+/// Строки кнопок под сообщением
+pub type NotificationKeyboard = Vec<Vec<NotificationButton>>;
+
 pub enum NotificationServiceParseMode {
     Html,
     Markdown,
@@ -49,11 +58,13 @@ pub trait NotificationService: Send + Sync {
         message_id: &SocialMessageId,
     ) -> Result<(), NotificationServiceDeleteMessageError>;
 
+    /// Кнопки передаются каждый раз: без них мессенджер уберёт клавиатуру
     async fn edit_message(
         &self,
         social_type: &SocialType,
         chat_id: &SocialChatId,
         message_id: &SocialMessageId,
         message: &MessageBuilder,
+        keyboard: Option<&NotificationKeyboard>,
     ) -> Result<(), NotificationServiceEditMessageError>;
 }

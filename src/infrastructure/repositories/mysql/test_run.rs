@@ -21,9 +21,6 @@ use sea_orm::{
 };
 use std::sync::Arc;
 
-/// Прогоны старше этого срока планировщик считает зависшими и добирает их статус у CI
-const STALE_RUN_MINUTES: i64 = 1;
-
 pub struct MySQLTestRunRepository {
     pub db: Arc<DatabaseConnection>,
 }
@@ -238,16 +235,14 @@ impl TestRunRepository for MySQLTestRunRepository {
         Ok(counts)
     }
 
-    async fn find_stale_active(&self, limit: u64) -> Result<Vec<TestRun>, FindTestRunError> {
+    async fn find_all_active(&self, limit: u64) -> Result<Vec<TestRun>, FindTestRunError> {
         let active_statuses = [
             TestRunStatus::Queued.as_str(),
             TestRunStatus::Running.as_str(),
         ];
-        let threshold = chrono::Utc::now() - chrono::Duration::minutes(STALE_RUN_MINUTES);
 
         let models = test_runs::Entity::find()
             .filter(test_runs::Column::Status.is_in(active_statuses))
-            .filter(test_runs::Column::UpdatedAt.lt(threshold))
             .order_by_asc(test_runs::Column::UpdatedAt)
             .limit(limit)
             .all(self.db.as_ref())

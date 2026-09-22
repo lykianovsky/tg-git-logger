@@ -1,5 +1,8 @@
 use crate::delivery::bot::telegram::keyboards::actions::TelegramBotKeyboardAction;
 use crate::delivery::bot::telegram::keyboards::actions::tests::TelegramBotTestsAction;
+use crate::domain::notification::services::notification_service::{
+    NotificationButton, NotificationKeyboard,
+};
 use crate::domain::test_run::entities::test_run::TestRun;
 use crate::domain::test_run::ports::test_runner::TestRunProgress;
 use crate::utils::builder::message::MessageBuilder;
@@ -130,56 +133,83 @@ pub fn build_card_text(
 }
 
 pub fn build_card_keyboard(run: Option<&TestRun>, is_configured: bool) -> InlineKeyboardMarkup {
-    let mut rows: Vec<Vec<InlineKeyboardButton>> = Vec::new();
+    InlineKeyboardMarkup::new(
+        card_actions(run, is_configured)
+            .into_iter()
+            .map(|row| row.into_iter().map(button).collect::<Vec<_>>())
+            .collect::<Vec<_>>(),
+    )
+}
+
+/// Та же клавиатура для автообновления карточки: иначе кнопки пропадут
+pub fn build_card_notification_keyboard(
+    run: Option<&TestRun>,
+    is_configured: bool,
+) -> NotificationKeyboard {
+    card_actions(run, is_configured)
+        .into_iter()
+        .map(|row| {
+            row.into_iter()
+                .map(|action| NotificationButton {
+                    label: action.label().to_string(),
+                    action: action.to_callback_data().to_string(),
+                })
+                .collect()
+        })
+        .collect()
+}
+
+fn card_actions(run: Option<&TestRun>, is_configured: bool) -> Vec<Vec<TelegramBotTestsAction>> {
+    let mut rows: Vec<Vec<TelegramBotTestsAction>> = Vec::new();
 
     // Пока тесты не подключены, запускать нечего — предлагаем настройку
     if !is_configured {
-        return InlineKeyboardMarkup::new(vec![
-            vec![button(TelegramBotTestsAction::Connect)],
-            vec![button(TelegramBotTestsAction::Close)],
-        ]);
+        return vec![
+            vec![TelegramBotTestsAction::Connect],
+            vec![TelegramBotTestsAction::Close],
+        ];
     }
 
     if let Some(run) = run {
         // Пока прогон идёт, итогов и отчёта ещё нет — показываем только обновление
         if run.is_active() {
-            rows.push(vec![
-                button(TelegramBotTestsAction::Refresh),
-                button(TelegramBotTestsAction::CancelRun),
-            ]);
-            rows.push(vec![button(TelegramBotTestsAction::Close)]);
-
-            return InlineKeyboardMarkup::new(rows);
+            return vec![
+                vec![
+                    TelegramBotTestsAction::Refresh,
+                    TelegramBotTestsAction::CancelRun,
+                ],
+                vec![TelegramBotTestsAction::Close],
+            ];
         }
 
-        let mut result_row = vec![button(TelegramBotTestsAction::Report)];
+        let mut result_row = vec![TelegramBotTestsAction::Report];
 
         if run.has_failures() {
-            result_row.push(button(TelegramBotTestsAction::Failures));
+            result_row.push(TelegramBotTestsAction::Failures);
         }
 
         rows.push(result_row);
 
         // Гонять весь набор ради двух упавших незачем
         if run.has_failures() {
-            rows.push(vec![button(TelegramBotTestsAction::RerunFailed)]);
+            rows.push(vec![TelegramBotTestsAction::RerunFailed]);
         }
     }
 
     rows.push(vec![
-        button(TelegramBotTestsAction::RunAll),
-        button(TelegramBotTestsAction::ChooseBlock),
+        TelegramBotTestsAction::RunAll,
+        TelegramBotTestsAction::ChooseBlock,
     ]);
     rows.push(vec![
-        button(TelegramBotTestsAction::Readiness),
-        button(TelegramBotTestsAction::Dashboard),
+        TelegramBotTestsAction::Readiness,
+        TelegramBotTestsAction::Dashboard,
     ]);
     rows.push(vec![
-        button(TelegramBotTestsAction::Refresh),
-        button(TelegramBotTestsAction::Close),
+        TelegramBotTestsAction::Refresh,
+        TelegramBotTestsAction::Close,
     ]);
 
-    InlineKeyboardMarkup::new(rows)
+    rows
 }
 
 fn button(action: TelegramBotTestsAction) -> InlineKeyboardButton {

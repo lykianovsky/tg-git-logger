@@ -1,7 +1,12 @@
-use crate::application::test_run::queries::build_test_report::executor::BuildTestReportExecutor;
-use crate::application::test_run::queries::build_test_report::query::BuildTestReportQuery;
+use crate::application::test_run::queries::get_test_run_progress::executor::GetTestRunProgressExecutor;
+use crate::application::test_run::queries::get_test_run_progress::query::GetTestRunProgressQuery;
+use crate::delivery::bot::telegram::dialogues::tests::card::{
+    build_card_notification_keyboard, build_card_text,
+};
 use crate::delivery::jobs::consumers::send_social_notify::payload::SendSocialNotifyJob;
-use crate::domain::notification::services::notification_service::NotificationService;
+use crate::domain::notification::services::notification_service::{
+    NotificationKeyboard, NotificationService,
+};
 use crate::domain::repository::repositories::repository_repository::RepositoryRepository;
 use crate::domain::shared::command::CommandExecutor;
 use crate::domain::test_run::entities::test_run::TestRun;
@@ -10,48 +15,7 @@ use crate::domain::user::value_objects::social_message_id::SocialMessageId;
 use crate::domain::user::value_objects::social_type::SocialType;
 use crate::infrastructure::drivers::message_broker::contracts::publisher::MessageBrokerPublisher;
 use crate::utils::builder::message::MessageBuilder;
-use rust_i18n::t;
 use std::sync::Arc;
-
-/// Итог прогона уходит одинаково и из вебхука, и из синхронизации по расписанию —
-/// поэтому текст и выбор чата живут в одном месте
-pub fn build_test_run_message(run: &TestRun, report_url: Option<&str>) -> MessageBuilder {
-    let totals = run.totals.unwrap_or_default();
-    let status_key = format!("report.test_run.status.{}", run.status.as_str());
-
-    let mut builder = MessageBuilder::new()
-        .bold(&t!(&status_key).to_string())
-        .empty_line()
-        .with_html_escape(true)
-        .section_code(
-            &t!("telegram_bot.test_run.branch").to_string(),
-            &run.git_ref,
-        );
-
-    if let Some(args) = run.args.as_deref() {
-        builder = builder.section_code(&t!("telegram_bot.dialogues.tests.scope").to_string(), args);
-    }
-
-    builder = builder.section(
-        &t!("telegram_bot.test_run.totals").to_string(),
-        &t!(
-            "telegram_bot.test_run.totals_value",
-            passed = totals.passed,
-            failed = totals.failed,
-            flaky = totals.flaky,
-            skipped = totals.skipped
-        )
-        .to_string(),
-    );
-
-    if let Some(url) = report_url {
-        builder = builder
-            .empty_line()
-            .link(&t!("telegram_bot.test_run.report").to_string(), url);
-    }
-
-    builder
-}
 
 /// Запуск из чата отвечает в тот же чат, ночной прогон — в чат репозитория
 pub async fn resolve_test_run_chat_id(
@@ -75,6 +39,34 @@ pub async fn resolve_test_run_chat_id(
         .unwrap_or(default_chat_id)
 }
 
+/// Карточка прогона для автообновления: тот же вид, что и в чате
+pub async fn build_test_run_card(
+    repository_repo: &Arc<dyn RepositoryRepository>,
+    get_test_run_progress: &Arc<GetTestRunProgressExecutor>,
+    run: &TestRun,
+) -> (MessageBuilder, NotificationKeyboard) {
+    let repository_title = repository_repo
+        .find_by_id(run.repository_id)
+        .await
+        .map(|repository| format!("{}/{}", repository.owner, repository.name))
+        .unwrap_or_default();
+
+    // Прогресс есть только у идущего прогона, и он стоит запроса в CI
+    let progress = match run.is_active() {
+        true => get_test_run_progress
+            .execute(&GetTestRunProgressQuery { run: run.clone() })
+            .await
+            .ok()
+            .and_then(|response| response.progress),
+        false => None,
+    };
+
+    let text = build_card_text(Some(run), true, &repository_title, progress.as_ref());
+    let keyboard = build_card_notification_keyboard(Some(run), true);
+
+    (MessageBuilder::new().raw(&text), keyboard)
+}
+
 /// Пока прогон идёт, бот переписывает свою карточку: жать «Обновить» не нужно.
 /// Если карточки нет (ночной прогон), отправляем обычное сообщение
 pub async fn deliver_test_run_update(
@@ -83,6 +75,7 @@ pub async fn deliver_test_run_update(
     run: &TestRun,
     chat_id: SocialChatId,
     message: MessageBuilder,
+    keyboard: Option<NotificationKeyboard>,
 ) {
     if let Some(message_id) = run.message_id {
         let edited = notification_service
@@ -91,6 +84,7 @@ pub async fn deliver_test_run_update(
                 &chat_id,
                 &SocialMessageId(message_id),
                 &message,
+                keyboard.as_ref(),
             )
             .await;
 
@@ -110,18 +104,4 @@ pub async fn deliver_test_run_update(
         })
         .await
         .ok();
-}
-
-pub async fn build_test_run_report_url(
-    build_test_report: &Arc<BuildTestReportExecutor>,
-    run: &TestRun,
-) -> Option<String> {
-    build_test_report
-        .execute(&BuildTestReportQuery {
-            test_run_id: run.id,
-        })
-        .await
-        .map(|response| response.report_url)
-        .inspect_err(|error| tracing::error!(%error, "Failed to build test report"))
-        .ok()
 }

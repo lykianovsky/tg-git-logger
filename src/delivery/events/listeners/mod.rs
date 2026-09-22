@@ -98,10 +98,10 @@ impl ApplicationDelivery for DeliveryEventListeners {
             .on(WebhookTestRunResultListener {
                 publisher: self.shared_dependency.publisher.clone(),
                 ingest_test_run_result: self.executors.commands.ingest_test_run_result.clone(),
-                build_test_report: self.executors.queries.build_test_report.clone(),
                 repository_repo: repository_repo.clone(),
                 default_chat_id,
                 notification_service: self.shared_dependency.notification_service.clone(),
+                get_test_run_progress: self.executors.queries.get_test_run_progress.clone(),
             })
             .await;
 

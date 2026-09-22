@@ -15,7 +15,7 @@ use std::sync::Arc;
 use teloxide::dispatching::DpHandlerDescription;
 use teloxide::dptree::case;
 use teloxide::prelude::*;
-use teloxide::types::{InlineKeyboardMarkup, ParseMode};
+use teloxide::types::ParseMode;
 use teloxide::{Bot, dptree};
 
 #[derive(Debug, Clone, Default)]

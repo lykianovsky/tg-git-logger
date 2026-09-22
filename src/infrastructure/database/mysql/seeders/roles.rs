@@ -4,7 +4,6 @@ use crate::infrastructure::database::seeder::{Seeder, SeederRunError};
 use async_trait::async_trait;
 use sea_orm::ColumnTrait;
 use sea_orm::QueryFilter;
-use sea_orm::sea_query::OnConflict;
 use sea_orm::{DatabaseConnection, EntityTrait, IntoActiveModel};
 
 pub struct MySQLRolesSeeder<'a> {

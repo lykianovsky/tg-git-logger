@@ -1,5 +1,5 @@
 use crate::domain::notification::services::notification_service::{
-    NotificationService, NotificationServiceDeleteMessageError,
+    NotificationKeyboard, NotificationService, NotificationServiceDeleteMessageError,
     NotificationServiceEditMessageError, NotificationServiceSendError,
 };
 use crate::domain::user::value_objects::social_chat_id::SocialChatId;
@@ -60,11 +60,12 @@ impl NotificationService for CompositionNotificationService {
         chat_id: &SocialChatId,
         message_id: &SocialMessageId,
         message: &MessageBuilder,
+        keyboard: Option<&NotificationKeyboard>,
     ) -> Result<(), NotificationServiceEditMessageError> {
         match social_type {
             SocialType::Telegram => {
                 self.telegram
-                    .edit_message(social_type, chat_id, message_id, message)
+                    .edit_message(social_type, chat_id, message_id, message, keyboard)
                     .await
             }
         }

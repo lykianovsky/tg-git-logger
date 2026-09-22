@@ -34,13 +34,11 @@ impl CommandExecutor for SyncStaleTestRunsExecutor {
     type Error = SyncStaleTestRunsError;
 
     async fn execute(&self, _cmd: &Self::Command) -> Result<Self::Response, Self::Error> {
-        let stale = self
-            .test_run_repo
-            .find_stale_active(STALE_RUNS_LIMIT)
-            .await?;
+        let running = self.test_run_repo.find_all_active(STALE_RUNS_LIMIT).await?;
         let mut finished = Vec::new();
+        let mut active = Vec::new();
 
-        for run in stale {
+        for run in running {
             let ingested = self
                 .ingest_test_run_result
                 .execute(&IngestTestRunResultCommand {
@@ -51,8 +49,8 @@ impl CommandExecutor for SyncStaleTestRunsExecutor {
                 .await;
 
             match ingested {
-                // Прогон всё ещё идёт — итоги заберём на следующем заходе
-                Ok(response) if response.run.is_active() => {}
+                // Прогон всё ещё идёт — обновим карточку и вернёмся к нему позже
+                Ok(response) if response.run.is_active() => active.push(response.run),
                 Ok(response) => finished.push(response.run),
                 Err(error) => {
                     tracing::warn!(%error, run_tag = %run.run_tag, "Failed to sync stale test run");
@@ -60,6 +58,6 @@ impl CommandExecutor for SyncStaleTestRunsExecutor {
             }
         }
 
-        Ok(SyncStaleTestRunsResponse { finished })
+        Ok(SyncStaleTestRunsResponse { finished, active })
     }
 }

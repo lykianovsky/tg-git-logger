@@ -4,7 +4,7 @@ use crate::application::user_preferences::commands::update_user_preferences::com
     UpdateUserPreferencesExecutorCommand, UserPreferencesPatch,
 };
 use crate::bootstrap::executors::ApplicationBoostrapExecutors;
-use crate::delivery::bot::telegram::dialogues::helpers::{close_menu, edit_menu};
+use crate::delivery::bot::telegram::dialogues::helpers::edit_menu;
 use crate::delivery::bot::telegram::dialogues::{
     TelegramBotDialogueState, TelegramBotDialogueType,
 };

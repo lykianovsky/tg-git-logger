@@ -70,8 +70,8 @@ pub trait TestRunRepository: Send + Sync {
         since: chrono::DateTime<chrono::Utc>,
     ) -> Result<Vec<TestFailureCount>, FindTestRunError>;
 
-    /// Прогоны, по которым не пришёл вебхук, — их статус добирает планировщик
-    async fn find_stale_active(&self, limit: u64) -> Result<Vec<TestRun>, FindTestRunError>;
+    /// Все идущие прогоны: планировщик держит их карточки в актуальном состоянии
+    async fn find_all_active(&self, limit: u64) -> Result<Vec<TestRun>, FindTestRunError>;
 
     async fn mark_started(
         &self,
