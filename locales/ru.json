@@ -600,7 +600,12 @@
         "select_assignee": "На кого повесить карточку?",
         "select_tag": "Каким тегом пометить карточку?",
         "without_tag": "Без тега",
-        "tracker_options_error": "Не удалось получить данные из трекера."
+        "tracker_options_error": "Не удалось получить данные из трекера.",
+        "not_connected": "Тесты к этому репозиторию не подключены.",
+        "enter_workflow_file": "Пришлите имя workflow-файла в .github/workflows (например e2e.yml):",
+        "enter_default_ref": "Пришлите ветку, которую тестируем по умолчанию (например dev):",
+        "connected": "🔌 Тесты подключены",
+        "connect_error": "Не удалось подключить тесты."
       }
     },
     "test_run": {

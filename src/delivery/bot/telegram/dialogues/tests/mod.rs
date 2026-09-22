@@ -3,6 +3,7 @@ pub mod card;
 use crate::application::task::queries::list_task_tracker_options::error::ListTaskTrackerOptionsError;
 use crate::application::task::queries::list_task_tracker_options::query::ListTaskTrackerOptionsQuery;
 use crate::application::task::queries::list_task_tracker_options::response::TaskTrackerOption;
+use crate::application::test_run::commands::connect_test_suite::command::ConnectTestSuiteCommand;
 use crate::application::test_run::commands::create_test_failure_card::command::CreateTestFailureCardCommand;
 use crate::application::test_run::commands::create_test_failure_card::error::CreateTestFailureCardError;
 use crate::application::test_run::commands::create_test_failure_card::response::CreateTestFailureCardResponse;
@@ -30,14 +31,16 @@ use crate::utils::builder::message::MessageBuilder;
 use rust_i18n::t;
 use std::error::Error;
 use std::sync::Arc;
-use teloxide::Bot;
 use teloxide::dispatching::{DpHandlerDescription, UpdateFilterExt};
 use teloxide::dptree::{Handler, case};
 use teloxide::payloads::EditMessageTextSetters;
+use teloxide::payloads::SendMessageSetters;
 use teloxide::prelude::{Requester, Update};
 use teloxide::types::{
-    CallbackQuery, ChatId, InlineKeyboardButton, InlineKeyboardMarkup, MessageId, ParseMode,
+    CallbackQuery, ChatId, InlineKeyboardButton, InlineKeyboardMarkup, Message, MessageId,
+    ParseMode,
 };
+use teloxide::{Bot, dptree};
 
 /// Кнопка запуска блока несёт его путь, поэтому у неё свой префикс —
 /// иначе путь не отличить от имени действия
@@ -64,6 +67,17 @@ pub enum TelegramBotTestsState {
         repository_id: i32,
     },
 
+    /// Шаг 1 подключения: файл процесса CI
+    EnterWorkflowFile {
+        repository_id: i32,
+    },
+
+    /// Шаг 2 подключения: ветка, которую тестируем по умолчанию
+    EnterDefaultRef {
+        repository_id: i32,
+        workflow_file: String,
+    },
+
     /// Шаг 1 формы карточки: на кого её повесить
     SelectCardAssignee {
         repository_id: i32,
@@ -83,7 +97,20 @@ pub struct TelegramBotTestsDispatcher {}
 impl TelegramBotTestsDispatcher {
     pub fn new() -> Handler<'static, Result<(), Box<dyn Error + Send + Sync>>, DpHandlerDescription>
     {
-        Update::filter_callback_query()
+        let messages = Update::filter_message()
+            .branch(
+                case![TelegramBotTestsState::EnterWorkflowFile { repository_id }]
+                    .endpoint(enter_workflow_file),
+            )
+            .branch(
+                case![TelegramBotTestsState::EnterDefaultRef {
+                    repository_id,
+                    workflow_file
+                }]
+                .endpoint(enter_default_ref),
+            );
+
+        let callbacks = Update::filter_callback_query()
             .branch(case![TelegramBotTestsState::SelectRepository].endpoint(choose_repository))
             .branch(case![TelegramBotTestsState::Card { repository_id }].endpoint(handle_card))
             .branch(
@@ -103,7 +130,9 @@ impl TelegramBotTestsDispatcher {
                     responsible_id
                 }]
                 .endpoint(choose_card_tag),
-            )
+            );
+
+        dptree::entry().branch(callbacks).branch(messages)
     }
 }
 
@@ -115,18 +144,29 @@ pub async fn render_card(
     message_id: MessageId,
     repository_id: RepositoryId,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
-    let run = executors
+    let response = executors
         .queries
         .get_last_test_run
         .execute(&GetLastTestRunQuery { repository_id })
-        .await
-        .map(|response| response.run)
-        .unwrap_or_default();
+        .await;
 
-    bot.edit_message_text(chat_id, message_id, build_card_text(run.as_ref()))
-        .parse_mode(ParseMode::Html)
-        .reply_markup(build_card_keyboard(run.as_ref()))
-        .await?;
+    let (run, is_configured) = match response {
+        Ok(response) => (response.run, response.is_configured),
+        Err(error) => {
+            tracing::error!(%error, "Failed to load last test run");
+
+            (None, true)
+        }
+    };
+
+    bot.edit_message_text(
+        chat_id,
+        message_id,
+        build_card_text(run.as_ref(), is_configured),
+    )
+    .parse_mode(ParseMode::Html)
+    .reply_markup(build_card_keyboard(run.as_ref(), is_configured))
+    .await?;
 
     Ok(())
 }
@@ -241,6 +281,22 @@ async fn handle_card(
                 repository_id,
             )
             .await?
+        }
+
+        TelegramBotTestsAction::Connect => {
+            dialogue
+                .update(TelegramBotDialogueState::Tests(
+                    TelegramBotTestsState::EnterWorkflowFile { repository_id },
+                ))
+                .await?;
+
+            bot.edit_message_text(
+                chat_id,
+                message_id,
+                t!("telegram_bot.dialogues.tests.enter_workflow_file").to_string(),
+            )
+            .reply_markup(InlineKeyboardMarkup::default())
+            .await?;
         }
 
         TelegramBotTestsAction::Back => {
@@ -562,6 +618,98 @@ async fn show_failures(
         .await?;
 
     Ok(())
+}
+
+async fn enter_workflow_file(
+    bot: Bot,
+    dialogue: TelegramBotDialogueType,
+    message: Message,
+    repository_id: i32,
+) -> Result<(), Box<dyn Error + Send + Sync>> {
+    let Some(workflow_file) = message
+        .text()
+        .map(str::trim)
+        .filter(|text| !text.is_empty())
+    else {
+        return Ok(());
+    };
+
+    dialogue
+        .update(TelegramBotDialogueState::Tests(
+            TelegramBotTestsState::EnterDefaultRef {
+                repository_id,
+                workflow_file: workflow_file.to_string(),
+            },
+        ))
+        .await?;
+
+    bot.send_message(
+        message.chat.id,
+        t!("telegram_bot.dialogues.tests.enter_default_ref").to_string(),
+    )
+    .await?;
+
+    Ok(())
+}
+
+async fn enter_default_ref(
+    bot: Bot,
+    dialogue: TelegramBotDialogueType,
+    executors: Arc<ApplicationBoostrapExecutors>,
+    message: Message,
+    (repository_id, workflow_file): (i32, String),
+) -> Result<(), Box<dyn Error + Send + Sync>> {
+    let Some(default_ref) = message
+        .text()
+        .map(str::trim)
+        .filter(|text| !text.is_empty())
+    else {
+        return Ok(());
+    };
+
+    let connected = executors
+        .commands
+        .connect_test_suite
+        .execute(&ConnectTestSuiteCommand {
+            repository_id: RepositoryId(repository_id),
+            workflow_file,
+            default_ref: default_ref.to_string(),
+        })
+        .await;
+
+    if let Err(error) = connected {
+        tracing::error!(%error, "Failed to connect test suite");
+
+        bot.send_message(
+            message.chat.id,
+            t!("telegram_bot.dialogues.tests.connect_error").to_string(),
+        )
+        .await?;
+
+        return Ok(());
+    }
+
+    dialogue
+        .update(TelegramBotDialogueState::Tests(
+            TelegramBotTestsState::Card { repository_id },
+        ))
+        .await?;
+
+    let sent = bot
+        .send_message(
+            message.chat.id,
+            t!("telegram_bot.dialogues.tests.connected").to_string(),
+        )
+        .await?;
+
+    render_card(
+        &bot,
+        &executors,
+        sent.chat.id,
+        sent.id,
+        RepositoryId(repository_id),
+    )
+    .await
 }
 
 /// Шаг 1: список людей из трекера. Ничего не зашиваем — состав команды меняется

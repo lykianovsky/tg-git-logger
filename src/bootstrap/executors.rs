@@ -36,6 +36,7 @@ use crate::application::repository::queries::get_all_repositories::executor::Get
 use crate::application::task::commands::move_task_to_test::executor::MoveTaskToTestExecutor;
 use crate::application::task::queries::get_task_card::executor::GetTaskCardExecutor;
 use crate::application::task::queries::list_task_tracker_options::executor::ListTaskTrackerOptionsExecutor;
+use crate::application::test_run::commands::connect_test_suite::executor::ConnectTestSuiteExecutor;
 use crate::application::test_run::commands::create_test_failure_card::executor::CreateTestFailureCardExecutor;
 use crate::application::test_run::commands::dispatch_test_run::executor::DispatchTestRunExecutor;
 use crate::application::test_run::commands::ingest_test_run_result::executor::IngestTestRunResultExecutor;
@@ -93,6 +94,7 @@ pub struct ApplicationBoostrapExecutorsQueries {
 }
 
 pub struct ApplicationBoostrapExecutorsCommands {
+    pub connect_test_suite: Arc<ConnectTestSuiteExecutor>,
     pub create_test_failure_card: Arc<CreateTestFailureCardExecutor>,
     pub dispatch_test_run: Arc<DispatchTestRunExecutor>,
     pub ingest_test_run_result: Arc<IngestTestRunResultExecutor>,
@@ -261,6 +263,7 @@ impl ApplicationBoostrapExecutors {
 
             get_last_test_run: Arc::new(GetLastTestRunExecutor::new(
                 shared_dependency.test_run_repo.clone(),
+                shared_dependency.test_suite_repo.clone(),
             )),
             get_run_failures: get_run_failures.clone(),
             list_test_blocks: Arc::new(ListTestBlocksExecutor::new(
@@ -281,6 +284,9 @@ impl ApplicationBoostrapExecutors {
         };
 
         let commands = ApplicationBoostrapExecutorsCommands {
+            connect_test_suite: Arc::new(ConnectTestSuiteExecutor::new(
+                shared_dependency.test_suite_repo.clone(),
+            )),
             create_test_failure_card: Arc::new(CreateTestFailureCardExecutor::new(
                 shared_dependency.test_run_repo.clone(),
                 shared_dependency.test_failure_card_repo.clone(),

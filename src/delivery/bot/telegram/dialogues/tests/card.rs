@@ -6,7 +6,11 @@ use rust_i18n::t;
 use teloxide::types::{InlineKeyboardButton, InlineKeyboardMarkup};
 
 /// Карточка последнего прогона: один и тот же вид для команды, обновления и итогов
-pub fn build_card_text(run: Option<&TestRun>) -> String {
+pub fn build_card_text(run: Option<&TestRun>, is_configured: bool) -> String {
+    if !is_configured {
+        return t!("telegram_bot.dialogues.tests.not_connected").to_string();
+    }
+
     let Some(run) = run else {
         return t!("telegram_bot.dialogues.tests.no_runs").to_string();
     };
@@ -55,8 +59,16 @@ pub fn build_card_text(run: Option<&TestRun>) -> String {
     builder.build()
 }
 
-pub fn build_card_keyboard(run: Option<&TestRun>) -> InlineKeyboardMarkup {
+pub fn build_card_keyboard(run: Option<&TestRun>, is_configured: bool) -> InlineKeyboardMarkup {
     let mut rows: Vec<Vec<InlineKeyboardButton>> = Vec::new();
+
+    // Пока тесты не подключены, запускать нечего — предлагаем настройку
+    if !is_configured {
+        return InlineKeyboardMarkup::new(vec![
+            vec![button(TelegramBotTestsAction::Connect)],
+            vec![button(TelegramBotTestsAction::Close)],
+        ]);
+    }
 
     if let Some(run) = run {
         // Пока прогон идёт, итогов и отчёта ещё нет — показываем только обновление

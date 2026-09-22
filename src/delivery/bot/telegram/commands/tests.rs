@@ -99,14 +99,21 @@ impl TelegramBotTestsCommandHandler {
         &self,
         repository_id: RepositoryId,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        let run = self
+        let response = self
             .executors
             .queries
             .get_last_test_run
             .execute(&GetLastTestRunQuery { repository_id })
-            .await
-            .map(|response| response.run)
-            .unwrap_or_default();
+            .await;
+
+        let (run, is_configured) = match response {
+            Ok(response) => (response.run, response.is_configured),
+            Err(error) => {
+                tracing::error!(%error, "Failed to load last test run");
+
+                (None, true)
+            }
+        };
 
         self.dialogue
             .update(TelegramBotDialogueState::Tests(
@@ -118,9 +125,12 @@ impl TelegramBotTestsCommandHandler {
 
         self.context
             .bot
-            .send_message(self.context.msg.chat.id, build_card_text(run.as_ref()))
+            .send_message(
+                self.context.msg.chat.id,
+                build_card_text(run.as_ref(), is_configured),
+            )
             .parse_mode(ParseMode::Html)
-            .reply_markup(build_card_keyboard(run.as_ref()))
+            .reply_markup(build_card_keyboard(run.as_ref(), is_configured))
             .await?;
 
         Ok(())
