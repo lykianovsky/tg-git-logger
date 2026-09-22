@@ -4,7 +4,7 @@ use crate::domain::test_run::entities::test_run::{
     NewTestRun, TestRun, TestRunOutcome, TestRunTotals,
 };
 use crate::domain::test_run::repositories::test_run_repository::{
-    CreateTestRunError, FindTestRunError, TestRunRepository, UpdateTestRunError,
+    CreateTestRunError, FindTestRunError, TestFailureCount, TestRunRepository, UpdateTestRunError,
 };
 use crate::domain::test_run::value_objects::run_tag::RunTag;
 use crate::domain::test_run::value_objects::test_fingerprint::TestFingerprint;
@@ -172,6 +172,70 @@ impl TestRunRepository for MySQLTestRunRepository {
             )),
             None => Ok(None),
         }
+    }
+
+    async fn list_recent(
+        &self,
+        repository_id: RepositoryId,
+        limit: u64,
+    ) -> Result<Vec<TestRun>, FindTestRunError> {
+        let models = test_runs::Entity::find()
+            .filter(test_runs::Column::RepositoryId.eq(repository_id.0))
+            .order_by_desc(test_runs::Column::Id)
+            .limit(limit)
+            .all(self.db.as_ref())
+            .await
+            .map_err(|error| FindTestRunError::DbError(error.to_string()))?;
+
+        Ok(models.into_iter().filter_map(Self::from_mysql).collect())
+    }
+
+    async fn count_failures_since(
+        &self,
+        repository_id: RepositoryId,
+        since: chrono::DateTime<chrono::Utc>,
+    ) -> Result<Vec<TestFailureCount>, FindTestRunError> {
+        // Падения живут рядом с прогонами, поэтому сначала берём прогоны за период
+        let run_ids: Vec<i32> = test_runs::Entity::find()
+            .filter(test_runs::Column::RepositoryId.eq(repository_id.0))
+            .filter(test_runs::Column::CreatedAt.gte(since))
+            .all(self.db.as_ref())
+            .await
+            .map_err(|error| FindTestRunError::DbError(error.to_string()))?
+            .into_iter()
+            .map(|run| run.id)
+            .collect();
+
+        if run_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let failures = test_run_failures::Entity::find()
+            .filter(test_run_failures::Column::TestRunId.is_in(run_ids))
+            .all(self.db.as_ref())
+            .await
+            .map_err(|error| FindTestRunError::DbError(error.to_string()))?;
+
+        let mut counts: Vec<TestFailureCount> = Vec::new();
+
+        for failure in failures {
+            match counts
+                .iter_mut()
+                .find(|item| item.title == failure.title && item.file == failure.file)
+            {
+                Some(item) => item.count += 1,
+                None => counts.push(TestFailureCount {
+                    project: failure.project,
+                    file: failure.file,
+                    title: failure.title,
+                    count: 1,
+                }),
+            }
+        }
+
+        counts.sort_by(|left, right| right.count.cmp(&left.count));
+
+        Ok(counts)
     }
 
     async fn find_stale_active(&self, limit: u64) -> Result<Vec<TestRun>, FindTestRunError> {

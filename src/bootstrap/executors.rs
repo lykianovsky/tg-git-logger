@@ -44,6 +44,7 @@ use crate::application::test_run::commands::dispatch_test_run::executor::Dispatc
 use crate::application::test_run::commands::ingest_test_run_result::executor::IngestTestRunResultExecutor;
 use crate::application::test_run::commands::rerun_failed_tests::executor::RerunFailedTestsExecutor;
 use crate::application::test_run::commands::sync_stale_test_runs::executor::SyncStaleTestRunsExecutor;
+use crate::application::test_run::queries::build_quality_dashboard::executor::BuildQualityDashboardExecutor;
 use crate::application::test_run::queries::build_test_report::executor::BuildTestReportExecutor;
 use crate::application::test_run::queries::get_last_test_run::executor::GetLastTestRunExecutor;
 use crate::application::test_run::queries::get_release_readiness::executor::GetReleaseReadinessExecutor;
@@ -99,6 +100,7 @@ pub struct ApplicationBoostrapExecutorsQueries {
     pub list_test_blocks: Arc<ListTestBlocksExecutor>,
     pub list_ci_options: Arc<ListCiOptionsExecutor>,
     pub build_test_report: Arc<BuildTestReportExecutor>,
+    pub build_quality_dashboard: Arc<BuildQualityDashboardExecutor>,
     pub list_task_tracker_options: Arc<ListTaskTrackerOptionsExecutor>,
 }
 
@@ -305,6 +307,13 @@ impl ApplicationBoostrapExecutors {
                 shared_dependency.test_run_repo.clone(),
                 shared_dependency.repository_repo.clone(),
                 get_run_failures,
+                config.base_url.clone(),
+                shared_dependency.cache.clone(),
+                config.secret.reversible_cipher_secret.clone(),
+            )),
+            build_quality_dashboard: Arc::new(BuildQualityDashboardExecutor::new(
+                shared_dependency.test_run_repo.clone(),
+                shared_dependency.repository_repo.clone(),
                 config.base_url.clone(),
                 shared_dependency.cache.clone(),
                 config.secret.reversible_cipher_secret.clone(),

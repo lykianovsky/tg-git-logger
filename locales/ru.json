@@ -97,6 +97,16 @@
       "generated_at": "сформирован %{value}",
       "duration_seconds": "%{value} с",
       "duration_minutes": "%{minutes} мин %{seconds} с"
+    },
+    "dashboard": {
+      "runs": "Прогонов",
+      "green_share": "Зелёных",
+      "failed_runs": "С падениями",
+      "duration": "Среднее время",
+      "trend": "Последние прогоны",
+      "top_failures": "Чаще всего падают",
+      "times": "Раз",
+      "empty": "Пока нет данных"
     }
   },
   "telegram_bot": {
@@ -627,7 +637,10 @@
           "no_data": "❔ Нет данных: тесты не прогонялись"
         },
         "readiness_blockers": "Мешают релизу — %{count}:",
-        "readiness_error": "Не удалось оценить готовность."
+        "readiness_error": "Не удалось оценить готовность.",
+        "dashboard_ready": "📈 Состояние качества",
+        "dashboard_link": "Открыть страницу →",
+        "dashboard_error": "Не удалось собрать страницу состояния."
       }
     },
     "test_run": {

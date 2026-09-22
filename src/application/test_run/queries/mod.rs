@@ -1,3 +1,4 @@
+pub mod build_quality_dashboard;
 pub mod build_test_report;
 pub mod get_last_test_run;
 pub mod get_release_readiness;

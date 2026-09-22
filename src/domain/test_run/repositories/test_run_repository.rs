@@ -27,6 +27,15 @@ pub enum UpdateTestRunError {
     DbError(String),
 }
 
+/// Сколько раз тест падал за период
+#[derive(Debug, Clone)]
+pub struct TestFailureCount {
+    pub project: String,
+    pub file: String,
+    pub title: String,
+    pub count: u32,
+}
+
 #[async_trait::async_trait]
 pub trait TestRunRepository: Send + Sync {
     async fn create(&self, run: &NewTestRun) -> Result<TestRun, CreateTestRunError>;
@@ -46,6 +55,20 @@ pub trait TestRunRepository: Send + Sync {
         &self,
         repository_id: RepositoryId,
     ) -> Result<Option<TestRun>, FindTestRunError>;
+
+    /// История прогонов репозитория: на ней строится дашборд качества
+    async fn list_recent(
+        &self,
+        repository_id: RepositoryId,
+        limit: u64,
+    ) -> Result<Vec<TestRun>, FindTestRunError>;
+
+    /// Падения за период, сгруппированные по тесту: показывают, что падает постоянно
+    async fn count_failures_since(
+        &self,
+        repository_id: RepositoryId,
+        since: chrono::DateTime<chrono::Utc>,
+    ) -> Result<Vec<TestFailureCount>, FindTestRunError>;
 
     /// Прогоны, по которым не пришёл вебхук, — их статус добирает планировщик
     async fn find_stale_active(&self, limit: u64) -> Result<Vec<TestRun>, FindTestRunError>;

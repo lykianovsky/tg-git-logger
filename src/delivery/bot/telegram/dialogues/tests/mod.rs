@@ -15,6 +15,7 @@ use crate::application::test_run::commands::dispatch_test_run::error::DispatchTe
 use crate::application::test_run::commands::ingest_test_run_result::command::IngestTestRunResultCommand;
 use crate::application::test_run::commands::rerun_failed_tests::command::RerunFailedTestsCommand;
 use crate::application::test_run::commands::rerun_failed_tests::error::RerunFailedTestsError;
+use crate::application::test_run::queries::build_quality_dashboard::query::BuildQualityDashboardQuery;
 use crate::application::test_run::queries::build_test_report::query::BuildTestReportQuery;
 use crate::application::test_run::queries::get_last_test_run::query::GetLastTestRunQuery;
 use crate::application::test_run::queries::get_release_readiness::query::GetReleaseReadinessQuery;
@@ -298,6 +299,10 @@ async fn handle_card(
                 social_user_id,
             )
             .await?
+        }
+
+        TelegramBotTestsAction::Dashboard => {
+            show_dashboard(&bot, &executors, chat_id, message_id, repository_id).await?
         }
 
         TelegramBotTestsAction::Readiness => {
@@ -726,6 +731,45 @@ async fn show_failures(
     bot.edit_message_text(chat_id, message_id, builder.build())
         .parse_mode(ParseMode::Html)
         .reply_markup(InlineKeyboardMarkup::new(rows))
+        .await?;
+
+    Ok(())
+}
+
+/// Страница состояния качества: тренд прогонов и что падает чаще всего
+async fn show_dashboard(
+    bot: &Bot,
+    executors: &Arc<ApplicationBoostrapExecutors>,
+    chat_id: ChatId,
+    message_id: MessageId,
+    repository_id: i32,
+) -> Result<(), Box<dyn Error + Send + Sync>> {
+    let text = match executors
+        .queries
+        .build_quality_dashboard
+        .execute(&BuildQualityDashboardQuery {
+            repository_id: RepositoryId(repository_id),
+        })
+        .await
+    {
+        Ok(response) => MessageBuilder::new()
+            .bold(&t!("telegram_bot.dialogues.tests.dashboard_ready").to_string())
+            .empty_line()
+            .link(
+                &t!("telegram_bot.dialogues.tests.dashboard_link").to_string(),
+                &response.dashboard_url,
+            )
+            .build(),
+        Err(error) => {
+            tracing::error!(%error, "Failed to build quality dashboard");
+
+            t!("telegram_bot.dialogues.tests.dashboard_error").to_string()
+        }
+    };
+
+    bot.edit_message_text(chat_id, message_id, text)
+        .parse_mode(ParseMode::Html)
+        .reply_markup(back_keyboard())
         .await?;
 
     Ok(())
