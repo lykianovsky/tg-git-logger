@@ -11,6 +11,7 @@ pub struct Model {
     pub repository_id: i32,
     pub space_id: i32,
     pub board_id: Option<i32>,
+    pub new_task_column_id: Option<i32>,
     pub qa_column_id: i32,
     pub review_column_id: i32,
     pub extract_pattern_regexp: String,

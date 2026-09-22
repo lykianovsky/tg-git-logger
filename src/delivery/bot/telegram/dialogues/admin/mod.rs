@@ -112,12 +112,21 @@ pub enum TelegramBotDialogueAdminState {
         board_id: i32,
         qa_column_id: i32,
     },
+    /// Колонка, в которую бот заводит новые задачи по упавшим тестам
+    ConfigureTaskTrackerSelectNewTaskColumn {
+        repository_id: i32,
+        space_id: i32,
+        board_id: i32,
+        qa_column_id: i32,
+        review_column_id: i32,
+    },
     ConfigureTaskTrackerEnterPattern {
         repository_id: i32,
         space_id: i32,
         board_id: i32,
         qa_column_id: i32,
         review_column_id: i32,
+        new_task_column_id: i32,
     },
 
     // ── Пинги ──────────────────────────────────────────────────────────────

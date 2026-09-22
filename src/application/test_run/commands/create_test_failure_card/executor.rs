@@ -95,17 +95,20 @@ impl CommandExecutor for CreateTestFailureCardExecutor {
                 CreateTestFailureCardError::TrackerNotConfigured
             })?;
 
-        // Доска и колонка берутся из настройки трекера репозитория — той же, по которой
-        // карточки переезжают при мерже
+        // Карточка заводится в колонку новых задач: QA-колонка — это то, куда задачи
+        // переезжают при мерже, а не то, куда попадают новые
         let board_id = tracker
             .board_id
+            .ok_or(CreateTestFailureCardError::TrackerNotConfigured)?;
+        let column_id = tracker
+            .new_task_column_id
             .ok_or(CreateTestFailureCardError::TrackerNotConfigured)?;
 
         let created = self
             .task_tracker_client
             .create_card(&NewTaskTrackerCard {
                 board_id,
-                column_id: tracker.qa_column_id,
+                column_id,
                 title: Self::build_title(&failure),
                 description: Self::build_description(&failure, &repository),
                 responsible_id: cmd.responsible_id,

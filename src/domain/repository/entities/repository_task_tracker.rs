@@ -9,6 +9,8 @@ pub struct RepositoryTaskTracker {
     pub space_id: i32,
     /// Доска, на которой живут колонки; нужна, чтобы создавать карточки
     pub board_id: Option<i32>,
+    /// Колонка новых задач: туда бот заводит карточки по упавшим тестам
+    pub new_task_column_id: Option<i32>,
     pub qa_column_id: i32,
     pub review_column_id: i32,
     pub extract_pattern_regexp: String,

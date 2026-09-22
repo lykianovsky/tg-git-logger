@@ -47,6 +47,8 @@ impl CommandExecutor for UpdateRepositoryTaskTrackerExecutor {
         let tracker = match existing {
             Ok(mut tracker) => {
                 tracker.space_id = cmd.space_id;
+                tracker.board_id = cmd.board_id;
+                tracker.new_task_column_id = cmd.new_task_column_id;
                 tracker.qa_column_id = cmd.qa_column_id;
                 tracker.review_column_id = cmd.review_column_id;
                 tracker.extract_pattern_regexp = cmd.extract_pattern_regexp.clone();
@@ -63,6 +65,7 @@ impl CommandExecutor for UpdateRepositoryTaskTrackerExecutor {
                     repository_id: cmd.repository_id,
                     space_id: cmd.space_id,
                     board_id: cmd.board_id,
+                    new_task_column_id: cmd.new_task_column_id,
                     qa_column_id: cmd.qa_column_id,
                     review_column_id: cmd.review_column_id,
                     extract_pattern_regexp: cmd.extract_pattern_regexp.clone(),
