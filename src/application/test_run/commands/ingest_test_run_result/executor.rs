@@ -1,4 +1,6 @@
-use crate::application::test_run::commands::ingest_test_run_result::command::IngestTestRunResultCommand;
+use crate::application::test_run::commands::ingest_test_run_result::command::{
+    IngestTestRunResultCommand, KnownTestRunState,
+};
 use crate::application::test_run::commands::ingest_test_run_result::error::IngestTestRunResultError;
 use crate::application::test_run::commands::ingest_test_run_result::response::IngestTestRunResultResponse;
 use crate::application::test_run::service::ci_token::CiTokenResolver;
@@ -57,6 +59,19 @@ impl IngestTestRunResultExecutor {
             .collect()
     }
 
+    /// Вебхук уже принёс состояние прогона — в CI за ним не ходим
+    fn outcome_from_known(known: &KnownTestRunState) -> TestRunOutcome {
+        TestRunOutcome {
+            status: TestRunStatus::from_provider(&known.status, known.conclusion.as_deref()),
+            provider_run_id: Some(known.provider_run_id),
+            run_url: known.run_url.clone(),
+            sha: known.sha.clone(),
+            started_at: known.started_at,
+            finished_at: known.finished_at,
+            totals: None,
+        }
+    }
+
     /// Итоги отчёта точнее статуса CI: шаг сборки мог упасть уже после тестов
     fn resolve_status(outcome: &TestRunOutcome) -> TestRunStatus {
         if outcome.status == TestRunStatus::Cancelled {
@@ -89,10 +104,14 @@ impl CommandExecutor for IngestTestRunResultExecutor {
             .resolve_or_background(run.requested_by_user_id)
             .await?;
 
-        let mut outcome = self
-            .test_runner
-            .find_run_by_tag(&actor.token, &suite, &cmd.run_tag)
-            .await?;
+        let mut outcome = match cmd.known_state.as_ref() {
+            Some(known) => Self::outcome_from_known(known),
+            None => {
+                self.test_runner
+                    .find_run_by_tag(&actor.token, &suite, &cmd.run_tag)
+                    .await?
+            }
+        };
 
         // Прогон ещё идёт: запоминаем ссылку на него, итоги придут следующим вебхуком
         if outcome.status.is_active() {

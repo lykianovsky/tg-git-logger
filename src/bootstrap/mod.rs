@@ -131,7 +131,7 @@ impl ApplicationBootstrap {
         });
 
         let scheduler_handle = tokio::spawn(async move {
-            DeliveryScheduler::new(executors.clone(), config.clone())
+            DeliveryScheduler::new(executors.clone(), config.clone(), shared_dependency.clone())
                 .serve()
                 .await
                 .expect("Delivery scheduler error");

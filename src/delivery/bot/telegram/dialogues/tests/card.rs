@@ -68,6 +68,32 @@ pub fn build_card_text(
         );
     }
 
+    // Пока прогон идёт, полезнее видеть, сколько он уже длится
+    if run.is_active() {
+        let elapsed = chrono::Utc::now() - run.started_at.unwrap_or(run.created_at);
+
+        builder = builder.section(
+            &t!("telegram_bot.dialogues.tests.elapsed").to_string(),
+            &t!(
+                "telegram_bot.dialogues.tests.elapsed_value",
+                minutes = elapsed.num_minutes().max(0),
+                seconds = (elapsed.num_seconds().max(0)) % 60
+            )
+            .to_string(),
+        );
+    }
+
+    if let Some(run_url) = run.run_url.as_deref() {
+        builder = builder.empty_line().section(
+            &t!("telegram_bot.dialogues.tests.ci_run").to_string(),
+            &format!(
+                "<a href=\"{}\">{}</a>",
+                MessageBuilder::escape_html(run_url),
+                t!("report.test_run.run_in_ci")
+            ),
+        );
+    }
+
     builder.build()
 }
 

@@ -34,6 +34,18 @@ impl TestRunStatus {
         }
     }
 
+    /// Статус прогона по тому, что сообщает CI: пара «состояние + итог»
+    pub fn from_provider(status: &str, conclusion: Option<&str>) -> Self {
+        match (status, conclusion) {
+            ("completed", Some("success")) => Self::Passed,
+            ("completed", Some("cancelled")) => Self::Cancelled,
+            ("completed", Some(_)) => Self::Failed,
+            ("completed", None) => Self::Unknown,
+            ("queued" | "waiting" | "pending" | "requested", _) => Self::Queued,
+            _ => Self::Running,
+        }
+    }
+
     pub fn is_active(&self) -> bool {
         matches!(self, Self::Queued | Self::Running)
     }

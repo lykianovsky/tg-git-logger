@@ -38,26 +38,28 @@ impl CommandExecutor for SyncStaleTestRunsExecutor {
             .test_run_repo
             .find_stale_active(STALE_RUNS_LIMIT)
             .await?;
-        let mut synced_count = 0;
+        let mut finished = Vec::new();
 
         for run in stale {
             let ingested = self
                 .ingest_test_run_result
                 .execute(&IngestTestRunResultCommand {
                     run_tag: run.run_tag.clone(),
+                    // Вебхука не было — состояние добираем запросом в CI
+                    known_state: None,
                 })
                 .await;
 
             match ingested {
-                // Прогон всё ещё идёт — вебхук может прийти позже, ничего не делаем
+                // Прогон всё ещё идёт — итоги заберём на следующем заходе
                 Ok(response) if response.run.is_active() => {}
-                Ok(_) => synced_count += 1,
+                Ok(response) => finished.push(response.run),
                 Err(error) => {
                     tracing::warn!(%error, run_tag = %run.run_tag, "Failed to sync stale test run");
                 }
             }
         }
 
-        Ok(SyncStaleTestRunsResponse { synced_count })
+        Ok(SyncStaleTestRunsResponse { finished })
     }
 }

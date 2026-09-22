@@ -9,6 +9,7 @@ use crate::application::test_run::commands::create_test_failure_card::error::Cre
 use crate::application::test_run::commands::create_test_failure_card::response::CreateTestFailureCardResponse;
 use crate::application::test_run::commands::dispatch_test_run::command::DispatchTestRunCommand;
 use crate::application::test_run::commands::dispatch_test_run::error::DispatchTestRunError;
+use crate::application::test_run::commands::ingest_test_run_result::command::IngestTestRunResultCommand;
 use crate::application::test_run::queries::build_test_report::query::BuildTestReportQuery;
 use crate::application::test_run::queries::get_last_test_run::query::GetLastTestRunQuery;
 use crate::application::test_run::queries::get_run_failures::query::GetRunFailuresQuery;
@@ -147,6 +148,9 @@ pub async fn render_card(
     message_id: MessageId,
     repository_id: RepositoryId,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
+    // Если вебхук не дошёл, статус идущего прогона добираем из CI прямо сейчас
+    refresh_active_run(executors, repository_id).await;
+
     let response = executors
         .queries
         .get_last_test_run
@@ -1202,6 +1206,37 @@ fn back_button() -> InlineKeyboardButton {
         TelegramBotTestsAction::Back.label(),
         TelegramBotTestsAction::Back.to_callback_data().to_string(),
     )
+}
+
+/// Статус активного прогона в базе может отставать от CI: обновляем его перед показом
+async fn refresh_active_run(
+    executors: &Arc<ApplicationBoostrapExecutors>,
+    repository_id: RepositoryId,
+) {
+    let Some(run) = executors
+        .queries
+        .get_last_test_run
+        .execute(&GetLastTestRunQuery { repository_id })
+        .await
+        .ok()
+        .and_then(|response| response.run)
+        .filter(TestRun::is_active)
+    else {
+        return;
+    };
+
+    let ingested = executors
+        .commands
+        .ingest_test_run_result
+        .execute(&IngestTestRunResultCommand {
+            run_tag: run.run_tag,
+            known_state: None,
+        })
+        .await;
+
+    if let Err(error) = ingested {
+        tracing::warn!(%error, "Failed to refresh active test run");
+    }
 }
 
 async fn last_run(

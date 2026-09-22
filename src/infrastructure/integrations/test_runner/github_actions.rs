@@ -90,14 +90,7 @@ impl GithubActionsTestRunner {
         let status = run.get("status").and_then(Value::as_str).unwrap_or("");
         let conclusion = run.get("conclusion").and_then(Value::as_str);
 
-        let run_status = match (status, conclusion) {
-            ("completed", Some("success")) => TestRunStatus::Passed,
-            ("completed", Some("cancelled")) => TestRunStatus::Cancelled,
-            ("completed", Some(_)) => TestRunStatus::Failed,
-            ("completed", None) => TestRunStatus::Unknown,
-            ("queued" | "waiting" | "pending", _) => TestRunStatus::Queued,
-            _ => TestRunStatus::Running,
-        };
+        let run_status = TestRunStatus::from_provider(status, conclusion);
 
         TestRunOutcome {
             status: run_status,

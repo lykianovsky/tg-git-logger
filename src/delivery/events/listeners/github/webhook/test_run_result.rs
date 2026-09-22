@@ -1,8 +1,12 @@
-use crate::application::test_run::commands::ingest_test_run_result::command::IngestTestRunResultCommand;
+use crate::application::test_run::commands::ingest_test_run_result::command::{
+    IngestTestRunResultCommand, KnownTestRunState,
+};
 use crate::application::test_run::commands::ingest_test_run_result::executor::IngestTestRunResultExecutor;
 use crate::application::test_run::queries::build_test_report::executor::BuildTestReportExecutor;
-use crate::application::test_run::queries::build_test_report::query::BuildTestReportQuery;
 use crate::delivery::jobs::consumers::send_social_notify::payload::SendSocialNotifyJob;
+use crate::delivery::notifications::test_run::{
+    build_test_run_message, build_test_run_report_url, resolve_test_run_chat_id,
+};
 use crate::domain::repository::repositories::repository_repository::RepositoryRepository;
 use crate::domain::shared::command::CommandExecutor;
 use crate::domain::shared::events::event_listener::EventListener;
@@ -27,76 +31,11 @@ pub struct WebhookTestRunResultListener {
     pub default_chat_id: SocialChatId,
 }
 
-impl WebhookTestRunResultListener {
-    /// Запуск из чата отвечает в тот же чат, ночной прогон — в чат репозитория
-    async fn resolve_chat_id(&self, run: &TestRun) -> SocialChatId {
-        if let Some(chat_id) = run.chat_id {
-            return chat_id;
-        }
-
-        let repository = self
-            .repository_repo
-            .find_by_id(run.repository_id)
-            .await
-            .ok();
-
-        repository
-            .and_then(|repository| {
-                repository
-                    .notifications_chat_id
-                    .or(repository.social_chat_id)
-            })
-            .unwrap_or(self.default_chat_id)
-    }
-
-    async fn build_report_url(&self, run: &TestRun) -> Option<String> {
-        self.build_test_report
-            .execute(&BuildTestReportQuery {
-                test_run_id: run.id,
-            })
-            .await
-            .map(|response| response.report_url)
-            .inspect_err(|error| tracing::error!(%error, "Failed to build test report"))
-            .ok()
-    }
-
-    fn build_message(run: &TestRun, report_url: Option<&str>) -> MessageBuilder {
-        let totals = run.totals.unwrap_or_default();
-        let status_key = format!("report.test_run.status.{}", run.status.as_str());
-
-        let mut builder = MessageBuilder::new()
-            .bold(&t!(&status_key).to_string())
-            .empty_line()
-            .with_html_escape(true)
-            .section_code(
-                &t!("telegram_bot.test_run.branch").to_string(),
-                &run.git_ref,
-            )
-            .section(
-                &t!("telegram_bot.test_run.totals").to_string(),
-                &t!(
-                    "telegram_bot.test_run.totals_value",
-                    passed = totals.passed,
-                    failed = totals.failed,
-                    flaky = totals.flaky,
-                    skipped = totals.skipped
-                )
-                .to_string(),
-            );
-
-        if let Some(url) = report_url {
-            builder = builder.empty_line().section(
-                &t!("telegram_bot.test_run.report").to_string(),
-                &format!(
-                    "<a href=\"{}\">{}</a>",
-                    MessageBuilder::escape_html(url),
-                    t!("telegram_bot.test_run.report_link")
-                ),
-            );
-        }
-
-        builder
-    }
+/// Время в вебхуке приходит строкой RFC 3339
+fn parse_time(value: Option<&str>) -> Option<chrono::DateTime<chrono::Utc>> {
+    chrono::DateTime::parse_from_rfc3339(value?)
+        .ok()
+        .map(|time| time.with_timezone(&chrono::Utc))
 }
 
 #[async_trait]
@@ -110,6 +49,21 @@ impl EventListener<WebhookWorkflowEvent> for WebhookTestRunResultListener {
             .ingest_test_run_result
             .execute(&IngestTestRunResultCommand {
                 run_tag: run_tag.clone(),
+                known_state: Some(KnownTestRunState {
+                    provider_run_id: payload.id,
+                    status: payload.status.clone(),
+                    conclusion: payload.conclusion.clone(),
+                    run_url: payload.html_url.clone(),
+                    sha: match payload.head_sha.is_empty() {
+                        true => None,
+                        false => Some(payload.head_sha.clone()),
+                    },
+                    started_at: parse_time(payload.created_at.as_deref()),
+                    finished_at: match payload.status.as_str() {
+                        "completed" => parse_time(payload.updated_at.as_deref()),
+                        _ => None,
+                    },
+                }),
             })
             .await
         {
@@ -126,14 +80,16 @@ impl EventListener<WebhookWorkflowEvent> for WebhookTestRunResultListener {
             return;
         }
 
-        let chat_id = self.resolve_chat_id(&response.run).await;
-        let report_url = self.build_report_url(&response.run).await;
+        let chat_id =
+            resolve_test_run_chat_id(&self.repository_repo, &response.run, self.default_chat_id)
+                .await;
+        let report_url = build_test_run_report_url(&self.build_test_report, &response.run).await;
 
         self.publisher
             .publish(&SendSocialNotifyJob {
                 social_type: SocialType::Telegram,
                 chat_id,
-                message: Self::build_message(&response.run, report_url.as_deref()),
+                message: build_test_run_message(&response.run, report_url.as_deref()),
             })
             .await
             .ok();

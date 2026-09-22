@@ -22,7 +22,7 @@ use sea_orm::{
 use std::sync::Arc;
 
 /// Прогоны старше этого срока планировщик считает зависшими и добирает их статус у CI
-const STALE_RUN_MINUTES: i64 = 5;
+const STALE_RUN_MINUTES: i64 = 1;
 
 pub struct MySQLTestRunRepository {
     pub db: Arc<DatabaseConnection>,
