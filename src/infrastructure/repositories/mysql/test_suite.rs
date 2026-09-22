@@ -103,4 +103,14 @@ impl TestSuiteRepository for MySQLTestSuiteRepository {
 
         Ok(())
     }
+
+    async fn delete(&self, repository_id: RepositoryId) -> Result<(), SaveTestSuiteError> {
+        test_suites::Entity::delete_many()
+            .filter(test_suites::Column::RepositoryId.eq(repository_id.0))
+            .exec(self.db.as_ref())
+            .await
+            .map_err(|error| SaveTestSuiteError::DbError(error.to_string()))?;
+
+        Ok(())
+    }
 }

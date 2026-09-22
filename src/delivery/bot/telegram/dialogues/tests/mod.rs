@@ -10,6 +10,7 @@ use crate::application::test_run::commands::connect_test_suite::command::Connect
 use crate::application::test_run::commands::create_test_failure_card::command::CreateTestFailureCardCommand;
 use crate::application::test_run::commands::create_test_failure_card::error::CreateTestFailureCardError;
 use crate::application::test_run::commands::create_test_failure_card::response::CreateTestFailureCardResponse;
+use crate::application::test_run::commands::disconnect_test_suite::command::DisconnectTestSuiteCommand;
 use crate::application::test_run::commands::dispatch_test_run::command::DispatchTestRunCommand;
 use crate::application::test_run::commands::dispatch_test_run::error::DispatchTestRunError;
 use crate::application::test_run::commands::ingest_test_run_result::command::IngestTestRunResultCommand;
@@ -21,6 +22,7 @@ use crate::application::test_run::queries::get_last_test_run::query::GetLastTest
 use crate::application::test_run::queries::get_release_readiness::query::GetReleaseReadinessQuery;
 use crate::application::test_run::queries::get_run_failures::query::GetRunFailuresQuery;
 use crate::application::test_run::queries::get_test_run_progress::query::GetTestRunProgressQuery;
+use crate::application::test_run::queries::get_test_suite::query::GetTestSuiteQuery;
 use crate::application::test_run::queries::list_ci_options::error::ListCiOptionsError;
 use crate::application::test_run::queries::list_ci_options::query::{
     CiOptionKind, ListCiOptionsQuery,
@@ -379,6 +381,22 @@ async fn handle_card(
                 message_id,
                 repository_id,
                 social_user_id,
+            )
+            .await?
+        }
+
+        TelegramBotTestsAction::Settings => {
+            show_test_settings(&bot, &executors, chat_id, message_id, repository_id).await?
+        }
+
+        TelegramBotTestsAction::Disconnect => {
+            disconnect_tests(
+                &bot,
+                &executors,
+                &dialogue,
+                chat_id,
+                message_id,
+                repository_id,
             )
             .await?
         }
@@ -998,6 +1016,108 @@ async fn cancel_run(
     .await
 }
 
+/// Что сейчас настроено и как это поменять: без такого экрана выбранный процесс CI
+/// нельзя было ни сменить, ни отключить
+async fn show_test_settings(
+    bot: &Bot,
+    executors: &Arc<ApplicationBoostrapExecutors>,
+    chat_id: ChatId,
+    message_id: MessageId,
+    repository_id: i32,
+) -> Result<(), Box<dyn Error + Send + Sync>> {
+    let suite = match executors
+        .queries
+        .get_test_suite
+        .execute(&GetTestSuiteQuery {
+            repository_id: RepositoryId(repository_id),
+        })
+        .await
+    {
+        Ok(response) => response.suite,
+        Err(error) => {
+            tracing::error!(%error, "Failed to load test suite");
+
+            return edit_with_back(
+                bot,
+                chat_id,
+                message_id,
+                t!("telegram_bot.dialogues.tests.settings_error").to_string(),
+            )
+            .await;
+        }
+    };
+
+    let Some(suite) = suite else {
+        return edit_with_back(
+            bot,
+            chat_id,
+            message_id,
+            t!("telegram_bot.dialogues.tests.not_connected").to_string(),
+        )
+        .await;
+    };
+
+    let text = MessageBuilder::new()
+        .bold(&t!("telegram_bot.dialogues.tests.settings_title").to_string())
+        .empty_line()
+        .with_html_escape(true)
+        .section_code(
+            &t!("telegram_bot.dialogues.tests.settings_workflow").to_string(),
+            &suite.workflow_file,
+        )
+        .section_code(
+            &t!("telegram_bot.dialogues.tests.settings_branch").to_string(),
+            &suite.default_ref,
+        )
+        .section_code(
+            &t!("telegram_bot.dialogues.tests.settings_tests_root").to_string(),
+            &suite.tests_root,
+        )
+        .build();
+
+    bot.edit_message_text(chat_id, message_id, text)
+        .parse_mode(ParseMode::Html)
+        .reply_markup(InlineKeyboardMarkup::new(vec![
+            vec![button_for(TelegramBotTestsAction::Connect)],
+            vec![button_for(TelegramBotTestsAction::Disconnect)],
+            vec![back_button()],
+        ]))
+        .await?;
+
+    Ok(())
+}
+
+async fn disconnect_tests(
+    bot: &Bot,
+    executors: &Arc<ApplicationBoostrapExecutors>,
+    dialogue: &TelegramBotDialogueType,
+    chat_id: ChatId,
+    message_id: MessageId,
+    repository_id: i32,
+) -> Result<(), Box<dyn Error + Send + Sync>> {
+    let disconnected = executors
+        .commands
+        .disconnect_test_suite
+        .execute(&DisconnectTestSuiteCommand {
+            repository_id: RepositoryId(repository_id),
+        })
+        .await;
+
+    if let Err(error) = disconnected {
+        tracing::error!(%error, "Failed to disconnect test suite");
+
+        return edit_with_back(
+            bot,
+            chat_id,
+            message_id,
+            t!("telegram_bot.dialogues.tests.disconnect_error").to_string(),
+        )
+        .await;
+    }
+
+    back_to_card(bot, executors, dialogue, chat_id, message_id, repository_id).await
+}
+
 /// Подключение начинается со списка процессов CI репозитория — руками ничего не вводим
 async fn start_connect(
     bot: &Bot,
@@ -1557,6 +1677,10 @@ fn tag_keyboard(options: &[TaskTrackerOption]) -> InlineKeyboardMarkup {
     rows.push(vec![back_button()]);
 
     InlineKeyboardMarkup::new(rows)
+}
+
+fn button_for(action: TelegramBotTestsAction) -> InlineKeyboardButton {
+    InlineKeyboardButton::callback(action.label(), action.to_callback_data().to_string())
 }
 
 fn back_button() -> InlineKeyboardButton {

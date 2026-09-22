@@ -647,7 +647,14 @@
         "progress": "📶 Прогресс",
         "current_step": "👉 Сейчас",
         "enter_default_ref": "🌿 Введите ветку, которую тестируем по умолчанию (например: dev, main, master):",
-        "branch_required": "❌ Введите название ветки текстом."
+        "branch_required": "❌ Введите название ветки текстом.",
+        "settings_title": "⚙️ Настройка тестов",
+        "settings_workflow": "⚙️ Процесс CI",
+        "settings_branch": "🌿 Ветка по умолчанию",
+        "settings_tests_root": "🧩 Каталог тестов",
+        "disconnected": "🔌 Тесты отключены. Прогоны остались в истории.",
+        "disconnect_error": "Не удалось отключить тесты.",
+        "settings_error": "Не удалось загрузить настройки тестов."
       }
     },
     "test_run": {

@@ -204,6 +204,7 @@ fn card_actions(run: Option<&TestRun>, is_configured: bool) -> Vec<Vec<TelegramB
         TelegramBotTestsAction::Readiness,
         TelegramBotTestsAction::Dashboard,
     ]);
+    rows.push(vec![TelegramBotTestsAction::Settings]);
     rows.push(vec![
         TelegramBotTestsAction::Refresh,
         TelegramBotTestsAction::Close,

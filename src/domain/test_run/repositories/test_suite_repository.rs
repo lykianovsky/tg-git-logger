@@ -26,4 +26,7 @@ pub trait TestSuiteRepository: Send + Sync {
 
     /// Повторное подключение переписывает настройки того же репозитория
     async fn upsert(&self, suite: &NewTestSuite) -> Result<(), SaveTestSuiteError>;
+
+    /// Отключение тестов: прогоны репозитория остаются в истории
+    async fn delete(&self, repository_id: RepositoryId) -> Result<(), SaveTestSuiteError>;
 }

@@ -40,6 +40,7 @@ use crate::application::test_run::commands::attach_test_run_message::executor::A
 use crate::application::test_run::commands::cancel_test_run::executor::CancelTestRunExecutor;
 use crate::application::test_run::commands::connect_test_suite::executor::ConnectTestSuiteExecutor;
 use crate::application::test_run::commands::create_test_failure_card::executor::CreateTestFailureCardExecutor;
+use crate::application::test_run::commands::disconnect_test_suite::executor::DisconnectTestSuiteExecutor;
 use crate::application::test_run::commands::dispatch_test_run::executor::DispatchTestRunExecutor;
 use crate::application::test_run::commands::ingest_test_run_result::executor::IngestTestRunResultExecutor;
 use crate::application::test_run::commands::rerun_failed_tests::executor::RerunFailedTestsExecutor;
@@ -50,6 +51,7 @@ use crate::application::test_run::queries::get_last_test_run::executor::GetLastT
 use crate::application::test_run::queries::get_release_readiness::executor::GetReleaseReadinessExecutor;
 use crate::application::test_run::queries::get_run_failures::executor::GetRunFailuresExecutor;
 use crate::application::test_run::queries::get_test_run_progress::executor::GetTestRunProgressExecutor;
+use crate::application::test_run::queries::get_test_suite::executor::GetTestSuiteExecutor;
 use crate::application::test_run::queries::list_ci_options::executor::ListCiOptionsExecutor;
 use crate::application::test_run::queries::list_test_blocks::executor::ListTestBlocksExecutor;
 use crate::application::test_run::service::ci_token::CiTokenResolver;
@@ -99,6 +101,7 @@ pub struct ApplicationBoostrapExecutorsQueries {
     pub get_run_failures: Arc<GetRunFailuresExecutor>,
     pub get_release_readiness: Arc<GetReleaseReadinessExecutor>,
     pub get_test_run_progress: Arc<GetTestRunProgressExecutor>,
+    pub get_test_suite: Arc<GetTestSuiteExecutor>,
     pub list_test_blocks: Arc<ListTestBlocksExecutor>,
     pub list_ci_options: Arc<ListCiOptionsExecutor>,
     pub build_test_report: Arc<BuildTestReportExecutor>,
@@ -111,6 +114,7 @@ pub struct ApplicationBoostrapExecutorsCommands {
     pub cancel_test_run: Arc<CancelTestRunExecutor>,
     pub connect_test_suite: Arc<ConnectTestSuiteExecutor>,
     pub create_test_failure_card: Arc<CreateTestFailureCardExecutor>,
+    pub disconnect_test_suite: Arc<DisconnectTestSuiteExecutor>,
     pub dispatch_test_run: Arc<DispatchTestRunExecutor>,
     pub rerun_failed_tests: Arc<RerunFailedTestsExecutor>,
     pub ingest_test_run_result: Arc<IngestTestRunResultExecutor>,
@@ -295,6 +299,9 @@ impl ApplicationBoostrapExecutors {
             get_release_readiness: Arc::new(GetReleaseReadinessExecutor::new(
                 shared_dependency.test_run_repo.clone(),
             )),
+            get_test_suite: Arc::new(GetTestSuiteExecutor::new(
+                shared_dependency.test_suite_repo.clone(),
+            )),
             get_test_run_progress: Arc::new(GetTestRunProgressExecutor::new(
                 shared_dependency.test_suite_repo.clone(),
                 shared_dependency.test_runner.clone(),
@@ -366,6 +373,9 @@ impl ApplicationBoostrapExecutors {
                 shared_dependency.repository_task_tracker_repo.clone(),
                 shared_dependency.task_tracker_client.clone(),
                 config.kaiten.base.clone(),
+            )),
+            disconnect_test_suite: Arc::new(DisconnectTestSuiteExecutor::new(
+                shared_dependency.test_suite_repo.clone(),
             )),
             dispatch_test_run: dispatch_test_run.clone(),
             rerun_failed_tests: Arc::new(RerunFailedTestsExecutor::new(
