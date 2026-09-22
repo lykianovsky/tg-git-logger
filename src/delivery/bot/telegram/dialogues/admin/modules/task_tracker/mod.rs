@@ -266,10 +266,28 @@ impl TelegramBotDialogueAdminTaskTrackerDispatcher {
                             )
                             .build();
 
+                        // Настройки без кнопок — тупик: сразу даём, чем их поменять
+                        let keyboard = KeyboardBuilder::new()
+                            .row::<TelegramBotAdminTaskTrackerEditField>(vec![
+                                TelegramBotAdminTaskTrackerEditField::ExtractPattern,
+                                TelegramBotAdminTaskTrackerEditField::Reconfigure,
+                            ])
+                            .build();
+
+                        dialogue
+                            .update(TelegramBotDialogueState::Admin(
+                                TelegramBotDialogueAdminState::ConfigureTaskTrackerEditSelectField {
+                                    repository_id,
+                                },
+                            ))
+                            .await?;
+
                         bot.edit_message_text(msg.chat().id, msg.id(), text)
                             .parse_mode(ParseMode::Html)
-                            .reply_markup(InlineKeyboardMarkup::default())
+                            .reply_markup(keyboard)
                             .await?;
+
+                        return Ok(());
                     }
                     Err(e) => {
                         tracing::error!(error = %e, "Failed to load task tracker settings");
