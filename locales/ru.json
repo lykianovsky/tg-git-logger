@@ -67,6 +67,36 @@
         "open": "Открыт",
         "closed": "Закрыт"
       }
+    },
+    "test_run": {
+      "title": "Тесты",
+      "status": {
+        "passed": "✅ Все тесты прошли",
+        "failed": "❌ Есть упавшие тесты",
+        "queued": "⏳ В очереди",
+        "running": "🔄 Выполняется",
+        "cancelled": "🚫 Отменён",
+        "unknown": "❔ Итогов нет"
+      },
+      "trigger": {
+        "chat": "Из чата",
+        "schedule": "По расписанию",
+        "manual": "Вручную"
+      },
+      "stats": {
+        "total": "Всего",
+        "passed": "Прошли",
+        "failed": "Упали",
+        "flaky": "Нестабильные",
+        "skipped": "Пропущены"
+      },
+      "failures_title": "Упавшие тесты — %{count}",
+      "no_failures": "Упавших тестов нет",
+      "card_exists": "Карточка заведена",
+      "run_in_ci": "Прогон в CI →",
+      "generated_at": "сформирован %{value}",
+      "duration_seconds": "%{value} с",
+      "duration_minutes": "%{minutes} мин %{seconds} с"
     }
   },
   "telegram_bot": {
