@@ -15,6 +15,7 @@ use crate::delivery::notifications::test_run::{
     build_test_run_message, build_test_run_report_url, deliver_test_run_update,
     resolve_test_run_chat_id,
 };
+use crate::domain::notification::services::notification_service::NotificationService;
 use crate::domain::shared::command::CommandExecutor;
 use crate::domain::user::value_objects::social_chat_id::SocialChatId;
 use crate::domain::user::value_objects::social_type::SocialType;
@@ -289,6 +290,9 @@ impl ApplicationDelivery for DeliveryScheduler {
                     let shared_dependency = test_runs_shared.clone();
 
                     Box::pin(async move {
+                        let notification_service: Arc<dyn NotificationService> =
+                            shared_dependency.notification_service.clone();
+
                         let response = match executors
                             .commands
                             .sync_stale_test_runs
@@ -318,7 +322,7 @@ impl ApplicationDelivery for DeliveryScheduler {
                             .await;
 
                             deliver_test_run_update(
-                                &shared_dependency.notification_service,
+                                &notification_service,
                                 &shared_dependency.publisher,
                                 &run,
                                 chat_id,
