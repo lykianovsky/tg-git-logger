@@ -162,7 +162,14 @@ impl TelegramBotTestsDispatcher {
                 }]
                 .endpoint(choose_card_tag),
             )
-            .branch(case![TelegramBotTestsState::Connect { step, draft }].endpoint(handle_connect));
+            .branch(case![TelegramBotTestsState::Connect { step, draft }].endpoint(handle_connect))
+            .branch(
+                case![TelegramBotTestsState::EnterDefaultRef {
+                    repository_id,
+                    workflow_file
+                }]
+                .endpoint(cancel_branch_input),
+            );
 
         // Ветку вводят текстом, поэтому у диалога есть и ветка сообщений
         let messages = Update::filter_message().branch(
@@ -1222,17 +1229,44 @@ async fn handle_connect(
                 ))
                 .await?;
 
+            // Кнопка «Назад» обязательна: иначе выбравший процесс CI застревает
+            // на вводе ветки без возможности вернуться
             bot.edit_message_text(
                 chat_id,
                 message_id,
                 t!("telegram_bot.dialogues.tests.enter_default_ref").to_string(),
             )
-            .reply_markup(InlineKeyboardMarkup::default())
+            .reply_markup(InlineKeyboardMarkup::new(vec![vec![back_button()]]))
             .await?;
         }
     }
 
     Ok(())
+}
+
+/// «Назад» с шага ввода ветки: подключение не завершено, возвращаем карточку
+async fn cancel_branch_input(
+    bot: Bot,
+    dialogue: TelegramBotDialogueType,
+    executors: Arc<ApplicationBoostrapExecutors>,
+    query: CallbackQuery,
+    (repository_id, _workflow_file): (i32, String),
+) -> Result<(), Box<dyn Error + Send + Sync>> {
+    bot.answer_callback_query(query.id.clone()).await?;
+
+    let Some((chat_id, message_id)) = message_target(&query) else {
+        return Ok(());
+    };
+
+    back_to_card(
+        &bot,
+        &executors,
+        &dialogue,
+        chat_id,
+        message_id,
+        repository_id,
+    )
+    .await
 }
 
 /// Ветку вводят текстом — веток в репозитории сотни, списком их не покажешь
