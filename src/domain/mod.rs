@@ -11,6 +11,7 @@ pub mod repository;
 pub mod role;
 pub mod shared;
 pub mod task;
+pub mod test_run;
 pub mod user;
 pub mod user_preferences;
 pub mod version_control;

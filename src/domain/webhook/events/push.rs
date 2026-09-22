@@ -47,7 +47,9 @@ impl WebhookEvent for WebhookPushEvent {
         let safe_repo = MessageBuilder::escape_html(&self.repo);
 
         let repo_line = match &self.repo_url {
-            Some(url) if url.trim().starts_with("http://") || url.trim().starts_with("https://") => {
+            Some(url)
+                if url.trim().starts_with("http://") || url.trim().starts_with("https://") =>
+            {
                 format!(
                     "📦 <a href=\"{}\">{}</a>",
                     MessageBuilder::escape_html(url.trim()),
@@ -91,9 +93,8 @@ impl WebhookEvent for WebhookPushEvent {
             for commit in self.commits.iter().take(max) {
                 let short_hash = &commit.id[..7.min(commit.id.len())];
                 let safe_author = MessageBuilder::escape_html(commit.author.as_str());
-                let safe_message = MessageBuilder::escape_html(
-                    commit.message.lines().next().unwrap_or(""),
-                );
+                let safe_message =
+                    MessageBuilder::escape_html(commit.message.lines().next().unwrap_or(""));
 
                 builder = builder.line(&format!(
                     "├ <code>{}</code> <i>({})</i>\n│   {}",
