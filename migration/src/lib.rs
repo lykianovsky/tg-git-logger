@@ -25,6 +25,10 @@ mod m20260429_000006_create_release_plan_repositories;
 mod m20260429_000007_add_notifications_chat_id_to_repositories;
 mod m20260429_000008_pending_notifications_user_id_nullable;
 mod m20260513_000001_add_review_column_to_repository_task_trackers;
+mod m20260922_000001_create_test_suites;
+mod m20260922_000002_create_test_runs;
+mod m20260922_000003_create_test_run_failures;
+mod m20260922_000004_create_test_failure_cards;
 
 pub struct Migrator;
 
@@ -63,6 +67,10 @@ impl MigratorTrait for Migrator {
             Box::new(
                 m20260513_000001_add_review_column_to_repository_task_trackers::Migration,
             ),
+            Box::new(m20260922_000001_create_test_suites::Migration),
+            Box::new(m20260922_000002_create_test_runs::Migration),
+            Box::new(m20260922_000003_create_test_run_failures::Migration),
+            Box::new(m20260922_000004_create_test_failure_cards::Migration),
         ]
     }
 }
