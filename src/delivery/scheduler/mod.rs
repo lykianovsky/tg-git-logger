@@ -216,10 +216,7 @@ impl ApplicationDelivery for DeliveryScheduler {
                             .await
                         {
                             Ok(r) if r.sent_count > 0 => {
-                                tracing::info!(
-                                    sent = r.sent_count,
-                                    "Release day reminders sent"
-                                );
+                                tracing::info!(sent = r.sent_count, "Release day reminders sent");
                             }
                             Err(e) => {
                                 tracing::error!(error = %e, "Release day reminders failed");
@@ -247,10 +244,7 @@ impl ApplicationDelivery for DeliveryScheduler {
                             .await
                         {
                             Ok(r) if r.sent_count > 0 => {
-                                tracing::info!(
-                                    sent = r.sent_count,
-                                    "Release call reminders sent"
-                                );
+                                tracing::info!(sent = r.sent_count, "Release call reminders sent");
                             }
                             Err(e) => {
                                 tracing::error!(error = %e, "Release call reminders failed");

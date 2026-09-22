@@ -32,7 +32,9 @@ impl From<UpdateReleasePlanError> for CancelReleasePlanExecutorError {
 impl From<FindSocialServiceByIdError> for CancelReleasePlanExecutorError {
     fn from(e: FindSocialServiceByIdError) -> Self {
         match e {
-            FindSocialServiceByIdError::NotFound => Self::DbError("Social account not found".to_string()),
+            FindSocialServiceByIdError::NotFound => {
+                Self::DbError("Social account not found".to_string())
+            }
             FindSocialServiceByIdError::DbError(msg) => Self::DbError(msg),
         }
     }

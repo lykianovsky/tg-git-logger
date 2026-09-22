@@ -3,7 +3,7 @@ use crate::domain::test_run::entities::test_suite::TestSuite;
 use crate::domain::test_run::repositories::test_suite_repository::{
     FindTestSuiteError, TestSuiteRepository,
 };
-use crate::infrastructure::database::mysql::entities::test_suites;
+use crate::infrastructure::database::mysql::entities::{repositories, test_suites};
 use async_trait::async_trait;
 use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter};
 use std::sync::Arc;
@@ -17,9 +17,11 @@ impl MySQLTestSuiteRepository {
         Self { db }
     }
 
-    fn from_mysql(model: test_suites::Model) -> TestSuite {
+    fn from_mysql(model: test_suites::Model, repository: repositories::Model) -> TestSuite {
         TestSuite {
             repository_id: RepositoryId(model.repository_id),
+            owner: repository.owner,
+            name: repository.name,
             workflow_file: model.workflow_file,
             default_ref: model.default_ref,
             args_input_name: model.args_input_name,
@@ -39,13 +41,17 @@ impl TestSuiteRepository for MySQLTestSuiteRepository {
         &self,
         repository_id: RepositoryId,
     ) -> Result<TestSuite, FindTestSuiteError> {
-        let model = test_suites::Entity::find()
+        let (model, repository) = test_suites::Entity::find()
             .filter(test_suites::Column::RepositoryId.eq(repository_id.0))
+            .find_also_related(repositories::Entity)
             .one(self.db.as_ref())
             .await
             .map_err(|error| FindTestSuiteError::DbError(error.to_string()))?
             .ok_or(FindTestSuiteError::NotConfigured)?;
 
-        Ok(Self::from_mysql(model))
+        // Набор тестов без репозитория недостижим: связь обязательная с каскадом
+        let repository = repository.ok_or(FindTestSuiteError::NotConfigured)?;
+
+        Ok(Self::from_mysql(model, repository))
     }
 }

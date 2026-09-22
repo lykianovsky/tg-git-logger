@@ -66,7 +66,11 @@ impl CommandExecutor for CheckOrgMembershipExecutor {
             }
         }
 
-        let Some(org) = self.required_organization.as_deref().filter(|s| !s.is_empty()) else {
+        let Some(org) = self
+            .required_organization
+            .as_deref()
+            .filter(|s| !s.is_empty())
+        else {
             return Ok(CheckOrgMembershipResponse::Allowed);
         };
 

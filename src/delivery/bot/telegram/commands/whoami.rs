@@ -77,11 +77,7 @@ impl TelegramBotWhoamiCommandHandler {
         };
 
         let dnd_text = match &overview.dnd_window {
-            Some(w) => format!(
-                "{}–{} МСК",
-                w.start.format("%H:%M"),
-                w.end.format("%H:%M")
-            ),
+            Some(w) => format!("{}–{} МСК", w.start.format("%H:%M"), w.end.format("%H:%M")),
             None => t!("telegram_bot.commands.whoami.default").to_string(),
         };
 
@@ -92,10 +88,9 @@ impl TelegramBotWhoamiCommandHandler {
 
         let now = Utc::now();
         let vacation_text = match overview.vacation_until {
-            Some(until) if until > now => until
-                .with_timezone(&Moscow)
-                .format("%d.%m.%Y")
-                .to_string(),
+            Some(until) if until > now => {
+                until.with_timezone(&Moscow).format("%d.%m.%Y").to_string()
+            }
             _ => t!("telegram_bot.commands.whoami.off").to_string(),
         };
 

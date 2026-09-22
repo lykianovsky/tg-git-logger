@@ -118,11 +118,7 @@ impl TelegramBotReleasesCommandHandler {
             .map(|r| (r.id, format!("{}/{}", r.owner, r.name)))
             .collect();
 
-        let header = t!(
-            "telegram_bot.commands.releases.title",
-            count = plans.len()
-        )
-        .to_string();
+        let header = t!("telegram_bot.commands.releases.title", count = plans.len()).to_string();
 
         let keyboard = build_plans_list_keyboard(&plans, &repo_label_by_id, today_msk);
 
@@ -202,13 +198,11 @@ pub fn render_plan_card(
 ) -> String {
     let date_label = format_date_label(plan.planned_date, today_msk);
 
-    let mut builder = MessageBuilder::new()
-        .with_html_escape(false)
-        .raw(&format!(
-            "🚀 <b>{}</b> — {}\n",
-            plan.planned_date.format("%d.%m.%Y"),
-            MessageBuilder::escape_html(&date_label),
-        ));
+    let mut builder = MessageBuilder::new().with_html_escape(false).raw(&format!(
+        "🚀 <b>{}</b> — {}\n",
+        plan.planned_date.format("%d.%m.%Y"),
+        MessageBuilder::escape_html(&date_label),
+    ));
 
     let repos_text = if plan.repository_ids.is_empty() {
         "—".to_string()
@@ -246,10 +240,9 @@ pub fn render_plan_card(
     }
 
     if let Some(note) = &plan.note {
-        builder = builder.with_html_escape(true).section(
-            &t!("telegram_bot.commands.releases.note").to_string(),
-            note,
-        );
+        builder = builder
+            .with_html_escape(true)
+            .section(&t!("telegram_bot.commands.releases.note").to_string(), note);
     }
 
     builder.build()
@@ -262,11 +255,7 @@ pub fn format_date_label(planned: NaiveDate, today: NaiveDate) -> String {
     } else if diff == 1 {
         t!("telegram_bot.commands.releases.tomorrow").to_string()
     } else if diff > 1 && diff <= 30 {
-        t!(
-            "telegram_bot.commands.releases.in_days",
-            n = diff
-        )
-        .to_string()
+        t!("telegram_bot.commands.releases.in_days", n = diff).to_string()
     } else {
         planned.format("%d.%m.%Y").to_string()
     }

@@ -86,10 +86,7 @@ impl CreateOAuthLinkExecutor {
             .await
             .map_err(|e| CreateOAuthLinkExecutorError::Cache(e.to_string()))?;
 
-        tracing::debug!(
-            ttl = OAUTH_STATE_TTL_SECONDS,
-            "OAuth state saved to cache"
-        );
+        tracing::debug!(ttl = OAUTH_STATE_TTL_SECONDS, "OAuth state saved to cache");
 
         Ok(url)
     }

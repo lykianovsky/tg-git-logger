@@ -1,7 +1,6 @@
 use crate::application::user::queries::check_org_membership::query::CheckOrgMembershipQuery;
 use crate::application::user::queries::check_org_membership::response::CheckOrgMembershipResponse;
 use crate::application::user::queries::get_user_roles_by_telegram_id::query::GetUserRolesByTelegramIdQuery;
-use crate::domain::role::value_objects::role_name::RoleName;
 use crate::bootstrap::executors::ApplicationBoostrapExecutors;
 use crate::config::application::ApplicationConfig;
 use crate::delivery::bot::telegram::commands::admin::TelegramBotAdminCommandHandler;
@@ -13,7 +12,6 @@ use crate::delivery::bot::telegram::commands::pending_reviews::TelegramBotPendin
 use crate::delivery::bot::telegram::commands::register::TelegramBotRegisterCommandHandler;
 use crate::delivery::bot::telegram::commands::release_plan::TelegramBotReleasePlanCommandHandler;
 use crate::delivery::bot::telegram::commands::releases::TelegramBotReleasesCommandHandler;
-use crate::delivery::bot::telegram::commands::whoami::TelegramBotWhoamiCommandHandler;
 use crate::delivery::bot::telegram::commands::report::TelegramBotVersionControlReportCommandHandler;
 use crate::delivery::bot::telegram::commands::setup::TelegramBotSetupCommandHandler;
 use crate::delivery::bot::telegram::commands::setup_notifications::TelegramBotSetupNotificationsCommandHandler;
@@ -23,8 +21,10 @@ use crate::delivery::bot::telegram::commands::status::TelegramBotStatusCommandHa
 use crate::delivery::bot::telegram::commands::task::TelegramBotTaskCommandHandler;
 use crate::delivery::bot::telegram::commands::unregister::TelegramBotUnregisterCommandHandler;
 use crate::delivery::bot::telegram::commands::vacation::TelegramBotVacationCommandHandler;
+use crate::delivery::bot::telegram::commands::whoami::TelegramBotWhoamiCommandHandler;
 use crate::delivery::bot::telegram::context::TelegramBotCommandContext;
 use crate::delivery::bot::telegram::dialogues::TelegramBotDialogueType;
+use crate::domain::role::value_objects::role_name::RoleName;
 use crate::domain::shared::command::CommandExecutor;
 use crate::domain::user::value_objects::social_user_id::SocialUserId;
 use std::sync::Arc;

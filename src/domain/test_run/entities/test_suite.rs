@@ -6,6 +6,9 @@ use crate::domain::repository::value_objects::repository_id::RepositoryId;
 #[derive(Debug, Clone)]
 pub struct TestSuite {
     pub repository_id: RepositoryId,
+    /// Владелец и имя репозитория в CI — берутся из привязки репозитория
+    pub owner: String,
+    pub name: String,
     pub workflow_file: String,
     pub default_ref: String,
     pub args_input_name: String,

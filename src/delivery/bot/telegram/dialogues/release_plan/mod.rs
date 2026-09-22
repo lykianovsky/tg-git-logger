@@ -275,7 +275,9 @@ fn build_call_setup_menu(default_label: &str) -> InlineKeyboardMarkup {
                 .to_string(),
         )],
         vec![InlineKeyboardButton::callback(
-            TelegramBotReleasePlanCallSetupAction::Cancel.label().to_string(),
+            TelegramBotReleasePlanCallSetupAction::Cancel
+                .label()
+                .to_string(),
             TelegramBotReleasePlanCallSetupAction::Cancel
                 .to_callback_data()
                 .to_string(),
@@ -286,7 +288,9 @@ fn build_call_setup_menu(default_label: &str) -> InlineKeyboardMarkup {
 fn build_optional_menu() -> InlineKeyboardMarkup {
     InlineKeyboardMarkup::new(vec![vec![
         InlineKeyboardButton::callback(
-            TelegramBotReleasePlanOptionalAction::Skip.label().to_string(),
+            TelegramBotReleasePlanOptionalAction::Skip
+                .label()
+                .to_string(),
             TelegramBotReleasePlanOptionalAction::Skip
                 .to_callback_data()
                 .to_string(),
@@ -606,7 +610,10 @@ async fn handle_call_time_input(
         }
     };
 
-    let local = match Moscow.from_local_datetime(&call_date.and_time(time)).single() {
+    let local = match Moscow
+        .from_local_datetime(&call_date.and_time(time))
+        .single()
+    {
         Some(dt) => dt,
         None => {
             bot.send_message(
@@ -781,8 +788,9 @@ async fn handle_note_input(
     };
 
     let from = msg.from().cloned();
-    let social_user_id =
-        from.map(|u| SocialUserId(u.id.0 as i32)).unwrap_or(SocialUserId(0));
+    let social_user_id = from
+        .map(|u| SocialUserId(u.id.0 as i32))
+        .unwrap_or(SocialUserId(0));
 
     submit_plan(
         &bot,
