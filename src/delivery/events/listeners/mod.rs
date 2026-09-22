@@ -17,6 +17,7 @@ use crate::delivery::events::listeners::github::webhook::push::WebhookPushEventL
 use crate::delivery::events::listeners::github::webhook::re_review_nudge::WebhookPrReReviewNudgeListener;
 use crate::delivery::events::listeners::github::webhook::release::WebhookReleaseEventListener;
 use crate::delivery::events::listeners::github::webhook::review_requested::WebhookReviewRequestedDmListener;
+use crate::delivery::events::listeners::github::webhook::test_run_result::WebhookTestRunResultListener;
 use crate::delivery::events::listeners::github::webhook::workflow::WebhookWorkflowEventListener;
 use crate::delivery::events::listeners::user::registration::failed::UserRegistrationFailedListener;
 use crate::delivery::events::listeners::user::registration::success::UserRegistrationSuccessListener;
@@ -86,6 +87,18 @@ impl ApplicationDelivery for DeliveryEventListeners {
             .event_bus
             .on(WebhookWorkflowEventListener {
                 publisher: self.shared_dependency.publisher.clone(),
+                repository_repo: repository_repo.clone(),
+                default_chat_id,
+            })
+            .await;
+
+        // Итоги прогона тестов: прогон узнаётся по метке в имени workflow
+        self.shared_dependency
+            .event_bus
+            .on(WebhookTestRunResultListener {
+                publisher: self.shared_dependency.publisher.clone(),
+                ingest_test_run_result: self.executors.commands.ingest_test_run_result.clone(),
+                build_test_report: self.executors.queries.build_test_report.clone(),
                 repository_repo: repository_repo.clone(),
                 default_chat_id,
             })

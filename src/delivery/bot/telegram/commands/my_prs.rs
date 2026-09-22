@@ -73,13 +73,7 @@ impl TelegramBotMyPrsCommandHandler {
         } else {
             let now = Utc::now();
             let mut builder = MessageBuilder::new()
-                .bold(
-                    &t!(
-                        "telegram_bot.commands.my_prs.title",
-                        count = prs.len()
-                    )
-                    .to_string(),
-                )
+                .bold(&t!("telegram_bot.commands.my_prs.title", count = prs.len()).to_string())
                 .empty_line();
 
             let mut sorted = prs.clone();

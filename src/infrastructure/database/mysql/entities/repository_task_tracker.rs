@@ -10,6 +10,7 @@ pub struct Model {
     #[sea_orm(unique)]
     pub repository_id: i32,
     pub space_id: i32,
+    pub board_id: Option<i32>,
     pub qa_column_id: i32,
     pub review_column_id: i32,
     pub extract_pattern_regexp: String,

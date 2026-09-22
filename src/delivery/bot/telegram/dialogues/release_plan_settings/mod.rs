@@ -13,7 +13,8 @@ use crate::delivery::bot::telegram::keyboards::actions::release_plan_settings::{
     RPS_BACK_TO_LIST, RPS_CANCEL_BTN_PREFIX, RPS_COMPLETE_BTN_PREFIX, RPS_EDIT_PREFIX,
     RPS_REPO_TOGGLE_PREFIX, RPS_VIEW_PREFIX, TelegramBotReleasePlanSettingsConfirmAction,
     TelegramBotReleasePlanSettingsMenuAction, TelegramBotReleasePlanSettingsReposAction,
-    rps_cancel_btn_callback, rps_complete_btn_callback, rps_edit_callback, rps_repo_toggle_callback,
+    rps_cancel_btn_callback, rps_complete_btn_callback, rps_edit_callback,
+    rps_repo_toggle_callback,
 };
 use crate::domain::release_plan::value_objects::release_plan_id::ReleasePlanId;
 use crate::domain::repository::value_objects::repository_id::RepositoryId;
@@ -171,10 +172,7 @@ fn build_confirm_keyboard() -> InlineKeyboardMarkup {
     ]])
 }
 
-async fn render_menu_text(
-    executors: &Arc<ApplicationBoostrapExecutors>,
-    plan_id: i32,
-) -> String {
+async fn render_menu_text(executors: &Arc<ApplicationBoostrapExecutors>, plan_id: i32) -> String {
     use crate::utils::builder::message::MessageBuilder;
     let plan = match executors
         .queries
@@ -317,8 +315,7 @@ async fn handle_awaiting_selection(
                 &bot,
                 chat_id,
                 message_id,
-                &t!("telegram_bot.dialogues.release_plan_settings.enter_cancel_reason")
-                    .to_string(),
+                &t!("telegram_bot.dialogues.release_plan_settings.enter_cancel_reason").to_string(),
                 None,
             )
             .await?;
@@ -341,8 +338,7 @@ async fn handle_awaiting_selection(
                 &bot,
                 chat_id,
                 message_id,
-                &t!("telegram_bot.dialogues.release_plan_settings.confirm_complete")
-                    .to_string(),
+                &t!("telegram_bot.dialogues.release_plan_settings.confirm_complete").to_string(),
                 Some(kb),
             )
             .await?;
@@ -420,11 +416,7 @@ async fn show_release_list(
         .map(|r| (r.id, format!("{}/{}", r.owner, r.name)))
         .collect();
 
-    let header = t!(
-        "telegram_bot.commands.releases.title",
-        count = plans.len()
-    )
-    .to_string();
+    let header = t!("telegram_bot.commands.releases.title", count = plans.len()).to_string();
     let kb = build_plans_list_keyboard(&plans, &repo_label_by_id, today_msk);
     edit_menu(bot, chat_id, message_id, &header, Some(kb)).await
 }
@@ -556,8 +548,7 @@ async fn handle_menu_callback(
                 &bot,
                 chat_id,
                 message_id,
-                &t!("telegram_bot.dialogues.release_plan_settings.enter_planned_date")
-                    .to_string(),
+                &t!("telegram_bot.dialogues.release_plan_settings.enter_planned_date").to_string(),
                 None,
             )
             .await?;
@@ -587,8 +578,7 @@ async fn handle_menu_callback(
                 &bot,
                 chat_id,
                 message_id,
-                &t!("telegram_bot.dialogues.release_plan_settings.enter_meeting_url")
-                    .to_string(),
+                &t!("telegram_bot.dialogues.release_plan_settings.enter_meeting_url").to_string(),
                 None,
             )
             .await?;
@@ -832,7 +822,10 @@ async fn handle_call_time_input(
         }
     };
 
-    let local = match Moscow.from_local_datetime(&call_date.and_time(time)).single() {
+    let local = match Moscow
+        .from_local_datetime(&call_date.and_time(time))
+        .single()
+    {
         Some(dt) => dt,
         None => {
             bot.send_message(
@@ -850,9 +843,7 @@ async fn handle_call_time_input(
         .update_release_plan
         .execute(&UpdateReleasePlanExecutorCommand {
             plan_id: ReleasePlanId(plan_id),
-            patch: ReleasePlanPatch::SetCallDateTime {
-                datetime: call_utc,
-            },
+            patch: ReleasePlanPatch::SetCallDateTime { datetime: call_utc },
         })
         .await
     {
@@ -1095,8 +1086,7 @@ async fn handle_select_repositories_callback(
                 if selected.is_empty() {
                     return Ok(());
                 }
-                let ids: Vec<RepositoryId> =
-                    selected.iter().map(|id| RepositoryId(*id)).collect();
+                let ids: Vec<RepositoryId> = selected.iter().map(|id| RepositoryId(*id)).collect();
                 if let Err(e) = executors
                     .commands
                     .update_release_plan

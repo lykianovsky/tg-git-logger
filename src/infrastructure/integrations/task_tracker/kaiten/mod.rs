@@ -2,9 +2,10 @@ use async_trait::async_trait;
 use serde::Deserialize;
 
 use crate::domain::task::ports::task_tracker_client::{
-    TaskTrackerBoard, TaskTrackerCard, TaskTrackerClient, TaskTrackerClientGetCardError,
-    TaskTrackerClientListError, TaskTrackerClientMoveToColumnError, TaskTrackerColumn,
-    TaskTrackerSpace,
+    NewTaskTrackerCard, TaskTrackerBoard, TaskTrackerCard, TaskTrackerClient,
+    TaskTrackerClientCreateCardError, TaskTrackerClientGetCardError, TaskTrackerClientListError,
+    TaskTrackerClientMoveToColumnError, TaskTrackerColumn, TaskTrackerSpace, TaskTrackerTag,
+    TaskTrackerUser,
 };
 use crate::domain::task::value_objects::task_id::TaskId;
 use reqwest::{Client, Method};
@@ -16,6 +17,19 @@ pub struct KaitenCard {
     pub id: u64,
     pub title: String,
     pub column_id: u64,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct KaitenUser {
+    pub id: u64,
+    pub full_name: Option<String>,
+    pub username: Option<String>,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct KaitenTag {
+    pub id: u64,
+    pub name: String,
 }
 
 #[derive(Deserialize, Debug)]
@@ -151,6 +165,79 @@ impl TaskTrackerClient for KaitenClient {
             title: card.title,
             url,
         })
+    }
+
+    async fn create_card(
+        &self,
+        card: &NewTaskTrackerCard,
+    ) -> Result<TaskTrackerCard, TaskTrackerClientCreateCardError> {
+        let body = json!({
+            "board_id": card.board_id,
+            "column_id": card.column_id,
+            "title": card.title,
+            "description": card.description,
+            "responsible_id": card.responsible_id,
+        });
+
+        let created: KaitenCard = self
+            .request(Method::POST, "/cards", Some(&body))
+            .await
+            .map_err(|error| TaskTrackerClientCreateCardError::ClientError(error.to_string()))?;
+
+        // Тег вешается отдельным запросом: в создании карточки Kaiten его не принимает
+        if let Some(tag) = card.tag.as_ref() {
+            let tag_body = json!({ "name": tag });
+            let attached: Result<serde_json::Value, _> = self
+                .request(
+                    Method::POST,
+                    &format!("/cards/{}/tags", created.id),
+                    Some(&tag_body),
+                )
+                .await;
+
+            if let Err(error) = attached {
+                tracing::warn!(error = %error, card_id = created.id, "Failed to attach card tag");
+            }
+        }
+
+        Ok(TaskTrackerCard {
+            id: TaskId(created.id),
+            title: created.title,
+            url: format!("{}/ticket/{}", self.base.0, created.id),
+        })
+    }
+
+    async fn list_users(&self) -> Result<Vec<TaskTrackerUser>, TaskTrackerClientListError> {
+        let users: Vec<KaitenUser> = self
+            .request::<(), _>(Method::GET, "/users", None)
+            .await
+            .map_err(|error| TaskTrackerClientListError::ClientError(error.to_string()))?;
+
+        Ok(users
+            .into_iter()
+            .map(|user| TaskTrackerUser {
+                id: user.id,
+                name: user
+                    .full_name
+                    .or(user.username)
+                    .unwrap_or_else(|| user.id.to_string()),
+            })
+            .collect())
+    }
+
+    async fn list_tags(&self) -> Result<Vec<TaskTrackerTag>, TaskTrackerClientListError> {
+        let tags: Vec<KaitenTag> = self
+            .request::<(), _>(Method::GET, "/tags", None)
+            .await
+            .map_err(|error| TaskTrackerClientListError::ClientError(error.to_string()))?;
+
+        Ok(tags
+            .into_iter()
+            .map(|tag| TaskTrackerTag {
+                id: tag.id,
+                name: tag.name,
+            })
+            .collect())
     }
 
     async fn list_spaces(&self) -> Result<Vec<TaskTrackerSpace>, TaskTrackerClientListError> {

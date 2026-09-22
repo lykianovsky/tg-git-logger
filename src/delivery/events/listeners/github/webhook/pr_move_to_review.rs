@@ -152,10 +152,7 @@ impl EventListener<WebhookPullRequestEvent> for WebhookPrMoveToReviewListener {
             return;
         }
         if payload.draft {
-            tracing::debug!(
-                pr = payload.number,
-                "Skipping move-to-review: PR is draft"
-            );
+            tracing::debug!(pr = payload.number, "Skipping move-to-review: PR is draft");
             return;
         }
 

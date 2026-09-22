@@ -42,17 +42,16 @@ impl WebhookEvent for WebhookPullRequestReviewEvent {
         };
 
         let pr_url_trimmed = self.pr_url.trim();
-        let pr_link = if pr_url_trimmed.starts_with("http://")
-            || pr_url_trimmed.starts_with("https://")
-        {
-            format!(
-                "<a href=\"{}\">{}</a>",
-                MessageBuilder::escape_html(pr_url_trimmed),
+        let pr_link =
+            if pr_url_trimmed.starts_with("http://") || pr_url_trimmed.starts_with("https://") {
+                format!(
+                    "<a href=\"{}\">{}</a>",
+                    MessageBuilder::escape_html(pr_url_trimmed),
+                    MessageBuilder::escape_html(&self.pr_title)
+                )
+            } else {
                 MessageBuilder::escape_html(&self.pr_title)
-            )
-        } else {
-            MessageBuilder::escape_html(&self.pr_title)
-        };
+            };
 
         let safe_repo = MessageBuilder::escape_html(&self.repo);
 

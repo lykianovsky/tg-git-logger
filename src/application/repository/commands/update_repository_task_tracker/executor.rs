@@ -62,6 +62,7 @@ impl CommandExecutor for UpdateRepositoryTaskTrackerExecutor {
                     id: Default::default(),
                     repository_id: cmd.repository_id,
                     space_id: cmd.space_id,
+                    board_id: cmd.board_id,
                     qa_column_id: cmd.qa_column_id,
                     review_column_id: cmd.review_column_id,
                     extract_pattern_regexp: cmd.extract_pattern_regexp.clone(),

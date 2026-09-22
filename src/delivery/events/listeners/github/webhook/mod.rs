@@ -11,6 +11,7 @@ pub mod push;
 pub mod re_review_nudge;
 pub mod release;
 pub mod review_requested;
+pub mod test_run_result;
 pub mod workflow;
 
 use crate::domain::repository::repositories::repository_repository::RepositoryRepository;

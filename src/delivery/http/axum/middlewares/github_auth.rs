@@ -21,9 +21,7 @@ impl GithubWebhookAuthorizationMiddleware {
 
     pub async fn handle(self, request: Request<Body>, next: Next) -> Result<Response, StatusCode> {
         if self.secret.is_empty() {
-            tracing::error!(
-                "GITHUB_WEBHOOK_SECRET is not configured; rejecting webhook request"
-            );
+            tracing::error!("GITHUB_WEBHOOK_SECRET is not configured; rejecting webhook request");
             return Err(StatusCode::SERVICE_UNAVAILABLE);
         }
 

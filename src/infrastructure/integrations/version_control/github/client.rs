@@ -574,10 +574,7 @@ impl VersionControlClient for GithubVersionControlClient {
             mergeable_state: Option<String>,
         }
 
-        let url = format!(
-            "{}/repos/{}/{}/pulls/{}",
-            self.base, owner, repo, pr_number
-        );
+        let url = format!("{}/repos/{}/{}/pulls/{}", self.base, owner, repo, pr_number);
 
         let resp = self
             .client
@@ -596,7 +593,9 @@ impl VersionControlClient for GithubVersionControlClient {
                     .map_err(|e| VersionControlClientGetPrError::Transport(e.to_string()))?;
                 Ok(detail.mergeable_state)
             }
-            s if s == reqwest::StatusCode::NOT_FOUND => Err(VersionControlClientGetPrError::NotFound),
+            s if s == reqwest::StatusCode::NOT_FOUND => {
+                Err(VersionControlClientGetPrError::NotFound)
+            }
             s if s == reqwest::StatusCode::UNAUTHORIZED || s == reqwest::StatusCode::FORBIDDEN => {
                 Err(VersionControlClientGetPrError::Unauthorized(format!(
                     "GitHub returned {}",

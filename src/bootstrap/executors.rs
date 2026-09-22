@@ -35,6 +35,18 @@ use crate::application::repository::commands::update_repository_task_tracker::ex
 use crate::application::repository::queries::get_all_repositories::executor::GetAllRepositoriesExecutor;
 use crate::application::task::commands::move_task_to_test::executor::MoveTaskToTestExecutor;
 use crate::application::task::queries::get_task_card::executor::GetTaskCardExecutor;
+use crate::application::task::queries::list_task_tracker_options::executor::ListTaskTrackerOptionsExecutor;
+use crate::application::test_run::commands::connect_test_suite::executor::ConnectTestSuiteExecutor;
+use crate::application::test_run::commands::create_test_failure_card::executor::CreateTestFailureCardExecutor;
+use crate::application::test_run::commands::dispatch_test_run::executor::DispatchTestRunExecutor;
+use crate::application::test_run::commands::ingest_test_run_result::executor::IngestTestRunResultExecutor;
+use crate::application::test_run::commands::sync_stale_test_runs::executor::SyncStaleTestRunsExecutor;
+use crate::application::test_run::queries::build_test_report::executor::BuildTestReportExecutor;
+use crate::application::test_run::queries::get_last_test_run::executor::GetLastTestRunExecutor;
+use crate::application::test_run::queries::get_run_failures::executor::GetRunFailuresExecutor;
+use crate::application::test_run::queries::list_ci_options::executor::ListCiOptionsExecutor;
+use crate::application::test_run::queries::list_test_blocks::executor::ListTestBlocksExecutor;
+use crate::application::test_run::service::ci_token::CiTokenResolver;
 use crate::application::user::commands::assign_user_role::executor::AssignUserRoleExecutor;
 use crate::application::user::commands::bind_repository::executor::BindRepositoryExecutor;
 use crate::application::user::commands::deactivate_user::executor::DeactivateUserExecutor;
@@ -77,9 +89,20 @@ pub struct ApplicationBoostrapExecutorsQueries {
     pub get_my_pull_requests: Arc<GetMyPullRequestsExecutor>,
     pub get_pending_reviews: Arc<GetPendingReviewsExecutor>,
     pub check_org_membership: Arc<CheckOrgMembershipExecutor>,
+    pub get_last_test_run: Arc<GetLastTestRunExecutor>,
+    pub get_run_failures: Arc<GetRunFailuresExecutor>,
+    pub list_test_blocks: Arc<ListTestBlocksExecutor>,
+    pub list_ci_options: Arc<ListCiOptionsExecutor>,
+    pub build_test_report: Arc<BuildTestReportExecutor>,
+    pub list_task_tracker_options: Arc<ListTaskTrackerOptionsExecutor>,
 }
 
 pub struct ApplicationBoostrapExecutorsCommands {
+    pub connect_test_suite: Arc<ConnectTestSuiteExecutor>,
+    pub create_test_failure_card: Arc<CreateTestFailureCardExecutor>,
+    pub dispatch_test_run: Arc<DispatchTestRunExecutor>,
+    pub ingest_test_run_result: Arc<IngestTestRunResultExecutor>,
+    pub sync_stale_test_runs: Arc<SyncStaleTestRunsExecutor>,
     pub register_user_via_oauth: Arc<RegisterUserViaOAuthExecutor>,
     pub create_oauth_link: Arc<CreateOAuthLinkExecutor>,
     pub dispatch_webhook_event: Arc<DispatchWebhookEventExecutor>,
@@ -139,6 +162,20 @@ impl ApplicationBoostrapExecutors {
         shared_dependency: Arc<ApplicationSharedDependency>,
         stats_provider: Arc<dyn WorkersStatsProvider>,
     ) -> Self {
+        // В CI ходим токеном пользователя: у привязанных аккаунтов доступы уже есть
+        let ci_token_resolver = Arc::new(CiTokenResolver::new(
+            shared_dependency.user_socials_repo.clone(),
+            shared_dependency.user_version_controls_repo.clone(),
+            shared_dependency.reversible_cipher.clone(),
+            SocialUserId(config.telegram.admin_user_id as i32),
+        ));
+
+        // Отчёт по прогону строится поверх списка упавших — исполнитель общий
+        let get_run_failures = Arc::new(GetRunFailuresExecutor::new(
+            shared_dependency.test_run_repo.clone(),
+            shared_dependency.test_failure_card_repo.clone(),
+        ));
+
         let queries = ApplicationBoostrapExecutorsQueries {
             build_report_by_range: Arc::new(BuildVersionControlDateRangeReportExecutor::new(
                 shared_dependency.reversible_cipher.clone(),
@@ -236,9 +273,67 @@ impl ApplicationBoostrapExecutors {
                 },
                 admin_social_user_id: SocialUserId(config.telegram.admin_user_id as i32),
             }),
+
+            get_last_test_run: Arc::new(GetLastTestRunExecutor::new(
+                shared_dependency.test_run_repo.clone(),
+                shared_dependency.test_suite_repo.clone(),
+                shared_dependency.repository_repo.clone(),
+            )),
+            get_run_failures: get_run_failures.clone(),
+            list_test_blocks: Arc::new(ListTestBlocksExecutor::new(
+                shared_dependency.test_suite_repo.clone(),
+                shared_dependency.test_runner.clone(),
+                ci_token_resolver.clone(),
+            )),
+            list_ci_options: Arc::new(ListCiOptionsExecutor::new(
+                shared_dependency.repository_repo.clone(),
+                shared_dependency.test_runner.clone(),
+                ci_token_resolver.clone(),
+            )),
+            build_test_report: Arc::new(BuildTestReportExecutor::new(
+                shared_dependency.test_run_repo.clone(),
+                shared_dependency.repository_repo.clone(),
+                get_run_failures,
+                config.base_url.clone(),
+                shared_dependency.cache.clone(),
+                config.secret.reversible_cipher_secret.clone(),
+            )),
+            list_task_tracker_options: Arc::new(ListTaskTrackerOptionsExecutor::new(
+                shared_dependency.task_tracker_client.clone(),
+            )),
         };
 
+        // Итоги прогона добирает и вебхук, и подстраховка по расписанию
+        let ingest_test_run_result = Arc::new(IngestTestRunResultExecutor::new(
+            shared_dependency.test_suite_repo.clone(),
+            shared_dependency.test_run_repo.clone(),
+            shared_dependency.test_runner.clone(),
+            ci_token_resolver.clone(),
+        ));
+
         let commands = ApplicationBoostrapExecutorsCommands {
+            connect_test_suite: Arc::new(ConnectTestSuiteExecutor::new(
+                shared_dependency.test_suite_repo.clone(),
+            )),
+            create_test_failure_card: Arc::new(CreateTestFailureCardExecutor::new(
+                shared_dependency.test_run_repo.clone(),
+                shared_dependency.test_failure_card_repo.clone(),
+                shared_dependency.repository_repo.clone(),
+                shared_dependency.repository_task_tracker_repo.clone(),
+                shared_dependency.task_tracker_client.clone(),
+                config.kaiten.base.clone(),
+            )),
+            dispatch_test_run: Arc::new(DispatchTestRunExecutor::new(
+                shared_dependency.test_suite_repo.clone(),
+                shared_dependency.test_run_repo.clone(),
+                shared_dependency.test_runner.clone(),
+                ci_token_resolver.clone(),
+            )),
+            ingest_test_run_result: ingest_test_run_result.clone(),
+            sync_stale_test_runs: Arc::new(SyncStaleTestRunsExecutor::new(
+                shared_dependency.test_run_repo.clone(),
+                ingest_test_run_result,
+            )),
             create_oauth_link: Arc::new(CreateOAuthLinkExecutor::new(
                 shared_dependency.user_repo.clone(),
                 shared_dependency.user_socials_repo.clone(),

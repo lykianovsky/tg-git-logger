@@ -45,6 +45,8 @@ redis = { version = "1.0.3", features = ["tokio-comp"] }
 aes-gcm = "0.11.0-rc.3"
 aead = "0.6.0-rc.10"
 base64 = "0.22.1"
+# Распаковка артефактов CI с отчётом о прогоне тестов
+zip = "2"
 rand = "0.8.5"
 lapin = "2.5"
 tokio-util = "0.7"

@@ -115,6 +115,7 @@ pub enum TelegramBotDialogueAdminState {
     ConfigureTaskTrackerEnterPattern {
         repository_id: i32,
         space_id: i32,
+        board_id: i32,
         qa_column_id: i32,
         review_column_id: i32,
     },

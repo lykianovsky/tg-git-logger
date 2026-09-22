@@ -12,6 +12,10 @@ use crate::domain::repository::repositories::repository_task_tracker_repository:
 use crate::domain::role::repositories::role_repository::RoleRepository;
 use crate::domain::task::ports::task_tracker_client::TaskTrackerClient;
 use crate::domain::task::services::task_tracker_service::TaskTrackerService;
+use crate::domain::test_run::ports::test_runner::TestRunner;
+use crate::domain::test_run::repositories::test_failure_card_repository::TestFailureCardRepository;
+use crate::domain::test_run::repositories::test_run_repository::TestRunRepository;
+use crate::domain::test_run::repositories::test_suite_repository::TestSuiteRepository;
 use crate::domain::user::repositories::user_connection_repositories_repository::UserConnectionRepositoriesRepository;
 use crate::domain::user::repositories::user_has_roles_repository::UserHasRolesRepository;
 use crate::domain::user::repositories::user_repository::UserRepository;
@@ -32,6 +36,7 @@ use crate::infrastructure::integrations::oauth::github::GithubOAuthClient;
 use crate::infrastructure::integrations::task_tracker::kaiten::{
     KaitenClient, KaitenClientBase, KaitenClientToken,
 };
+use crate::infrastructure::integrations::test_runner::github_actions::GithubActionsTestRunner;
 use crate::infrastructure::integrations::version_control::github::client::GithubVersionControlClient;
 use crate::infrastructure::processing::event_bus::EventBus;
 use crate::infrastructure::repositories::mysql::digest_subscription::MySQLDigestSubscriptionRepository;
@@ -43,6 +48,9 @@ use crate::infrastructure::repositories::mysql::release_plan::MySQLReleasePlanRe
 use crate::infrastructure::repositories::mysql::repository::MySQLRepositoryRepository;
 use crate::infrastructure::repositories::mysql::repository_task_tracker::MySQLRepositoryTaskTrackerRepository;
 use crate::infrastructure::repositories::mysql::role::MySQLRoleRepository;
+use crate::infrastructure::repositories::mysql::test_failure_card::MySQLTestFailureCardRepository;
+use crate::infrastructure::repositories::mysql::test_run::MySQLTestRunRepository;
+use crate::infrastructure::repositories::mysql::test_suite::MySQLTestSuiteRepository;
 use crate::infrastructure::repositories::mysql::user::MySQLUserRepository;
 use crate::infrastructure::repositories::mysql::user_connection_repositories::MySQLUserConnectionRepositoriesRepository;
 use crate::infrastructure::repositories::mysql::user_has_roles::MySQLUserHasRolesRepository;
@@ -83,6 +91,10 @@ pub struct ApplicationSharedDependency {
     pub pr_review_repo: Arc<dyn PrReviewRepository>,
     pub notification_log_repo: Arc<dyn NotificationLogRepository>,
     pub release_plan_repo: Arc<dyn ReleasePlanRepository>,
+    pub test_suite_repo: Arc<dyn TestSuiteRepository>,
+    pub test_run_repo: Arc<dyn TestRunRepository>,
+    pub test_failure_card_repo: Arc<dyn TestFailureCardRepository>,
+    pub test_runner: Arc<dyn TestRunner>,
 }
 
 impl ApplicationSharedDependency {
@@ -187,6 +199,18 @@ impl ApplicationSharedDependency {
         let release_plan_repo: Arc<dyn ReleasePlanRepository> =
             Arc::new(MySQLReleasePlanRepository::new(mysql_pool.clone()));
 
+        let test_suite_repo: Arc<dyn TestSuiteRepository> =
+            Arc::new(MySQLTestSuiteRepository::new(mysql_pool.clone()));
+
+        let test_run_repo: Arc<dyn TestRunRepository> =
+            Arc::new(MySQLTestRunRepository::new(mysql_pool.clone()));
+
+        let test_failure_card_repo: Arc<dyn TestFailureCardRepository> =
+            Arc::new(MySQLTestFailureCardRepository::new(mysql_pool.clone()));
+
+        let test_runner: Arc<dyn TestRunner> =
+            Arc::new(GithubActionsTestRunner::new(config.github.api_base.clone()));
+
         Ok(Self {
             event_bus,
             message_broker,
@@ -215,6 +239,10 @@ impl ApplicationSharedDependency {
             pr_review_repo,
             notification_log_repo,
             release_plan_repo,
+            test_suite_repo,
+            test_run_repo,
+            test_failure_card_repo,
+            test_runner,
         })
     }
 }

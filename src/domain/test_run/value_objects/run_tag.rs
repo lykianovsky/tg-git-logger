@@ -1,0 +1,89 @@
+/// Метка запуска: бот передаёт её во вход workflow, CI подставляет в имя прогона,
+/// и по ней прогон находится обратно — `workflow_dispatch` не возвращает идентификатор.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct RunTag(pub String);
+
+/// Длина случайной части метки: её достаточно, чтобы метки не совпали, и она
+/// помещается в имя прогона рядом с веткой
+const RANDOM_PART_BYTES: usize = 8;
+/// Дата в метке — `ГГГГММДД`
+const DATE_PART_LENGTH: usize = 8;
+
+impl RunTag {
+    /// Метка вида `20260922-1a2b3c4d5e6f7a8b`: по дате её легко узнать в списке прогонов,
+    /// случайная часть исключает совпадение при двух запусках в одну секунду
+    pub fn generate(now: chrono::DateTime<chrono::Utc>) -> Self {
+        use rand::RngCore;
+
+        let mut random = [0u8; RANDOM_PART_BYTES];
+
+        rand::rngs::OsRng.fill_bytes(&mut random);
+
+        Self(format!("{}-{}", now.format("%Y%m%d"), hex::encode(random)))
+    }
+
+    /// Метку вынимаем из имени прогона: CI подставляет её рядом с веткой,
+    /// а идентификатора запуска `workflow_dispatch` не возвращает
+    pub fn extract_from_run_name(name: &str) -> Option<Self> {
+        name.split_whitespace()
+            .map(|part| part.trim_matches(|symbol: char| !symbol.is_ascii_alphanumeric()))
+            .find(|part| Self::looks_like_tag(part))
+            .map(|part| Self(part.to_string()))
+    }
+
+    fn looks_like_tag(value: &str) -> bool {
+        let Some((date, random)) = value.split_once('-') else {
+            return false;
+        };
+
+        date.len() == DATE_PART_LENGTH
+            && date.chars().all(|symbol| symbol.is_ascii_digit())
+            && random.len() == RANDOM_PART_BYTES * 2
+            && random.chars().all(|symbol| symbol.is_ascii_hexdigit())
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl std::fmt::Display for RunTag {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(formatter, "{}", self.0)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn generated_tags_do_not_repeat() {
+        let now = chrono::Utc::now();
+        let first = RunTag::generate(now);
+        let second = RunTag::generate(now);
+
+        assert_ne!(first, second);
+    }
+
+    #[test]
+    fn tag_is_extracted_from_run_name() {
+        let tag = RunTag::generate(chrono::Utc::now());
+        let name = format!("E2E · dev · {tag}");
+
+        assert_eq!(RunTag::extract_from_run_name(&name), Some(tag));
+    }
+
+    #[test]
+    fn run_name_without_tag_gives_nothing() {
+        assert_eq!(RunTag::extract_from_run_name("E2E · dev"), None);
+    }
+
+    #[test]
+    fn tag_starts_with_date() {
+        let now = chrono::Utc::now();
+        let tag = RunTag::generate(now);
+
+        assert!(tag.as_str().starts_with(&now.format("%Y%m%d").to_string()));
+    }
+}

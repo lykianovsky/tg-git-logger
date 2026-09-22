@@ -59,8 +59,8 @@ impl TelegramBotReleasePlanCommandHandler {
             }
         };
 
-        let can_manage = roles.contains(&RoleName::Admin)
-            || roles.contains(&RoleName::ProductManager);
+        let can_manage =
+            roles.contains(&RoleName::Admin) || roles.contains(&RoleName::ProductManager);
         if !can_manage {
             self.bot
                 .send_message(

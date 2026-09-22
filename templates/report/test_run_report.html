@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Тесты — {{ repo_owner }}/{{ repo_name }}</title>
+<style>
+:root {
+  --bg: #0d1117;
+  --surface: #161b22;
+  --surface2: #21262d;
+  --border: #30363d;
+  --text: #c9d1d9;
+  --muted: #8b949e;
+  --accent: #58a6ff;
+  --green: #3fb950;
+  --red: #f85149;
+  --orange: #e3b341;
+  --purple: #bc8cff;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.6;
+}
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+code {
+  font-family: 'SFMono-Regular', Consolas, monospace;
+  font-size: 12px;
+  background: var(--surface2);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.page-wrap { max-width: 1000px; margin: 0 auto; padding: 32px 24px; }
+
+.report-header {
+  background: linear-gradient(135deg, #1a1f2e 0%, #161b22 70%, #1c2030 100%);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 28px 32px;
+  margin-bottom: 20px;
+}
+.report-header h1 { font-size: 22px; font-weight: 700; color: #fff; margin-bottom: 10px; }
+.report-header h1 span { color: var(--accent); }
+.report-meta { display: flex; flex-wrap: wrap; gap: 16px; color: var(--muted); font-size: 13px; }
+
+.status-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 14px; border-radius: 20px; font-size: 13px; font-weight: 600;
+  margin-bottom: 12px;
+}
+.status-passed { background: rgba(63,185,80,0.12); border: 1px solid rgba(63,185,80,0.3); color: var(--green); }
+.status-failed { background: rgba(248,81,73,0.12); border: 1px solid rgba(248,81,73,0.3); color: var(--red); }
+.status-running { background: rgba(88,166,255,0.12); border: 1px solid rgba(88,166,255,0.3); color: var(--accent); }
+.status-unknown { background: rgba(139,148,158,0.12); border: 1px solid rgba(139,148,158,0.3); color: var(--muted); }
+
+.stats-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px; margin-bottom: 20px;
+}
+.stat-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 16px 18px;
+}
+.stat-card .value { font-size: 24px; font-weight: 700; color: #fff; }
+.stat-card .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.4px; }
+.stat-card.passed .value { color: var(--green); }
+.stat-card.failed .value { color: var(--red); }
+.stat-card.flaky .value { color: var(--orange); }
+.stat-card.skipped .value { color: var(--muted); }
+
+.progress {
+  height: 8px; background: var(--surface2); border-radius: 6px;
+  overflow: hidden; display: flex; margin-bottom: 24px;
+}
+.progress .bar-passed { background: var(--green); }
+.progress .bar-failed { background: var(--red); }
+.progress .bar-flaky { background: var(--orange); }
+
+.section-title {
+  font-size: 15px; font-weight: 600; color: #fff;
+  margin: 24px 0 12px; display: flex; align-items: center; gap: 8px;
+}
+
+.failure-file {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; margin-bottom: 12px; overflow: hidden;
+}
+.failure-file > .file-head {
+  padding: 12px 18px; background: var(--surface2);
+  border-bottom: 1px solid var(--border);
+  font-family: 'SFMono-Regular', Consolas, monospace; font-size: 12px; color: var(--muted);
+}
+.failure-row { padding: 14px 18px; border-bottom: 1px solid var(--border); }
+.failure-row:last-child { border-bottom: none; }
+.failure-title { color: #fff; font-weight: 600; }
+.project-badge {
+  display: inline-block; font-size: 11px; padding: 1px 8px; border-radius: 10px;
+  background: rgba(188,140,255,0.12); border: 1px solid rgba(188,140,255,0.25);
+  color: var(--purple); margin-right: 8px;
+}
+.failure-error {
+  margin-top: 6px; font-family: 'SFMono-Regular', Consolas, monospace;
+  font-size: 12px; color: var(--red); white-space: pre-wrap; word-break: break-word;
+}
+.card-link { margin-top: 6px; font-size: 12px; }
+
+.empty-state {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 40px; text-align: center; color: var(--muted);
+}
+.empty-state .icon { font-size: 48px; display: block; margin-bottom: 8px; }
+
+.footer { margin-top: 28px; color: var(--muted); font-size: 12px; text-align: center; }
+</style>
+</head>
+<body>
+<div class="page-wrap">
+
+  <div class="report-header">
+    <div class="status-badge {{ status_class }}">{{ status_label }}</div>
+    <h1>Тесты — <span>{{ repo_owner }}/{{ repo_name }}</span></h1>
+    <div class="report-meta">
+      <span>🌿 {{ git_ref }}</span>
+      {% if sha_short != "" %}<span>🔐 <code>{{ sha_short }}</code></span>{% endif %}
+      <span>🚀 {{ trigger_label }}</span>
+      <span>🕒 {{ finished_label }}</span>
+      <span>⏱️ {{ duration_label }}</span>
+      {% if args != "" %}<span>⚙️ <code>{{ args }}</code></span>{% endif %}
+    </div>
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-card"><div class="value">{{ total }}</div><div class="label">{{ label_total }}</div></div>
+    <div class="stat-card passed"><div class="value">{{ passed }}</div><div class="label">{{ label_passed }}</div></div>
+    <div class="stat-card failed"><div class="value">{{ failed }}</div><div class="label">{{ label_failed }}</div></div>
+    <div class="stat-card flaky"><div class="value">{{ flaky }}</div><div class="label">{{ label_flaky }}</div></div>
+    <div class="stat-card skipped"><div class="value">{{ skipped }}</div><div class="label">{{ label_skipped }}</div></div>
+  </div>
+
+  <div class="progress">
+    <div class="bar-passed" style="width: {{ passed_pct }}%"></div>
+    <div class="bar-flaky" style="width: {{ flaky_pct }}%"></div>
+    <div class="bar-failed" style="width: {{ failed_pct }}%"></div>
+  </div>
+
+  <div class="section-title">❌ {{ failures_title }}</div>
+
+  {% if failure_files.is_empty() %}
+  <div class="empty-state">
+    <span class="icon">🟢</span>
+    {{ no_failures_label }}
+  </div>
+  {% else %}
+  {% for file in failure_files %}
+  <div class="failure-file">
+    <div class="file-head">{{ file.path }}</div>
+    {% for failure in file.failures %}
+    <div class="failure-row">
+      <div class="failure-title"><span class="project-badge">{{ failure.project }}</span>{{ failure.title }}</div>
+      {% if failure.error != "" %}<div class="failure-error">{{ failure.error }}</div>{% endif %}
+      {% if failure.card_url != "" %}
+      <div class="card-link">🗂️ <a href="{{ failure.card_url }}" target="_blank" rel="noopener">{{ card_exists_label }}</a></div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% endfor %}
+  {% endif %}
+
+  <div class="footer">
+    {% if run_url != "" %}<a href="{{ run_url }}" target="_blank" rel="noopener">{{ run_in_ci_label }}</a> · {% endif %}
+    {{ generated_label }}
+  </div>
+
+</div>
+</body>
+</html>

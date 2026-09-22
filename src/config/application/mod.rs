@@ -2,6 +2,8 @@ use crate::config::environment::ENV;
 use chrono::{NaiveTime, Weekday};
 use chrono_tz::Tz;
 
+/// Значения по умолчанию для управления тестами, если в окружении задано некорректное число
+
 pub struct ApplicationNotificationsConfig {
     pub default_dnd_start: NaiveTime,
     pub default_dnd_end: NaiveTime,
@@ -19,6 +21,7 @@ pub struct ApplicationTaskTrackerConfig {
     pub extract_pattern: String,
 }
 
+/// Управление тестами из бота: доступ к CI, хранение и раздача HTML-отчётов
 pub struct ApplicationKaitenConfig {
     pub base: String,
     pub api_token: String,

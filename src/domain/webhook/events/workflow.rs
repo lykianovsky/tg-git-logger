@@ -53,7 +53,9 @@ impl WebhookEvent for WebhookWorkflowEvent {
         let safe_repo = MessageBuilder::escape_html(&self.repo);
 
         let repo_line = match &self.repo_url {
-            Some(url) if url.trim().starts_with("http://") || url.trim().starts_with("https://") => {
+            Some(url)
+                if url.trim().starts_with("http://") || url.trim().starts_with("https://") =>
+            {
                 format!(
                     "📦 <a href=\"{}\">{}</a>",
                     MessageBuilder::escape_html(url.trim()),

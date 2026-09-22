@@ -33,6 +33,7 @@ impl RepositoryTaskTrackerRepository for MySQLRepositoryTaskTrackerRepository {
         let model = repository_task_tracker::ActiveModel {
             repository_id: Set(tracker.repository_id.0),
             space_id: Set(tracker.space_id),
+            board_id: Set(tracker.board_id),
             qa_column_id: Set(tracker.qa_column_id),
             review_column_id: Set(tracker.review_column_id),
             extract_pattern_regexp: Set(tracker.extract_pattern_regexp.clone()),
@@ -57,6 +58,7 @@ impl RepositoryTaskTrackerRepository for MySQLRepositoryTaskTrackerRepository {
             id: Set(tracker.id),
             repository_id: Set(tracker.repository_id.0),
             space_id: Set(tracker.space_id),
+            board_id: Set(tracker.board_id),
             qa_column_id: Set(tracker.qa_column_id),
             review_column_id: Set(tracker.review_column_id),
             extract_pattern_regexp: Set(tracker.extract_pattern_regexp.clone()),
@@ -107,6 +109,7 @@ impl RepositoryTaskTracker {
             id: model.id,
             repository_id: RepositoryId(model.repository_id),
             space_id: model.space_id,
+            board_id: model.board_id,
             qa_column_id: model.qa_column_id,
             review_column_id: model.review_column_id,
             extract_pattern_regexp: model.extract_pattern_regexp,

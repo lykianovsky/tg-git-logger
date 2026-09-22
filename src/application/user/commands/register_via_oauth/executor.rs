@@ -74,7 +74,11 @@ impl CommandExecutor for RegisterUserViaOAuthExecutor {
             .get_user(&exchange_code_response.access_token)
             .await?;
 
-        if let Some(org) = self.required_organization.as_deref().filter(|s| !s.is_empty()) {
+        if let Some(org) = self
+            .required_organization
+            .as_deref()
+            .filter(|s| !s.is_empty())
+        {
             let is_admin = cmd.state.social_user_id == self.telegram_admin_user_id;
             if !is_admin {
                 let is_member = self

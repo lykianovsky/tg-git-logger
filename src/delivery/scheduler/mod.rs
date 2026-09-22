@@ -5,10 +5,18 @@ use crate::application::notification::commands::scan_pr_conflicts::command::Scan
 use crate::application::notification::commands::scan_stale_pull_requests::command::ScanStalePullRequestsExecutorCommand;
 use crate::application::release_plan::commands::send_call_reminders::command::SendCallRemindersExecutorCommand;
 use crate::application::release_plan::commands::send_release_day_reminders::command::SendReleaseDayRemindersExecutorCommand;
+use crate::application::test_run::commands::sync_stale_test_runs::command::SyncStaleTestRunsCommand;
 use crate::bootstrap::executors::ApplicationBoostrapExecutors;
+use crate::bootstrap::shared_dependency::ApplicationSharedDependency;
 use crate::config::application::ApplicationConfig;
 use crate::delivery::contract::ApplicationDelivery;
+use crate::delivery::jobs::consumers::send_social_notify::payload::SendSocialNotifyJob;
+use crate::delivery::notifications::test_run::{
+    build_test_run_message, build_test_run_report_url, resolve_test_run_chat_id,
+};
 use crate::domain::shared::command::CommandExecutor;
+use crate::domain::user::value_objects::social_chat_id::SocialChatId;
+use crate::domain::user::value_objects::social_type::SocialType;
 use async_trait::async_trait;
 use chrono::{Timelike, Utc};
 use std::error::Error;
@@ -18,14 +26,20 @@ use tokio_cron_scheduler::{Job, JobScheduler};
 pub struct DeliveryScheduler {
     executors: Arc<ApplicationBoostrapExecutors>,
     config: Arc<ApplicationConfig>,
+    shared_dependency: Arc<ApplicationSharedDependency>,
 }
 
 impl DeliveryScheduler {
     pub fn new(
         executors: Arc<ApplicationBoostrapExecutors>,
         config: Arc<ApplicationConfig>,
+        shared_dependency: Arc<ApplicationSharedDependency>,
     ) -> Self {
-        Self { executors, config }
+        Self {
+            executors,
+            config,
+            shared_dependency,
+        }
     }
 }
 
@@ -216,10 +230,7 @@ impl ApplicationDelivery for DeliveryScheduler {
                             .await
                         {
                             Ok(r) if r.sent_count > 0 => {
-                                tracing::info!(
-                                    sent = r.sent_count,
-                                    "Release day reminders sent"
-                                );
+                                tracing::info!(sent = r.sent_count, "Release day reminders sent");
                             }
                             Err(e) => {
                                 tracing::error!(error = %e, "Release day reminders failed");
@@ -247,10 +258,7 @@ impl ApplicationDelivery for DeliveryScheduler {
                             .await
                         {
                             Ok(r) if r.sent_count > 0 => {
-                                tracing::info!(
-                                    sent = r.sent_count,
-                                    "Release call reminders sent"
-                                );
+                                tracing::info!(sent = r.sent_count, "Release call reminders sent");
                             }
                             Err(e) => {
                                 tracing::error!(error = %e, "Release call reminders failed");
@@ -267,6 +275,63 @@ impl ApplicationDelivery for DeliveryScheduler {
         scheduler.start().await.expect("JobScheduler start failed");
 
         tracing::info!("Scheduler started");
+
+        // Итоги прогонов тестов — подстраховка, если вебхук не дошёл
+        let test_runs_executors = self.executors.clone();
+        let test_runs_shared = self.shared_dependency.clone();
+        let test_runs_default_chat_id = SocialChatId(self.config.telegram.chat_id);
+
+        scheduler
+            .add(
+                Job::new_async("30 * * * * *", move |_uuid, _lock| {
+                    let executors = test_runs_executors.clone();
+                    let shared_dependency = test_runs_shared.clone();
+
+                    Box::pin(async move {
+                        let response = match executors
+                            .commands
+                            .sync_stale_test_runs
+                            .execute(&SyncStaleTestRunsCommand {})
+                            .await
+                        {
+                            Ok(response) => response,
+                            Err(error) => {
+                                tracing::error!(error = %error, "Stale test runs sync failed");
+
+                                return;
+                            }
+                        };
+
+                        // Прогон завершился, а вебхука не было — сообщаем сами
+                        for run in response.finished {
+                            let chat_id = resolve_test_run_chat_id(
+                                &shared_dependency.repository_repo,
+                                &run,
+                                test_runs_default_chat_id,
+                            )
+                            .await;
+                            let report_url = build_test_run_report_url(
+                                &executors.queries.build_test_report,
+                                &run,
+                            )
+                            .await;
+
+                            shared_dependency
+                                .publisher
+                                .publish(&SendSocialNotifyJob {
+                                    social_type: SocialType::Telegram,
+                                    chat_id,
+                                    message: build_test_run_message(&run, report_url.as_deref()),
+                                })
+                                .await
+                                .ok();
+                        }
+                    })
+                })
+                .expect("Stale test runs job create error"),
+            )
+            .await
+            .expect("JobScheduler failed to add stale test runs job");
 
         // Keep the scheduler alive — dropping it stops all cron jobs
         loop {
