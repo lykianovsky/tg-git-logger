@@ -3,43 +3,30 @@ use crate::domain::test_run::entities::test_suite::TestSuite;
 use crate::domain::test_run::ports::test_runner::{
     DispatchTestRunError, FetchTestRunError, ListTestBlocksError, TestRunArtifacts, TestRunner,
 };
-use crate::domain::test_run::value_objects::report_state::TestReportState;
 use crate::domain::test_run::value_objects::run_tag::RunTag;
 use crate::domain::test_run::value_objects::test_run_status::TestRunStatus;
 use crate::infrastructure::integrations::test_runner::summary::parse_summary;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde_json::{Value, json};
-use std::path::{Path, PathBuf};
 
 /// Сколько последних прогонов просматриваем, разыскивая свой по метке
 const RUNS_LOOKUP_LIMIT: u32 = 30;
 const GITHUB_API_VERSION: &str = "2022-11-28";
 const USER_AGENT: &str = "tg-bot-logger";
-const BYTES_IN_MEGABYTE: u64 = 1024 * 1024;
 
 pub struct GithubActionsTestRunner {
     http: reqwest::Client,
     api_base: String,
     token: String,
-    /// Куда распаковывается HTML-отчёт до переноса в постоянное хранилище
-    work_dir: PathBuf,
-    report_max_size_mb: u64,
 }
 
 impl GithubActionsTestRunner {
-    pub fn new(
-        api_base: String,
-        token: String,
-        work_dir: PathBuf,
-        report_max_size_mb: u64,
-    ) -> Self {
+    pub fn new(api_base: String, token: String) -> Self {
         Self {
             http: reqwest::Client::new(),
             api_base,
             token,
-            work_dir,
-            report_max_size_mb,
         }
     }
 
@@ -93,7 +80,6 @@ impl GithubActionsTestRunner {
                 false => Self::parse_time(run, "updated_at"),
             },
             totals: None,
-            report_state: TestReportState::None,
         }
     }
 
@@ -105,77 +91,27 @@ impl GithubActionsTestRunner {
             .map(|value| value.with_timezone(&Utc))
     }
 
-    /// Артефакт распаковывается выборочно: итоги — в память, HTML-отчёт — на диск.
-    /// Пути из архива проверяются, чтобы запись не ушла за пределы каталога
-    fn unpack(
+    /// Из артефакта нужен только машиночитаемый отчёт: HTML-отчёт бот строит сам,
+    /// а полный отчёт Playwright остаётся в артефактах прогона
+    fn read_summary(
         archive: Vec<u8>,
         suite: &TestSuite,
-        target_dir: &Path,
-        max_size_bytes: u64,
-    ) -> Result<(Option<String>, bool), FetchTestRunError> {
+    ) -> Result<Option<String>, FetchTestRunError> {
         let reader = std::io::Cursor::new(archive);
         let mut zip = zip::ZipArchive::new(reader)
             .map_err(|error| FetchTestRunError::ProviderError(error.to_string()))?;
 
-        let report_prefix = format!("{}/", suite.report_path.trim_end_matches('/'));
-        let mut summary = None;
-        let mut report_size = 0u64;
-        let mut report_too_large = false;
+        let mut entry = match zip.by_name(&suite.summary_path) {
+            Ok(entry) => entry,
+            Err(_) => return Ok(None),
+        };
 
-        for index in 0..zip.len() {
-            let mut entry = zip
-                .by_index(index)
-                .map_err(|error| FetchTestRunError::ProviderError(error.to_string()))?;
+        let mut content = String::new();
 
-            let Some(entry_path) = entry.enclosed_name() else {
-                continue;
-            };
-            let entry_path = entry_path.to_path_buf();
-            let entry_name = entry_path.to_string_lossy().to_string();
+        std::io::Read::read_to_string(&mut entry, &mut content)
+            .map_err(|error| FetchTestRunError::ProviderError(error.to_string()))?;
 
-            if entry_name == suite.summary_path {
-                let mut content = String::new();
-
-                std::io::Read::read_to_string(&mut entry, &mut content)
-                    .map_err(|error| FetchTestRunError::ProviderError(error.to_string()))?;
-                summary = Some(content);
-
-                continue;
-            }
-
-            if !entry_name.starts_with(&report_prefix) || entry.is_dir() {
-                continue;
-            }
-
-            report_size += entry.size();
-
-            if report_size > max_size_bytes {
-                report_too_large = true;
-
-                continue;
-            }
-
-            let relative = entry_name.trim_start_matches(&report_prefix);
-            let destination = target_dir.join(relative);
-
-            if let Some(parent) = destination.parent() {
-                std::fs::create_dir_all(parent)
-                    .map_err(|error| FetchTestRunError::ProviderError(error.to_string()))?;
-            }
-
-            let mut file = std::fs::File::create(&destination)
-                .map_err(|error| FetchTestRunError::ProviderError(error.to_string()))?;
-
-            std::io::copy(&mut entry, &mut file)
-                .map_err(|error| FetchTestRunError::ProviderError(error.to_string()))?;
-        }
-
-        if report_too_large {
-            // Частично распакованный отчёт бесполезен — убираем
-            std::fs::remove_dir_all(target_dir).ok();
-        }
-
-        Ok((summary, report_too_large))
+        Ok(Some(content))
     }
 }
 
@@ -318,8 +254,6 @@ impl TestRunner for GithubActionsTestRunner {
             return Ok(TestRunArtifacts {
                 totals: None,
                 failures: Vec::new(),
-                report_dir: None,
-                report_too_large: false,
             });
         };
 
@@ -338,25 +272,12 @@ impl TestRunner for GithubActionsTestRunner {
             .map_err(|error| FetchTestRunError::ProviderError(error.to_string()))?
             .to_vec();
 
-        let target_dir = self.work_dir.join(provider_run_id.to_string());
-
-        std::fs::create_dir_all(&target_dir)
-            .map_err(|error| FetchTestRunError::ProviderError(error.to_string()))?;
-
-        let max_size_bytes = self.report_max_size_mb * BYTES_IN_MEGABYTE;
-        let (summary_raw, report_too_large) =
-            Self::unpack(archive, suite, &target_dir, max_size_bytes)?;
-
+        let summary_raw = Self::read_summary(archive, suite)?;
         let parsed = summary_raw.as_deref().and_then(parse_summary);
 
         Ok(TestRunArtifacts {
             totals: parsed.as_ref().map(|summary| summary.totals),
             failures: parsed.map(|summary| summary.failures).unwrap_or_default(),
-            report_dir: match report_too_large {
-                true => None,
-                false => Some(target_dir.to_string_lossy().to_string()),
-            },
-            report_too_large,
         })
     }
 

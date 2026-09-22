@@ -16,6 +16,5 @@ pub struct TestSuite {
     pub tag_input_name: String,
     pub artifact_prefix: String,
     pub summary_path: String,
-    pub report_path: String,
     pub tests_root: String,
 }

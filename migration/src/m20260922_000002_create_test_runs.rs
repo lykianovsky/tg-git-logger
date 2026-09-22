@@ -65,13 +65,6 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(TestRuns::Failed).integer().null())
                     .col(ColumnDef::new(TestRuns::Flaky).integer().null())
                     .col(ColumnDef::new(TestRuns::Skipped).integer().null())
-                    // none / stored / too_large / expired — состояние HTML-отчёта у бота
-                    .col(
-                        ColumnDef::new(TestRuns::ReportState)
-                            .string_len(32)
-                            .not_null()
-                            .default("none"),
-                    )
                     .col(
                         ColumnDef::new(TestRuns::CreatedAt)
                             .timestamp_with_time_zone()
@@ -152,7 +145,6 @@ enum TestRuns {
     Failed,
     Flaky,
     Skipped,
-    ReportState,
     CreatedAt,
     UpdatedAt,
 }

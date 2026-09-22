@@ -29,7 +29,6 @@ impl MySQLTestSuiteRepository {
             tag_input_name: model.tag_input_name,
             artifact_prefix: model.artifact_prefix,
             summary_path: model.summary_path,
-            report_path: model.report_path,
             tests_root: model.tests_root,
         }
     }

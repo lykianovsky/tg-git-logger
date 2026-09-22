@@ -5,13 +5,10 @@ use crate::domain::repository::value_objects::repository_id::RepositoryId;
 use crate::domain::shared::command::CommandExecutor;
 use crate::domain::test_run::entities::test_failure::NewTestFailure;
 use crate::domain::test_run::entities::test_run::TestRunOutcome;
-use crate::domain::test_run::ports::test_report_storage::TestReportStorage;
 use crate::domain::test_run::ports::test_runner::{TestRunArtifacts, TestRunner};
 use crate::domain::test_run::repositories::test_run_repository::TestRunRepository;
 use crate::domain::test_run::repositories::test_suite_repository::TestSuiteRepository;
-use crate::domain::test_run::value_objects::report_state::TestReportState;
 use crate::domain::test_run::value_objects::test_fingerprint::TestFingerprint;
-use crate::domain::test_run::value_objects::test_run_id::TestRunId;
 use crate::domain::test_run::value_objects::test_run_status::TestRunStatus;
 use std::sync::Arc;
 
@@ -19,7 +16,6 @@ pub struct IngestTestRunResultExecutor {
     test_suite_repo: Arc<dyn TestSuiteRepository>,
     test_run_repo: Arc<dyn TestRunRepository>,
     test_runner: Arc<dyn TestRunner>,
-    report_storage: Arc<dyn TestReportStorage>,
 }
 
 impl IngestTestRunResultExecutor {
@@ -27,33 +23,11 @@ impl IngestTestRunResultExecutor {
         test_suite_repo: Arc<dyn TestSuiteRepository>,
         test_run_repo: Arc<dyn TestRunRepository>,
         test_runner: Arc<dyn TestRunner>,
-        report_storage: Arc<dyn TestReportStorage>,
     ) -> Self {
         Self {
             test_suite_repo,
             test_run_repo,
             test_runner,
-            report_storage,
-        }
-    }
-
-    /// Отчёт кладём под прогон: ссылку бот раздаёт со своего домена
-    async fn store_report(&self, id: TestRunId, artifacts: &TestRunArtifacts) -> TestReportState {
-        if artifacts.report_too_large {
-            return TestReportState::TooLarge;
-        }
-
-        let Some(report_dir) = artifacts.report_dir.as_deref() else {
-            return TestReportState::None;
-        };
-
-        match self.report_storage.store(id, report_dir).await {
-            Ok(_) => TestReportState::Stored,
-            Err(error) => {
-                tracing::error!(%error, run_id = id.0, "Failed to store test report");
-
-                TestReportState::None
-            }
         }
     }
 
@@ -137,7 +111,6 @@ impl CommandExecutor for IngestTestRunResultExecutor {
                 .await?;
 
             outcome.totals = artifacts.totals;
-            outcome.report_state = self.store_report(run.id, &artifacts).await;
 
             failures = Self::build_failures(run.repository_id, &artifacts);
         }

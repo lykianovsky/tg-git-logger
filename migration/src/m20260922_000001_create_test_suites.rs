@@ -64,11 +64,6 @@ impl MigrationTrait for Migration {
                             .not_null(),
                     )
                     .col(
-                        ColumnDef::new(TestSuites::ReportPath)
-                            .string_len(500)
-                            .not_null(),
-                    )
-                    .col(
                         ColumnDef::new(TestSuites::TestsRoot)
                             .string_len(500)
                             .not_null(),
@@ -120,7 +115,6 @@ enum TestSuites {
     TagInputName,
     ArtifactPrefix,
     SummaryPath,
-    ReportPath,
     TestsRoot,
     CreatedAt,
     UpdatedAt,

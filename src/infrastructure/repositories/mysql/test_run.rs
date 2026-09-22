@@ -6,7 +6,6 @@ use crate::domain::test_run::entities::test_run::{
 use crate::domain::test_run::repositories::test_run_repository::{
     CreateTestRunError, FindTestRunError, TestRunRepository, UpdateTestRunError,
 };
-use crate::domain::test_run::value_objects::report_state::TestReportState;
 use crate::domain::test_run::value_objects::run_tag::RunTag;
 use crate::domain::test_run::value_objects::test_fingerprint::TestFingerprint;
 use crate::domain::test_run::value_objects::test_run_id::TestRunId;
@@ -37,7 +36,6 @@ impl MySQLTestRunRepository {
     fn from_mysql(model: test_runs::Model) -> Option<TestRun> {
         let status = TestRunStatus::from_str(&model.status)?;
         let trigger = TestRunTrigger::from_str(&model.trigger)?;
-        let report_state = TestReportState::from_str(&model.report_state)?;
 
         // Итоги есть только у завершённого прогона, разобранного из отчёта
         let totals = model.total.map(|total| TestRunTotals {
@@ -66,7 +64,6 @@ impl MySQLTestRunRepository {
             started_at: model.started_at,
             finished_at: model.finished_at,
             totals,
-            report_state,
             created_at: model.created_at,
         })
     }
@@ -100,7 +97,6 @@ impl TestRunRepository for MySQLTestRunRepository {
             requested_by_user_id: Set(run.requested_by_user_id.map(|id| id.0)),
             chat_id: Set(run.chat_id.map(|id| id.0)),
             status: Set(TestRunStatus::Queued.as_str().to_string()),
-            report_state: Set(TestReportState::None.as_str().to_string()),
             ..Default::default()
         };
 
@@ -228,7 +224,6 @@ impl TestRunRepository for MySQLTestRunRepository {
         let mut model = test_runs::ActiveModel {
             id: Set(id.0),
             status: Set(outcome.status.as_str().to_string()),
-            report_state: Set(outcome.report_state.as_str().to_string()),
             finished_at: Set(outcome.finished_at),
             ..Default::default()
         };

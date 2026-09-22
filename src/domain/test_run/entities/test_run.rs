@@ -1,5 +1,4 @@
 use crate::domain::repository::value_objects::repository_id::RepositoryId;
-use crate::domain::test_run::value_objects::report_state::TestReportState;
 use crate::domain::test_run::value_objects::run_tag::RunTag;
 use crate::domain::test_run::value_objects::test_run_id::TestRunId;
 use crate::domain::test_run::value_objects::test_run_status::TestRunStatus;
@@ -38,7 +37,6 @@ pub struct TestRun {
     pub started_at: Option<DateTime<Utc>>,
     pub finished_at: Option<DateTime<Utc>>,
     pub totals: Option<TestRunTotals>,
-    pub report_state: TestReportState,
     pub created_at: DateTime<Utc>,
 }
 
@@ -63,7 +61,6 @@ pub struct TestRunOutcome {
     pub started_at: Option<DateTime<Utc>>,
     pub finished_at: Option<DateTime<Utc>>,
     pub totals: Option<TestRunTotals>,
-    pub report_state: TestReportState,
 }
 
 impl TestRun {

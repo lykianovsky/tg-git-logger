@@ -28,7 +28,6 @@ pub struct Model {
     pub failed: Option<i32>,
     pub flaky: Option<i32>,
     pub skipped: Option<i32>,
-    pub report_state: String,
     pub created_at: DateTimeUtc,
     pub updated_at: DateTimeUtc,
 }

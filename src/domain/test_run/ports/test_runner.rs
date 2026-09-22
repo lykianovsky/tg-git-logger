@@ -32,9 +32,6 @@ pub enum ListTestBlocksError {
 pub struct TestRunArtifacts {
     pub totals: Option<TestRunTotals>,
     pub failures: Vec<ParsedTestFailure>,
-    /// Локальный каталог с распакованным HTML-отчётом
-    pub report_dir: Option<String>,
-    pub report_too_large: bool,
 }
 
 #[derive(Debug, Clone)]
