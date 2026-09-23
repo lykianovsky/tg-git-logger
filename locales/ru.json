@@ -665,6 +665,11 @@
       "totals_value": "прошли %{passed} · упали %{failed} · нестабильные %{flaky} · пропущены %{skipped}",
       "report": "📄 Отчёт",
       "report_link": "Открыть →"
+    },
+    "pagination": {
+      "previous": "‹ Предыдущие",
+      "next": "Следующие ›",
+      "counter": "%{page}/%{pages}"
     }
   }
 }

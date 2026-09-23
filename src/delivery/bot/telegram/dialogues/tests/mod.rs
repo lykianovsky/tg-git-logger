@@ -38,6 +38,9 @@ use crate::delivery::bot::telegram::dialogues::{
 };
 use crate::delivery::bot::telegram::keyboards::actions::TelegramBotKeyboardAction;
 use crate::delivery::bot::telegram::keyboards::actions::tests::TelegramBotTestsAction;
+use crate::delivery::bot::telegram::keyboards::pagination::{
+    is_pagination, paginated_rows, parse_page,
+};
 use crate::domain::repository::value_objects::repository_id::RepositoryId;
 use crate::domain::shared::command::CommandExecutor;
 use crate::domain::test_run::entities::test_run::TestRun;
@@ -52,7 +55,9 @@ use std::error::Error;
 use std::sync::Arc;
 use teloxide::dispatching::{DpHandlerDescription, UpdateFilterExt};
 use teloxide::dptree::{Handler, case};
-use teloxide::payloads::{EditMessageTextSetters, SendMessageSetters};
+use teloxide::payloads::{
+    EditMessageReplyMarkupSetters, EditMessageTextSetters, SendMessageSetters,
+};
 use teloxide::prelude::{Requester, Update};
 use teloxide::types::{
     CallbackQuery, ChatId, InlineKeyboardButton, InlineKeyboardMarkup, Message, MessageId,
@@ -69,8 +74,8 @@ const CARD_CALLBACK_PREFIX: &str = "card:";
 const OPTION_CALLBACK_PREFIX: &str = "opt:";
 /// Кнопка тега несёт его название: именно им тег вешается на карточку
 const TAG_CALLBACK_PREFIX: &str = "tag:";
-/// Сколько вариантов показываем на шаге выбора
-const MAX_OPTION_BUTTONS: usize = 30;
+/// Список всегда открывается с первой страницы
+const FIRST_PAGE: usize = 0;
 /// Сколько мешающих тестов показываем в ответе про релиз
 const MAX_READINESS_BLOCKERS: usize = 10;
 
@@ -127,8 +132,9 @@ pub enum ConnectStep {
 #[derive(Debug, Clone, Default)]
 pub struct ConnectDraft {
     pub repository_id: i32,
-    /// Варианты шага: кнопка несёт номер, значение берём отсюда
-    pub options: Vec<String>,
+    /// Варианты шага целиком: кнопка несёт номер, значение и подпись берём отсюда.
+    /// Подпись нужна и после первого показа — на переходе по страницам
+    pub options: Vec<CiOption>,
 }
 
 pub struct TelegramBotTestsDispatcher {}
@@ -376,6 +382,7 @@ async fn handle_card(
                 message_id,
                 repository_id,
                 social_user_id,
+                FIRST_PAGE,
             )
             .await?
         }
@@ -463,6 +470,15 @@ async fn choose_block(
 
     let data = query.data.as_deref().unwrap_or("");
 
+    // Переход по страницам не выбор блока: экран и состояние те же, меняется клавиатура
+    if is_pagination(data) {
+        let Some(page) = parse_page(data) else {
+            return Ok(());
+        };
+
+        return show_page(&bot, chat_id, message_id, blocks_keyboard(&blocks, page)).await;
+    }
+
     dialogue
         .update(TelegramBotDialogueState::Tests(
             TelegramBotTestsState::Card { repository_id },
@@ -506,6 +522,7 @@ async fn show_blocks(
     message_id: MessageId,
     repository_id: i32,
     social_user_id: SocialUserId,
+    page: usize,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     let blocks = match executors
         .queries
@@ -586,31 +603,32 @@ async fn show_blocks(
         ))
         .await?;
 
-    let mut rows: Vec<Vec<InlineKeyboardButton>> = blocks
-        .iter()
-        .enumerate()
-        .map(|(index, block)| {
-            vec![InlineKeyboardButton::callback(
-                block.clone(),
-                format!("{BLOCK_CALLBACK_PREFIX}{index}"),
-            )]
-        })
-        .collect();
-
-    rows.push(vec![InlineKeyboardButton::callback(
-        TelegramBotTestsAction::Back.label(),
-        TelegramBotTestsAction::Back.to_callback_data().to_string(),
-    )]);
-
     bot.edit_message_text(
         chat_id,
         message_id,
         t!("telegram_bot.dialogues.tests.select_block").to_string(),
     )
-    .reply_markup(InlineKeyboardMarkup::new(rows))
+    .reply_markup(blocks_keyboard(&blocks, page))
     .await?;
 
     Ok(())
+}
+
+/// Блоков столько, сколько каталогов в репозитории, — показываем страницами
+fn blocks_keyboard(blocks: &[String], page: usize) -> InlineKeyboardMarkup {
+    let buttons = blocks
+        .iter()
+        .enumerate()
+        .map(|(index, block)| {
+            InlineKeyboardButton::callback(block.clone(), format!("{BLOCK_CALLBACK_PREFIX}{index}"))
+        })
+        .collect();
+
+    let mut rows = paginated_rows(buttons, page);
+
+    rows.push(vec![back_button()]);
+
+    InlineKeyboardMarkup::new(rows)
 }
 
 async fn run_tests(
@@ -1189,7 +1207,7 @@ async fn start_connect(
                 step: ConnectStep::Workflow,
                 draft: ConnectDraft {
                     repository_id,
-                    options: options.iter().map(|option| option.value.clone()).collect(),
+                    options: options.clone(),
                 },
             },
         ))
@@ -1200,7 +1218,7 @@ async fn start_connect(
         message_id,
         t!("telegram_bot.dialogues.tests.select_workflow").to_string(),
     )
-    .reply_markup(ci_options_keyboard(&options))
+    .reply_markup(ci_options_keyboard(&options, FIRST_PAGE))
     .await?;
 
     Ok(())
@@ -1234,11 +1252,25 @@ async fn handle_connect(
         .await;
     }
 
+    if is_pagination(data) {
+        let Some(page) = parse_page(data) else {
+            return Ok(());
+        };
+
+        return show_page(
+            &bot,
+            chat_id,
+            message_id,
+            ci_options_keyboard(&draft.options, page),
+        )
+        .await;
+    }
+
     // Кнопка несёт номер: имя процесса в 64 байта данных кнопки не помещается
     let Some(workflow_file) = data
         .strip_prefix(OPTION_CALLBACK_PREFIX)
         .and_then(|index| index.parse::<usize>().ok())
-        .and_then(|index| draft.options.get(index))
+        .and_then(|index| draft.options.get(index).map(|option| option.value.clone()))
     else {
         return Ok(());
     };
@@ -1249,7 +1281,7 @@ async fn handle_connect(
                 .update(TelegramBotDialogueState::Tests(
                     TelegramBotTestsState::EnterDefaultRef {
                         repository_id: draft.repository_id,
-                        workflow_file: workflow_file.clone(),
+                        workflow_file,
                     },
                 ))
                 .await?;
@@ -1402,19 +1434,20 @@ async fn show_ci_options_error(
     edit_with_back(bot, chat_id, message_id, text).await
 }
 
-fn ci_options_keyboard(options: &[CiOption]) -> InlineKeyboardMarkup {
-    // В данные кнопки влезает 64 байта — имя ветки туда не помещается, шлём номер
-    let mut rows: Vec<Vec<InlineKeyboardButton>> = options
+fn ci_options_keyboard(options: &[CiOption], page: usize) -> InlineKeyboardMarkup {
+    // В данные кнопки влезает 64 байта — имя процесса туда не помещается, шлём номер
+    let buttons = options
         .iter()
-        .take(MAX_OPTION_BUTTONS)
         .enumerate()
         .map(|(index, option)| {
-            vec![InlineKeyboardButton::callback(
+            InlineKeyboardButton::callback(
                 option.label.clone(),
                 format!("{OPTION_CALLBACK_PREFIX}{index}"),
-            )]
+            )
         })
         .collect();
+
+    let mut rows = paginated_rows(buttons, page);
 
     rows.push(vec![back_button()]);
 
@@ -1470,7 +1503,7 @@ async fn ask_card_assignee(
         message_id,
         t!("telegram_bot.dialogues.tests.select_assignee").to_string(),
     )
-    .reply_markup(options_keyboard(&options))
+    .reply_markup(options_keyboard(&options, FIRST_PAGE))
     .await?;
 
     Ok(())
@@ -1503,6 +1536,22 @@ async fn choose_card_assignee(
         .await;
     }
 
+    // Состав команды в состоянии не держим — на переходе по страницам спрашиваем трекер
+    // ровно так же, как при первом показе списка
+    if is_pagination(data) {
+        let Some(page) = parse_page(data) else {
+            return Ok(());
+        };
+
+        let Ok(options) =
+            load_tracker_options(&executors, ListTaskTrackerOptionsQuery::Users).await
+        else {
+            return Ok(());
+        };
+
+        return show_page(&bot, chat_id, message_id, options_keyboard(&options, page)).await;
+    }
+
     let Some(responsible_id) = data
         .strip_prefix(OPTION_CALLBACK_PREFIX)
         .and_then(|raw| raw.parse::<u64>().ok())
@@ -1527,13 +1576,15 @@ async fn choose_card_assignee(
         }
     };
 
+    let tags: Vec<String> = options.iter().map(|option| option.name.clone()).collect();
+
     dialogue
         .update(TelegramBotDialogueState::Tests(
             TelegramBotTestsState::SelectCardTag {
                 repository_id,
                 test_failure_id,
                 responsible_id,
-                tags: options.iter().map(|option| option.name.clone()).collect(),
+                tags: tags.clone(),
             },
         ))
         .await?;
@@ -1543,7 +1594,7 @@ async fn choose_card_assignee(
         message_id,
         t!("telegram_bot.dialogues.tests.select_tag").to_string(),
     )
-    .reply_markup(tag_keyboard(&options))
+    .reply_markup(tag_keyboard(&tags, FIRST_PAGE))
     .await?;
 
     Ok(())
@@ -1576,13 +1627,31 @@ async fn choose_card_tag(
         .await;
     }
 
-    // Тег необязателен: карточку можно завести и без него
-    show_loading(&bot, chat_id, message_id).await;
+    if is_pagination(data) {
+        let Some(page) = parse_page(data) else {
+            return Ok(());
+        };
 
-    let tag = data
-        .strip_prefix(TAG_CALLBACK_PREFIX)
-        .filter(|tag| !tag.is_empty())
-        .map(str::to_string);
+        return show_page(&bot, chat_id, message_id, tag_keyboard(&tags, page)).await;
+    }
+
+    let Some(choice) = data.strip_prefix(TAG_CALLBACK_PREFIX) else {
+        return Ok(());
+    };
+
+    // Кнопка несёт номер тега, а не название: в данные кнопки влезает 64 байта.
+    // Пустой номер — кнопка «без тега»: карточку можно завести и без него
+    let tag = match choice.parse::<usize>() {
+        Ok(index) => match tags.get(index) {
+            Some(tag) => Some(tag.clone()),
+            // Список тегов успел смениться — молча вешать чужой тег нельзя
+            None => return Ok(()),
+        },
+        Err(_) if choice.is_empty() => None,
+        Err(_) => return Ok(()),
+    };
+
+    show_loading(&bot, chat_id, message_id).await;
 
     dialogue
         .update(TelegramBotDialogueState::Tests(
@@ -1701,36 +1770,36 @@ async fn edit_with_back(
     Ok(())
 }
 
-/// Людей в трекере много — режем список, иначе клавиатура не влезет в сообщение
-fn options_keyboard(options: &[TaskTrackerOption]) -> InlineKeyboardMarkup {
-    let mut rows: Vec<Vec<InlineKeyboardButton>> = options
+/// Людей в трекере много — показываем страницами: обрезанный список выглядел бы так,
+/// будто нужного человека в трекере нет
+fn options_keyboard(options: &[TaskTrackerOption], page: usize) -> InlineKeyboardMarkup {
+    let buttons = options
         .iter()
-        .take(MAX_OPTION_BUTTONS)
         .map(|option| {
-            vec![InlineKeyboardButton::callback(
+            InlineKeyboardButton::callback(
                 option.name.clone(),
                 format!("{OPTION_CALLBACK_PREFIX}{}", option.id),
-            )]
+            )
         })
         .collect();
+
+    let mut rows = paginated_rows(buttons, page);
 
     rows.push(vec![back_button()]);
 
     InlineKeyboardMarkup::new(rows)
 }
 
-fn tag_keyboard(options: &[TaskTrackerOption]) -> InlineKeyboardMarkup {
-    let mut rows: Vec<Vec<InlineKeyboardButton>> = options
+fn tag_keyboard(tags: &[String], page: usize) -> InlineKeyboardMarkup {
+    let buttons = tags
         .iter()
-        .take(MAX_OPTION_BUTTONS)
         .enumerate()
-        .map(|(index, option)| {
-            vec![InlineKeyboardButton::callback(
-                option.name.clone(),
-                format!("{TAG_CALLBACK_PREFIX}{index}"),
-            )]
+        .map(|(index, tag)| {
+            InlineKeyboardButton::callback(tag.clone(), format!("{TAG_CALLBACK_PREFIX}{index}"))
         })
         .collect();
+
+    let mut rows = paginated_rows(buttons, page);
 
     rows.push(vec![InlineKeyboardButton::callback(
         t!("telegram_bot.dialogues.tests.without_tag").to_string(),
@@ -1820,6 +1889,21 @@ fn back_keyboard() -> InlineKeyboardMarkup {
 }
 
 /// Поход в GitHub или трекер занимает секунды: показываем, что кнопка сработала
+/// Переход по страницам меняет только клавиатуру: текст экрана остаётся прежним,
+/// и перерисовывать его — лишний запрос к мессенджеру
+async fn show_page(
+    bot: &Bot,
+    chat_id: ChatId,
+    message_id: MessageId,
+    keyboard: InlineKeyboardMarkup,
+) -> Result<(), Box<dyn Error + Send + Sync>> {
+    bot.edit_message_reply_markup(chat_id, message_id)
+        .reply_markup(keyboard)
+        .await?;
+
+    Ok(())
+}
+
 async fn show_loading(bot: &Bot, chat_id: ChatId, message_id: MessageId) {
     bot.edit_message_text(
         chat_id,
