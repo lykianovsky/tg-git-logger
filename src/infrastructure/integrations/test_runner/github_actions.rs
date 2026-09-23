@@ -55,6 +55,28 @@ impl GithubActionsTestRunner {
         )
     }
 
+    /// Неуспешный ответ GitHub — в ошибку, по которой видно, что делать: 404 чинится
+    /// настройкой (не та ветка или каталог), 401/403 — доступом, остальное — повтором.
+    /// `path` и `git_ref` нужны только 404, поэтому передаются вызывающим
+    fn status_error(
+        status: reqwest::StatusCode,
+        path: Option<(&str, &str)>,
+    ) -> ListTestBlocksError {
+        if status == reqwest::StatusCode::UNAUTHORIZED || status == reqwest::StatusCode::FORBIDDEN {
+            return ListTestBlocksError::AccessDenied;
+        }
+
+        match (status, path) {
+            (reqwest::StatusCode::NOT_FOUND, Some((path, git_ref))) => {
+                ListTestBlocksError::PathNotFound {
+                    path: path.to_string(),
+                    git_ref: git_ref.to_string(),
+                }
+            }
+            _ => ListTestBlocksError::ProviderError(status.to_string()),
+        }
+    }
+
     async fn get_json(&self, token: &str, url: String) -> Result<Value, ListTestBlocksError> {
         let response = self
             .request(token, reqwest::Method::GET, url)
@@ -63,9 +85,7 @@ impl GithubActionsTestRunner {
             .map_err(|error| ListTestBlocksError::ProviderError(error.to_string()))?;
 
         if !response.status().is_success() {
-            return Err(ListTestBlocksError::ProviderError(
-                response.status().to_string(),
-            ));
+            return Err(Self::status_error(response.status(), None));
         }
 
         response
@@ -532,8 +552,9 @@ impl GithubActionsTestRunner {
             .map_err(|error| ListTestBlocksError::ProviderError(error.to_string()))?;
 
         if !response.status().is_success() {
-            return Err(ListTestBlocksError::ProviderError(
-                response.status().to_string(),
+            return Err(Self::status_error(
+                response.status(),
+                Some((path, &suite.default_ref)),
             ));
         }
 
@@ -556,5 +577,53 @@ impl GithubActionsTestRunner {
                     .map(str::to_string)
             })
             .collect())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn missing_path_names_directory_and_branch() {
+        let error = GithubActionsTestRunner::status_error(
+            reqwest::StatusCode::NOT_FOUND,
+            Some(("e2e/tests", "dev")),
+        );
+
+        assert!(matches!(
+            error,
+            ListTestBlocksError::PathNotFound { path, git_ref }
+                if path == "e2e/tests" && git_ref == "dev"
+        ));
+    }
+
+    #[test]
+    fn missing_path_without_context_stays_provider_error() {
+        let error = GithubActionsTestRunner::status_error(reqwest::StatusCode::NOT_FOUND, None);
+
+        assert!(matches!(error, ListTestBlocksError::ProviderError(_)));
+    }
+
+    #[test]
+    fn unauthorized_and_forbidden_are_access_denied() {
+        for status in [
+            reqwest::StatusCode::UNAUTHORIZED,
+            reqwest::StatusCode::FORBIDDEN,
+        ] {
+            let error = GithubActionsTestRunner::status_error(status, Some(("e2e/tests", "dev")));
+
+            assert!(matches!(error, ListTestBlocksError::AccessDenied));
+        }
+    }
+
+    #[test]
+    fn server_error_keeps_status_for_retry() {
+        let error = GithubActionsTestRunner::status_error(
+            reqwest::StatusCode::INTERNAL_SERVER_ERROR,
+            Some(("e2e/tests", "dev")),
+        );
+
+        assert!(matches!(error, ListTestBlocksError::ProviderError(_)));
     }
 }

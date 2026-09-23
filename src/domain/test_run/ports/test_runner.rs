@@ -23,6 +23,15 @@ pub enum FetchTestRunError {
 
 #[derive(Debug, Error)]
 pub enum ListTestBlocksError {
+    /// В указанной ветке нет такого пути: либо каталога тестов, либо самой ветки.
+    /// Отделено от прочих сбоев CI, потому что чинится настройкой, а не повтором запроса
+    #[error("Path {path} not found in {git_ref}")]
+    PathNotFound { path: String, git_ref: String },
+
+    /// Токен не даёт доступа к репозиторию: не выдан, протух или не той организации
+    #[error("Access to repository denied")]
+    AccessDenied,
+
     #[error("CI error: {0}")]
     ProviderError(String),
 }

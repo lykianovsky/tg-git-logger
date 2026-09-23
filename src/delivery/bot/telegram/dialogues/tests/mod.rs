@@ -517,12 +517,37 @@ async fn show_blocks(
         .await
     {
         Ok(response) => response.blocks,
+        // Причины чинятся по-разному, поэтому и называются по-разному: ветка и каталог —
+        // настройкой тестов, доступ — привязкой аккаунта, остальное — повтором
         Err(ListTestBlocksError::NoVersionControlAccount) => {
             return edit_with_back(
                 bot,
                 chat_id,
                 message_id,
                 t!("telegram_bot.dialogues.tests.no_github_account").to_string(),
+            )
+            .await;
+        }
+        Err(ListTestBlocksError::TestsPathNotFound { path, git_ref }) => {
+            return edit_with_back(
+                bot,
+                chat_id,
+                message_id,
+                t!(
+                    "telegram_bot.dialogues.tests.tests_path_not_found",
+                    path = path,
+                    git_ref = git_ref
+                )
+                .to_string(),
+            )
+            .await;
+        }
+        Err(ListTestBlocksError::AccessDenied) => {
+            return edit_with_back(
+                bot,
+                chat_id,
+                message_id,
+                t!("telegram_bot.dialogues.tests.access_denied").to_string(),
             )
             .await;
         }
@@ -1363,6 +1388,9 @@ async fn show_ci_options_error(
     let text = match error {
         ListCiOptionsError::NoVersionControlAccount => {
             t!("telegram_bot.dialogues.tests.no_github_account").to_string()
+        }
+        ListCiOptionsError::AccessDenied => {
+            t!("telegram_bot.dialogues.tests.access_denied").to_string()
         }
         error => {
             tracing::error!(%error, "Failed to load CI options");

@@ -16,6 +16,10 @@ pub enum ListCiOptionsError {
 
     #[error("CI error: {0}")]
     ProviderError(String),
+
+    /// Токен пользователя не даёт доступа к репозиторию
+    #[error("Access to repository denied")]
+    AccessDenied,
 }
 
 impl From<FindRepositoryByIdError> for ListCiOptionsError {
@@ -30,6 +34,11 @@ impl From<FindRepositoryByIdError> for ListCiOptionsError {
 impl From<ProviderListError> for ListCiOptionsError {
     fn from(error: ProviderListError) -> Self {
         match error {
+            ProviderListError::AccessDenied => Self::AccessDenied,
+            // Пути здесь не запрашиваются: списки процессов и веток отдаёт сам репозиторий
+            ProviderListError::PathNotFound { path, git_ref } => {
+                Self::ProviderError(format!("{path} not found in {git_ref}"))
+            }
             ProviderListError::ProviderError(message) => Self::ProviderError(message),
         }
     }

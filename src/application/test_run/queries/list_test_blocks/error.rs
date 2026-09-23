@@ -14,6 +14,14 @@ pub enum ListTestBlocksError {
     #[error("CI error: {0}")]
     ProviderError(String),
 
+    /// Каталога тестов нет в настроенной ветке — показываем, где искали
+    #[error("Tests directory {path} not found in {git_ref}")]
+    TestsPathNotFound { path: String, git_ref: String },
+
+    /// Токен пользователя не даёт доступа к репозиторию
+    #[error("Access to repository denied")]
+    AccessDenied,
+
     #[error("No linked version control account")]
     NoVersionControlAccount,
 }
@@ -39,6 +47,10 @@ impl From<FindTestSuiteError> for ListTestBlocksError {
 impl From<ProviderListError> for ListTestBlocksError {
     fn from(error: ProviderListError) -> Self {
         match error {
+            ProviderListError::PathNotFound { path, git_ref } => {
+                Self::TestsPathNotFound { path, git_ref }
+            }
+            ProviderListError::AccessDenied => Self::AccessDenied,
             ProviderListError::ProviderError(message) => Self::ProviderError(message),
         }
     }
