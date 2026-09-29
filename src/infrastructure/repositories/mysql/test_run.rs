@@ -252,20 +252,27 @@ impl TestRunRepository for MySQLTestRunRepository {
         Ok(models.into_iter().filter_map(Self::from_mysql).collect())
     }
 
-    async fn mark_started(
+    async fn mark_active(
         &self,
         id: TestRunId,
         provider_run_id: u64,
         run_url: String,
+        status: TestRunStatus,
+        started_at: Option<chrono::DateTime<chrono::Utc>>,
     ) -> Result<(), UpdateTestRunError> {
-        let model = test_runs::ActiveModel {
+        let mut model = test_runs::ActiveModel {
             id: Set(id.0),
             provider_run_id: Set(Some(provider_run_id as i64)),
             run_url: Set(Some(run_url)),
-            status: Set(TestRunStatus::Running.as_str().to_string()),
-            started_at: Set(Some(chrono::Utc::now())),
+            status: Set(status.as_str().to_string()),
             ..Default::default()
         };
+
+        // Начало берём из CI: планировщик зовёт метод каждый тик, и «сейчас» обнуляло бы таймер.
+        // В очереди прогон ещё не начался — время не трогаем
+        if status == TestRunStatus::Running {
+            model.started_at = Set(Some(started_at.unwrap_or_else(chrono::Utc::now)));
+        }
 
         model
             .update(self.db.as_ref())

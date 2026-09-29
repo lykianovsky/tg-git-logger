@@ -3,6 +3,7 @@ use crate::domain::test_run::entities::test_failure::{NewTestFailure, TestFailur
 use crate::domain::test_run::entities::test_run::{NewTestRun, TestRun, TestRunOutcome};
 use crate::domain::test_run::value_objects::run_tag::RunTag;
 use crate::domain::test_run::value_objects::test_run_id::TestRunId;
+use crate::domain::test_run::value_objects::test_run_status::TestRunStatus;
 use crate::domain::user::value_objects::social_chat_id::SocialChatId;
 use thiserror::Error;
 
@@ -73,11 +74,14 @@ pub trait TestRunRepository: Send + Sync {
     /// Все идущие прогоны: планировщик держит их карточки в актуальном состоянии
     async fn find_all_active(&self, limit: u64) -> Result<Vec<TestRun>, FindTestRunError>;
 
-    async fn mark_started(
+    /// Прогон найден в CI и ещё идёт: в очереди или уже выполняется
+    async fn mark_active(
         &self,
         id: TestRunId,
         provider_run_id: u64,
         run_url: String,
+        status: TestRunStatus,
+        started_at: Option<chrono::DateTime<chrono::Utc>>,
     ) -> Result<(), UpdateTestRunError>;
 
     async fn save_outcome(
