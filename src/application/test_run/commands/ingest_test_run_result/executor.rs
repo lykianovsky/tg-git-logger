@@ -117,10 +117,13 @@ impl CommandExecutor for IngestTestRunResultExecutor {
         if outcome.status.is_active() {
             if let Some(provider_run_id) = outcome.provider_run_id {
                 self.test_run_repo
-                    .mark_started(
+                    .mark_active(
                         run.id,
                         provider_run_id,
                         outcome.run_url.clone().unwrap_or_default(),
+                        outcome.status,
+                        // Уже идущему прогону начало не переписываем
+                        run.started_at.or(outcome.started_at),
                     )
                     .await?;
             }

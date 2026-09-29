@@ -8,6 +8,7 @@ use crate::domain::user::value_objects::social_type::SocialType;
 use crate::utils::builder::message::MessageBuilder;
 use teloxide::prelude::*;
 use teloxide::types::{ChatId, InlineKeyboardButton, InlineKeyboardMarkup, MessageId, ParseMode};
+use teloxide::{ApiError, RequestError};
 
 pub struct TelegramNotificationClient {
     bot: Bot,
@@ -116,16 +117,21 @@ impl NotificationService for TelegramNotificationClient {
         request.parse_mode = Some(ParseMode::Html);
         request.reply_markup = markup;
 
-        request.await.map_err(|e| {
-            tracing::error!(
-                error = %e,
-                chat_id = chat_id.0,
-                message_id = message_id.0,
-                "Failed to delete message Telegram notification"
-            );
-            NotificationServiceEditMessageError::Transport(e.to_string())
-        })?;
-
-        Ok(())
+        match request.await {
+            Ok(_) => Ok(()),
+            // Текст не изменился — сообщение и так актуально, это не сбой
+            Err(RequestError::Api(ApiError::MessageNotModified)) => Ok(()),
+            Err(e) => {
+                tracing::error!(
+                    error = %e,
+                    chat_id = chat_id.0,
+                    message_id = message_id.0,
+                    "Failed to edit message Telegram notification"
+                );
+                Err(NotificationServiceEditMessageError::Transport(
+                    e.to_string(),
+                ))
+            }
+        }
     }
 }
